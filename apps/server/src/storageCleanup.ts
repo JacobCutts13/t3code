@@ -820,7 +820,7 @@ const make = Effect.gen(function* () {
   const nestedLinkedWorktrees = Effect.fn("StorageCleanup.nestedLinkedWorktrees")(function* (
     cwd: string,
   ) {
-    const found: Array<{ name: string; path: string; source: string }> = [];
+    const found: Array<{ path: string; source: string }> = [];
     for (const name of yield* fs.readDirectory(cwd)) {
       const child = path.join(cwd, name);
       // A linked worktree and a submodule both have a `.git` file, so ask Git which one this is:
@@ -838,7 +838,7 @@ const make = Effect.gen(function* () {
       });
       const [gitDir, commonDir] = dirs.stdout.trim().split("\n");
       if (dirs.exitCode === 0 && commonDir !== undefined && gitDir !== commonDir)
-        found.push({ name, path: child, source: path.dirname(commonDir) });
+        found.push({ path: child, source: path.dirname(commonDir) });
     }
     return found;
   });
@@ -1256,7 +1256,8 @@ const make = Effect.gen(function* () {
             const nested = yield* nestedLinkedWorktrees(worktreePath);
             for (const repo of nested) {
               const changes = yield* localChangesReason(repo.path, settings);
-              if (changes !== null) return keep(`nested repo ${repo.name} ${changes}`);
+              if (changes !== null)
+                return keep(`nested repo ${path.basename(repo.path)} ${changes}`);
             }
             for (const repo of nested) yield* removeNestedWorktree(repo);
             // Clean only untracked files. Ordinary worktrees retain Git's final tracked-edit check.
