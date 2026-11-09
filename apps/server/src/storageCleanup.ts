@@ -824,20 +824,17 @@ const make = Effect.gen(function* () {
     for (const name of yield* fs.readDirectory(cwd)) {
       const child = path.join(cwd, name);
       // A linked worktree and a submodule both have a `.git` file, so ask Git which one this is:
-      // only a linked worktree has a git dir different from its common dir.
-      const hasGitFile = yield* fs.stat(path.join(child, ".git")).pipe(
-        Effect.map((info) => info.type === "File"),
-        Effect.orElseSucceed(() => false),
-      );
-      if (!hasGitFile) continue;
+      // only a linked worktree has a git dir different from its common dir. Errors propagate and
+      // keep the worktree: a folder Git cannot read must not be skipped and then deleted.
+      const gitPath = path.join(child, ".git");
+      if (!(yield* fs.exists(gitPath)) || (yield* fs.stat(gitPath)).type !== "File") continue;
       const dirs = yield* git.execute({
         operation: "StorageCleanup.nestedLinkedWorktrees",
         cwd: child,
         args: ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
-        allowNonZeroExit: true,
       });
       const [gitDir, commonDir] = dirs.stdout.trim().split("\n");
-      if (dirs.exitCode === 0 && commonDir !== undefined && gitDir !== commonDir)
+      if (commonDir !== undefined && gitDir !== commonDir)
         found.push({ path: child, source: commonDir });
     }
     return found;
@@ -875,6 +872,10 @@ const make = Effect.gen(function* () {
       force: false,
       execute: git.execute,
       run: (args) => cleanupGit(nested.source, [...args], "git worktree remove"),
+    });
+    yield* Effect.logInfo("storage cleanup removed nested worktree", {
+      path: nested.path,
+      source: nested.source,
     });
   });
 
