@@ -838,9 +838,28 @@ const make = Effect.gen(function* () {
       });
       const [gitDir, commonDir] = dirs.stdout.trim().split("\n");
       if (dirs.exitCode === 0 && commonDir !== undefined && gitDir !== commonDir)
-        found.push({ path: child, source: path.dirname(commonDir) });
+        found.push({ path: child, source: commonDir });
     }
     return found;
+  });
+
+  // Why a nested worktree must stay, or null when it is safe to remove. Removing a worktree also
+  // drops its HEAD, so commits that only a detached HEAD points at would be lost with it.
+  const nestedKeepReason = Effect.fn("StorageCleanup.nestedKeepReason")(function* (
+    repo: { readonly path: string },
+    rules: WorktreeCleanupRules,
+  ) {
+    const name = path.basename(repo.path);
+    const changes = yield* localChangesReason(repo.path, rules);
+    if (changes !== null) return `nested repo ${name} ${changes}`;
+    const unsaved = yield* git.execute({
+      operation: "StorageCleanup.nestedKeepReason",
+      cwd: repo.path,
+      args: ["rev-list", "--max-count=1", "HEAD", "--not", "--branches", "--remotes", "--tags"],
+    });
+    return unsaved.stdout.trim() === ""
+      ? null
+      : `nested repo ${name} has commits not on any branch`;
   });
 
   // Removes only this worktree's folder and its registration in the source clone. The clone, its
@@ -1255,9 +1274,8 @@ const make = Effect.gen(function* () {
             // below would delete their folders without unregistering them.
             const nested = yield* nestedLinkedWorktrees(worktreePath);
             for (const repo of nested) {
-              const changes = yield* localChangesReason(repo.path, settings);
-              if (changes !== null)
-                return keep(`nested repo ${path.basename(repo.path)} ${changes}`);
+              const reason = yield* nestedKeepReason(repo, settings);
+              if (reason !== null) return keep(reason);
             }
             for (const repo of nested) yield* removeNestedWorktree(repo);
             // Clean only untracked files. Ordinary worktrees retain Git's final tracked-edit check.
