@@ -823,6 +823,12 @@ const make = Effect.gen(function* () {
     const found: Array<{ path: string; source: string }> = [];
     for (const name of yield* fs.readDirectory(cwd)) {
       const child = path.join(cwd, name);
+      // Plain files and dangling links hold no worktree, and probing under a file fails with ENOTDIR.
+      const isFolder = yield* fs.stat(child).pipe(
+        Effect.map((info) => info.type === "Directory"),
+        Effect.orElseSucceed(() => false),
+      );
+      if (!isFolder) continue;
       // A linked worktree and a submodule both have a `.git` file, so ask Git which one this is:
       // only a linked worktree has a git dir different from its common dir. Errors propagate and
       // keep the worktree: a folder Git cannot read must not be skipped and then deleted.
