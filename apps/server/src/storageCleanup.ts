@@ -816,35 +816,44 @@ const make = Effect.gen(function* () {
 
   // Linked worktrees of other repositories placed directly inside a thread's worktree, as a
   // multi-repo project does. Git in the thread's worktree cannot see into them, so they are
-  // checked and removed here, from the repository that owns each one.
+  // checked and removed here, from the clone each one was created from.
   const nestedWorktrees = Effect.fn("StorageCleanup.nestedWorktrees")(function* (cwd: string) {
-    const found: Array<{ name: string; path: string }> = [];
+    const found: Array<{ name: string; path: string; source: string }> = [];
     for (const name of yield* fs.readDirectory(cwd)) {
       const child = path.join(cwd, name);
-      const pointer = yield* fs.readFileString(path.join(child, ".git")).pipe(Effect.option);
-      if (Option.isSome(pointer) && /[\\/]worktrees[\\/]/.test(pointer.value))
-        found.push({ name, path: child });
+      // A linked worktree and a submodule both have a `.git` file, so ask Git which one this is:
+      // only a linked worktree has a git dir different from its common dir.
+      const hasGitFile = yield* fs.stat(path.join(child, ".git")).pipe(
+        Effect.map((info) => info.type === "File"),
+        Effect.orElseSucceed(() => false),
+      );
+      if (!hasGitFile) continue;
+      const dirs = yield* git.execute({
+        operation: "StorageCleanup.nestedWorktrees",
+        cwd: child,
+        args: ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
+        allowNonZeroExit: true,
+      });
+      const [gitDir, commonDir] = dirs.stdout.trim().split("\n");
+      if (dirs.exitCode === 0 && commonDir !== undefined && gitDir !== commonDir)
+        found.push({ name, path: child, source: path.dirname(commonDir) });
     }
     return found;
   });
 
+  // Removes only this worktree's folder and its registration in the source clone. The clone, its
+  // branches and its other worktrees stay, and `force: false` refuses to remove uncommitted work.
   const removeNestedWorktree = Effect.fn("StorageCleanup.removeNestedWorktree")(function* (nested: {
     readonly path: string;
+    readonly source: string;
   }) {
-    const common = yield* git.execute({
-      operation: "StorageCleanup.nestedWorktrees",
-      cwd: nested.path,
-      args: ["rev-parse", "--path-format=absolute", "--git-common-dir"],
-      maxOutputBytes: 64 * 1024,
-    });
-    const owner = path.dirname(common.stdout.trim());
     yield* removeLinkedWorktree({
       operation: "StorageCleanup.cleanupGit",
-      cwd: owner,
+      cwd: nested.source,
       worktreePath: nested.path,
       force: false,
       execute: git.execute,
-      run: (args) => cleanupGit(owner, [...args], "git worktree remove"),
+      run: (args) => cleanupGit(nested.source, [...args], "git worktree remove"),
     });
   });
 
