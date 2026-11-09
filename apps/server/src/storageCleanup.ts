@@ -817,7 +817,9 @@ const make = Effect.gen(function* () {
   // Linked worktrees of other repositories placed directly inside a thread's worktree, as a
   // multi-repo project does. Git in the thread's worktree cannot see into them, so they are
   // checked and removed here, from the clone each one was created from.
-  const nestedWorktrees = Effect.fn("StorageCleanup.nestedWorktrees")(function* (cwd: string) {
+  const nestedLinkedWorktrees = Effect.fn("StorageCleanup.nestedLinkedWorktrees")(function* (
+    cwd: string,
+  ) {
     const found: Array<{ name: string; path: string; source: string }> = [];
     for (const name of yield* fs.readDirectory(cwd)) {
       const child = path.join(cwd, name);
@@ -829,7 +831,7 @@ const make = Effect.gen(function* () {
       );
       if (!hasGitFile) continue;
       const dirs = yield* git.execute({
-        operation: "StorageCleanup.nestedWorktrees",
+        operation: "StorageCleanup.nestedLinkedWorktrees",
         cwd: child,
         args: ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
         allowNonZeroExit: true,
@@ -1251,7 +1253,7 @@ const make = Effect.gen(function* () {
               return keep("settings changed since check");
             // Nested repositories go first, and only when all of them are clean: the clean step
             // below would delete their folders without unregistering them.
-            const nested = yield* nestedWorktrees(worktreePath);
+            const nested = yield* nestedLinkedWorktrees(worktreePath);
             for (const repo of nested) {
               const changes = yield* localChangesReason(repo.path, settings);
               if (changes !== null) return keep(`nested repo ${repo.name} ${changes}`);
