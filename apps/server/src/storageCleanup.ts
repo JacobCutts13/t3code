@@ -814,6 +814,40 @@ const make = Effect.gen(function* () {
       });
   });
 
+  // Linked worktrees of other repositories placed directly inside a thread's worktree, as a
+  // multi-repo project does. Git in the thread's worktree cannot see into them, so they are
+  // checked and removed here, from the repository that owns each one.
+  const nestedWorktrees = Effect.fn("StorageCleanup.nestedWorktrees")(function* (cwd: string) {
+    const found: Array<{ name: string; path: string }> = [];
+    for (const name of yield* fs.readDirectory(cwd)) {
+      const child = path.join(cwd, name);
+      const pointer = yield* fs.readFileString(path.join(child, ".git")).pipe(Effect.option);
+      if (Option.isSome(pointer) && /[\\/]worktrees[\\/]/.test(pointer.value))
+        found.push({ name, path: child });
+    }
+    return found;
+  });
+
+  const removeNestedWorktree = Effect.fn("StorageCleanup.removeNestedWorktree")(function* (nested: {
+    readonly path: string;
+  }) {
+    const common = yield* git.execute({
+      operation: "StorageCleanup.nestedWorktrees",
+      cwd: nested.path,
+      args: ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      maxOutputBytes: 64 * 1024,
+    });
+    const owner = path.dirname(common.stdout.trim());
+    yield* removeLinkedWorktree({
+      operation: "StorageCleanup.cleanupGit",
+      cwd: owner,
+      worktreePath: nested.path,
+      force: false,
+      execute: git.execute,
+      run: (args) => cleanupGit(owner, [...args], "git worktree remove"),
+    });
+  });
+
   const cleanWorktrees = Effect.fn("StorageCleanup.cleanWorktrees")(function* (
     serverSettings: ServerSettings,
     now: number,
@@ -1206,6 +1240,14 @@ const make = Effect.gen(function* () {
               )
             )
               return keep("settings changed since check");
+            // Nested repositories go first, and only when all of them are clean: the clean step
+            // below would delete their folders without unregistering them.
+            const nested = yield* nestedWorktrees(worktreePath);
+            for (const repo of nested) {
+              const changes = yield* localChangesReason(repo.path, settings);
+              if (changes !== null) return keep(`nested repo ${repo.name} ${changes}`);
+            }
+            for (const repo of nested) yield* removeNestedWorktree(repo);
             // Clean only untracked files. Ordinary worktrees retain Git's final tracked-edit check.
             if (settings.worktreeKeepWhen === "tracked-changes")
               yield* cleanupGit(worktreePath, ["clean", "-ffdx"], "git clean");
