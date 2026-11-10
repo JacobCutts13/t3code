@@ -5186,6 +5186,10 @@ describe("AcpAdapterV2", () => {
         runtimeInputs[1]?.processEnvironment?.T3CODE_THREAD_ID,
         "thread-acp-rollback-session-target",
       );
+      assert.match(
+        runtimeInputs[1]?.processEnvironment?.AGENT_SELF_INPUT ?? "",
+        /'thread' 'send' "\$T3CODE_THREAD_ID" -$/,
+      );
       const replacementMcpServer = runtimeInputs[1]?.mcpServers[0];
       const replacementMcpEnvironment =
         replacementMcpServer !== undefined &&

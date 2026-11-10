@@ -37,6 +37,7 @@ import {
 import { AgentScope, AgentScopeThreadId } from "@t3tools/shared/AgentScope";
 import { HTML_RENDER_TOOL_NAME } from "@t3tools/shared/htmlRender";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
+import { AGENT_SELF_INPUT_ENV, agentSelfInputCommand } from "@t3tools/shared/agentSelfInput";
 import { type SelfInvocation, selfInvocationArgs } from "@t3tools/shared/nodeRuntime";
 import { resolveT3McpToolId } from "@t3tools/shared/t3McpToolPresentation";
 import {
@@ -876,6 +877,8 @@ function acpMcpContext(
       // the same variable (PortScanner.AGENT_THREAD_ENV; a string literal here
       // because this package cannot reach apps/server).
       T3CODE_THREAD_ID: session.threadId,
+      // How a skill gives the agent input in its own thread, such as `/goal`.
+      [AGENT_SELF_INPUT_ENV]: agentSelfInputCommand(self),
       T3_ACP_MCP_ENDPOINT: session.endpoint,
       T3_ACP_MCP_AUTHORIZATION: session.authorizationHeader,
       T3_ACP_MCP_NODE: self.command,

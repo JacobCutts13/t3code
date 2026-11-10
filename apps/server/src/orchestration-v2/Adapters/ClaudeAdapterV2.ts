@@ -82,7 +82,9 @@ import {
   mcpAppToolResourceUri,
 } from "@t3tools/shared/mcpApp";
 import { AgentScope } from "@t3tools/shared/AgentScope";
+import { AGENT_SELF_INPUT_ENV, agentSelfInputCommand } from "@t3tools/shared/agentSelfInput";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { resolveSelfInvocation } from "@t3tools/shared/nodeRuntime";
 import { applyClaudePromptEffortPrefix } from "@t3tools/shared/model";
 import {
   CLAUDE_RESUME_COMPACTION_COMPACT_ANSWER,
@@ -1166,6 +1168,7 @@ export const layerQueryRunner: Layer.Layer<
     const runFork = Effect.runForkWith(yield* Effect.context<never>());
     const hostEnvironment = yield* HostProcess.Environment;
     const portDiscovery = yield* PortScanner.PortDiscovery;
+    const selfInput = agentSelfInputCommand(yield* resolveSelfInvocation());
 
     return ClaudeAgentSdkQueryRunner.of({
       allocateSessionId: random.uuidV4(),
@@ -1194,6 +1197,8 @@ export const layerQueryRunner: Layer.Layer<
             env: {
               ...(sdkOptions.env ?? hostEnvironment),
               [PortScanner.AGENT_THREAD_ENV]: input.threadId,
+              // How a skill gives the agent input in its own thread, such as `/goal`.
+              [AGENT_SELF_INPUT_ENV]: selfInput,
             },
           };
           // The SDK can prepend a scope wrapper to native binaries; script entries run through node.

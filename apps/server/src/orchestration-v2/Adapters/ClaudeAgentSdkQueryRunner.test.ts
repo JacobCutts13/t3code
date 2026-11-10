@@ -680,7 +680,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("Claude CLI pro
       const cli = fakeClaudeCli(
         [
           'dir=$(dirname "$0")',
-          `printf '%s' "$${PortScanner.AGENT_THREAD_ENV}" > "$dir/thread"`,
+          `printf '%s\\n%s' "$${PortScanner.AGENT_THREAD_ENV}" "$AGENT_SELF_INPUT" > "$dir/thread"`,
           "cat > /dev/null",
         ].join("\n"),
       );
@@ -697,7 +697,10 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("Claude CLI pro
       });
 
       const session = yield* openFakeCli(cli);
-      assert.equal(yield* Effect.promise(() => threadRead), "thread-fake-cli");
+      const [thread, selfInput] = (yield* Effect.promise(() => threadRead)).split("\n");
+      assert.equal(thread, "thread-fake-cli");
+      // The agent's own way to give its thread input, so a skill can set `/goal` anywhere.
+      assert.match(selfInput ?? "", /'thread' 'send' "\$T3CODE_THREAD_ID" -$/);
       assert.equal(runningAgents, 1);
       yield* session.close;
       yield* Effect.promise(() => agentReleased);

@@ -339,6 +339,10 @@
       "types": "./src/chatList.ts",
       "import": "./src/chatList.ts"
     },
+    "./agentSelfInput": {
+      "types": "./src/agentSelfInput.ts",
+      "import": "./src/agentSelfInput.ts"
+    },
     "./nodeRuntime": {
       "types": "./src/nodeRuntime.ts",
       "import": "./src/nodeRuntime.ts"
