@@ -89,12 +89,13 @@ export function LinearSettingsSection({
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              {viewer.data !== null
-                ? `Connected as ${viewer.data.name} in ${viewer.data.organization}.`
-                : viewer.error !== null
-                  ? isSaved
-                    ? viewer.error
-                    : "Not connected."
+              {/* A refresh that fails keeps the last data; the error is the current answer. */}
+              {viewer.error !== null
+                ? isSaved
+                  ? viewer.error
+                  : "Not connected."
+                : viewer.data !== null
+                  ? `Connected as ${viewer.data.name} in ${viewer.data.organization}.`
                   : "Checking the connection…"}
             </p>
             <div className="flex shrink-0 gap-2">

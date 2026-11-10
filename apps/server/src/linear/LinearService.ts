@@ -267,7 +267,7 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
     return yield* fail(
       operation,
       "not-connected",
-      "Linear isn't connected. Add an API key in Settings → Source control.",
+      "Not connected. Add a Linear API key in Settings → Source control.",
     );
   });
 
