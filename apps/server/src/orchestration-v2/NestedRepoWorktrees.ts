@@ -34,6 +34,34 @@ export interface CreatedNestedWorktree {
 const detailOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 
 /**
+ * Keeps the nested checkouts out of the container's `git status`. Without this they read as untracked
+ * files, and storage cleanup keeps every thread as having uncommitted work. The exclude file is shared
+ * by all worktrees of the container, so the lines are added once and left alone afterwards.
+ */
+const excludeNestedFolders = Effect.fn("NestedRepoWorktrees.exclude")(function* (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  worktreePath: string,
+  names: ReadonlyArray<string>,
+) {
+  // A worktree's `.git` is a file: "gitdir: <common>/.git/worktrees/<id>", whose `commondir` points back.
+  const pointer = yield* fs.readFileString(path.join(worktreePath, ".git"));
+  const gitDir = path.resolve(worktreePath, pointer.trim().replace(/^gitdir:\s*/, ""));
+  const commonDir = path.resolve(
+    gitDir,
+    (yield* fs.readFileString(path.join(gitDir, "commondir"))).trim(),
+  );
+  const excludePath = path.join(commonDir, "info", "exclude");
+  const existing = yield* fs.readFileString(excludePath).pipe(Effect.orElseSucceed(() => ""));
+  const have = new Set(existing.split("\n").map((line) => line.trim()));
+  const missing = names.map((name) => `/${name}/`).filter((line) => !have.has(line));
+  if (missing.length === 0) return;
+  yield* fs.makeDirectory(path.dirname(excludePath), { recursive: true });
+  const separator = existing === "" || existing.endsWith("\n") ? "" : "\n";
+  yield* fs.writeFileString(excludePath, `${existing}${separator}${missing.join("\n")}\n`);
+});
+
+/**
  * Adds one worktree per repo under `worktreePath/<name>` on `branch`, each started from its base.
  * Sequential and all-or-nothing: the caller removes everything reported through `onCreated` on failure.
  */
@@ -51,6 +79,18 @@ export const addNestedRepoWorktrees = Effect.fn("NestedRepoWorktrees.add")(funct
   readonly onRepo?: (name: string) => Effect.Effect<void>;
 }) {
   const { git, fs, path, home } = input;
+
+  // Best effort: the thread still works without it, it only reads as having uncommitted changes.
+  yield* excludeNestedFolders(
+    fs,
+    path,
+    input.worktreePath,
+    input.repos.map((repo) => repo.name),
+  ).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning("Could not exclude nested repo folders from the container", { cause }),
+    ),
+  );
 
   for (const repo of input.repos) {
     const fail = (cause: unknown) =>
