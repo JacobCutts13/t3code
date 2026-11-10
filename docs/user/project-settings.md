@@ -217,9 +217,8 @@ repositories whose checkout settings changed.
 ## Storage cleanup
 
 Open **Settings → Worktrees → Cleanup** to enable automatic cleanup on one machine or all connected
-environments. Policies are off by default, except **Delete worktrees with deleted threads**, which
-is on. They run on the server at startup, when changed, and hourly. Offline machines keep their
-existing policies.
+environments. Policies are off by default and run on the server at startup, when changed, and
+hourly. Offline machines keep their existing policies.
 
 Select a project to set **Automatic worktree cleanup** to **Inherit**, **Off**, or **Custom**.
 Inherit follows each machine's rules; Off keeps that project's worktrees until you remove them
