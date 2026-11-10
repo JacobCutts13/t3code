@@ -1,12 +1,17 @@
-import type {
-  EnvironmentId,
-  IssueInvolvement,
-  IssueState,
-  IssueSummary,
-  ModelSelection,
+import { Link } from "@tanstack/react-router";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import {
+  type EnvironmentId,
+  type IssueInvolvement,
+  type IssueState,
+  type IssueSummary,
+  type LinearIssueSummary,
+  type ModelSelection,
+  type ThreadId,
 } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { CircleDotIcon, ExternalLinkIcon, PlayIcon, RefreshCwIcon } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   isAtomCommandInterrupted,
@@ -14,9 +19,12 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 
 import { useDispatchIssue } from "~/hooks/useDispatchIssue";
+import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
+import { useProjects, useThreadShells } from "~/state/entities";
 import { usePrimaryEnvironmentId } from "~/state/environments";
+import { buildThreadRouteParams } from "~/threadRoutes";
 import { issueEnvironment } from "~/state/issues";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
@@ -24,10 +32,12 @@ import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 import ChatMarkdown from "../ChatMarkdown";
 import { RelativeTime } from "../RelativeTime";
 import { IssueModelPicker } from "./IssueModelPicker";
-import { mergeIssuePages } from "./issueList.logic";
+import { dispatchedThreadId, issueBranchName, linearBranchName } from "./issueDispatch.logic";
+import { type IssueEntry, mergeIssuePages, mergeIssueSources } from "./issueList.logic";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SidebarInset } from "../ui/sidebar";
 import { Spinner } from "../ui/spinner";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
@@ -44,8 +54,18 @@ const STATES: ReadonlyArray<{ readonly value: IssueState; readonly label: string
   { value: "closed", label: "Closed" },
 ];
 
-const issueKey = (issue: Pick<IssueSummary, "host" | "repository" | "number">) =>
-  `${issue.host}/${issue.repository}#${issue.number}`;
+type IssueSource = "all" | "github" | "linear";
+
+const SOURCES: ReadonlyArray<{ readonly value: IssueSource; readonly label: string }> = [
+  { value: "all", label: "All" },
+  { value: "github", label: "GitHub" },
+  { value: "linear", label: "Linear" },
+];
+
+const PRIORITY_LABELS = ["", "Urgent", "High", "Medium", "Low"] as const;
+
+// Per viewer: the project each Linear team's issues were last dispatched into.
+const LinearProjectsSchema = Schema.Record(Schema.String, Schema.String);
 
 function FilterGroup<T extends string>(props: {
   readonly label: string;
@@ -76,14 +96,17 @@ function FilterGroup<T extends string>(props: {
 }
 
 function IssueRow(props: {
-  readonly issue: IssueSummary;
+  readonly title: string;
+  readonly meta: ReactNode;
   readonly selected: boolean;
   readonly dispatching: boolean;
-  readonly hasProject: boolean;
+  /** Why Dispatch is unavailable, or null when it can run. */
+  readonly blocked: string | null;
+  readonly environmentId: EnvironmentId;
+  readonly dispatchedThreadId: ThreadId | null;
   readonly onSelect: () => void;
   readonly onDispatch: () => void;
 }) {
-  const { issue } = props;
   return (
     <li
       className={cn(
@@ -97,35 +120,171 @@ function IssueRow(props: {
         className="flex min-w-0 flex-1 flex-col gap-1 text-start outline-none focus-visible:underline"
         onClick={props.onSelect}
       >
-        <span className="truncate text-sm font-medium">{issue.title}</span>
+        <span className="truncate text-sm font-medium">{props.title}</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-xs">
-          <span>
-            {issue.repository}#{issue.number}
-          </span>
-          <RelativeTime timestamp={issue.updatedAt} />
-          {issue.labels.slice(0, 3).map((label) => (
-            <Badge key={label.name} variant="outline" size="sm">
-              {label.name}
-            </Badge>
-          ))}
+          {props.meta}
         </span>
       </button>
+      {props.dispatchedThreadId === null ? null : (
+        <Badge
+          variant="info"
+          size="sm"
+          render={
+            <Link
+              to="/$environmentId/$threadId"
+              params={buildThreadRouteParams(
+                scopeThreadRef(props.environmentId, props.dispatchedThreadId),
+              )}
+            />
+          }
+          title="A thread is already working on this issue's branch"
+        >
+          Dispatched
+        </Badge>
+      )}
       <Button
         type="button"
         size="compact"
         variant="outline"
-        disabled={props.dispatching || !props.hasProject}
-        title={
-          props.hasProject
-            ? "Start an agent on this issue"
-            : `Add ${issue.repository} as a project first`
-        }
+        disabled={props.dispatching || props.blocked !== null}
+        title={props.blocked ?? "Start an agent on this issue"}
         onClick={props.onDispatch}
       >
         {props.dispatching ? <Spinner /> : <PlayIcon />}
         Dispatch
       </Button>
     </li>
+  );
+}
+
+function GitHubIssueMeta(props: { readonly issue: IssueSummary }) {
+  const { issue } = props;
+  return (
+    <>
+      <span>
+        {issue.repository}#{issue.number}
+      </span>
+      <RelativeTime timestamp={issue.updatedAt} />
+      {issue.labels.slice(0, 3).map((label) => (
+        <Badge key={label.name} variant="outline" size="sm">
+          {label.name}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
+function LinearStateLabel(props: { readonly state: LinearIssueSummary["state"] }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        aria-hidden
+        className="size-2 rounded-full"
+        style={{ backgroundColor: props.state.color }}
+      />
+      {props.state.name}
+    </span>
+  );
+}
+
+function LinearIssueMeta(props: { readonly issue: LinearIssueSummary }) {
+  const { issue } = props;
+  const priority = PRIORITY_LABELS[issue.priority];
+  return (
+    <>
+      <span>{issue.identifier}</span>
+      <LinearStateLabel state={issue.state} />
+      {priority ? <span>{priority}</span> : null}
+      <span>{issue.project ?? issue.team.name}</span>
+      <RelativeTime timestamp={issue.updatedAt} />
+    </>
+  );
+}
+
+function IssueComments(props: {
+  readonly environmentId: EnvironmentId;
+  readonly comments: ReadonlyArray<{
+    readonly author: string | null;
+    readonly body: string;
+    readonly createdAt: string;
+  }>;
+  readonly truncated: boolean;
+}) {
+  return (
+    <>
+      {props.truncated ? (
+        <p className="text-muted-foreground text-xs">
+          Showing the first {props.comments.length} comments.
+        </p>
+      ) : null}
+      {props.comments.map((comment) => (
+        <section
+          key={`${comment.createdAt}:${comment.author ?? ""}`}
+          className="flex flex-col gap-1 border-t pt-3"
+        >
+          <h3 className="text-muted-foreground text-xs">
+            {comment.author ?? "unknown"} · <RelativeTime timestamp={comment.createdAt} />
+          </h3>
+          <ChatMarkdown text={comment.body} cwd={undefined} environmentId={props.environmentId} />
+        </section>
+      ))}
+    </>
+  );
+}
+
+function LinearIssueDetailPane(props: {
+  readonly environmentId: EnvironmentId;
+  readonly issue: LinearIssueSummary;
+}) {
+  const { environmentId, issue } = props;
+  const detail = useEnvironmentQuery(
+    issueEnvironment.linearGet({ environmentId, input: { id: issue.id } }),
+  );
+  return (
+    <article className="flex flex-col gap-4 p-6">
+      <header className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold leading-tight">{issue.title}</h2>
+        <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+          <span>{issue.identifier}</span>
+          <LinearStateLabel state={issue.state} />
+          {issue.assignee ? <span>assigned to {issue.assignee}</span> : null}
+          <a
+            href={issue.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+          >
+            Linear <ExternalLinkIcon className="size-3" />
+          </a>
+        </div>
+      </header>
+      {detail.error !== null ? (
+        <p role="alert" className="text-destructive-foreground text-sm">
+          {detail.error}
+        </p>
+      ) : detail.data === null ? (
+        <p role="status" className="text-muted-foreground text-sm">
+          Loading…
+        </p>
+      ) : (
+        <>
+          {detail.data.description.trim() === "" ? (
+            <p className="text-muted-foreground text-sm">No description.</p>
+          ) : (
+            <ChatMarkdown
+              text={detail.data.description}
+              cwd={undefined}
+              environmentId={environmentId}
+            />
+          )}
+          <IssueComments
+            environmentId={environmentId}
+            comments={detail.data.comments}
+            truncated={detail.data.commentsTruncated}
+          />
+        </>
+      )}
+    </article>
   );
 }
 
@@ -184,22 +343,11 @@ function IssueDetailPane(props: {
           ) : (
             <ChatMarkdown text={detail.data.body} cwd={undefined} environmentId={environmentId} />
           )}
-          {detail.data.commentsTruncated ? (
-            <p className="text-muted-foreground text-xs">
-              Showing the first {detail.data.comments.length} comments.
-            </p>
-          ) : null}
-          {detail.data.comments.map((comment) => (
-            <section
-              key={`${comment.createdAt}:${comment.author ?? ""}`}
-              className="flex flex-col gap-1 border-t pt-3"
-            >
-              <h3 className="text-muted-foreground text-xs">
-                {comment.author ?? "unknown"} · <RelativeTime timestamp={comment.createdAt} />
-              </h3>
-              <ChatMarkdown text={comment.body} cwd={undefined} environmentId={environmentId} />
-            </section>
-          ))}
+          <IssueComments
+            environmentId={environmentId}
+            comments={detail.data.comments}
+            truncated={detail.data.commentsTruncated}
+          />
         </>
       )}
     </article>
@@ -221,28 +369,72 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : "Could not load more issues.";
 
+function SourceNotice(props: { readonly source: "GitHub" | "Linear"; readonly error: string }) {
+  return (
+    <div role="alert" className="flex flex-col gap-1 border-b p-3 text-sm">
+      <p className="text-destructive-foreground">
+        {props.source}: {props.error}
+      </p>
+      {props.source === "Linear" ? (
+        <Link
+          to="/settings/source-control"
+          className="text-xs underline underline-offset-2 hover:text-foreground"
+        >
+          Open Settings → Source control
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const { environmentId } = props;
+  const [source, setSource] = useState<IssueSource>("all");
   const [involvement, setInvolvement] = useState<IssueInvolvement>("mine");
   const [state, setState] = useState<IssueState>("open");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dispatchingKey, setDispatchingKey] = useState<string | null>(null);
   // The model picked in this session; each dispatch uses it where the project offers it.
   const [picked, setPicked] = useState<ModelSelection | null>(null);
-  const { projectFor, modelFor, dispatch } = useDispatchIssue(environmentId);
+  const [linearProjects, setLinearProjects] = useLocalStorage(
+    `t3code:issues:linear-projects:${environmentId}`,
+    {},
+    LinearProjectsSchema,
+  );
+  const { projectFor, modelFor, dispatch, dispatchLinear } = useDispatchIssue(environmentId);
+  const projects = useProjects().filter(
+    (project) => project.environmentId === environmentId && project.isScratch !== true,
+  );
+  const threads = useThreadShells().filter((thread) => thread.environmentId === environmentId);
+  const showGitHub = source !== "linear";
+  const showLinear = source !== "github";
   const list = useEnvironmentQuery(
-    issueEnvironment.list({ environmentId, input: { involvement, state } }),
+    showGitHub ? issueEnvironment.list({ environmentId, input: { involvement, state } }) : null,
+  );
+  const linearList = useEnvironmentQuery(
+    showLinear
+      ? issueEnvironment.linearList({ environmentId, input: { involvement, state } })
+      : null,
   );
   const loadPage = useAtomQueryRunner(issueEnvironment.list, {
     reportFailure: false,
     reportDefect: false,
   });
-  // Pages after the first, read by "Load more" under the filters in `key`.
+  // GitHub pages after the first, read by "Load more" under the filters in `key`.
   const [more, setMore] = useState<MorePages | null>(null);
   const filterKey = `${involvement}:${state}`;
   const extra = more?.key === filterKey ? more : null;
-  const entries = mergeIssuePages([list.data?.entries ?? [], extra?.entries ?? []]);
-  const hasMore = extra === null ? (list.data?.hasMore ?? false) : extra.hasMore;
+  const githubEntries = showGitHub
+    ? mergeIssuePages([list.data?.entries ?? [], extra?.entries ?? []])
+    : [];
+  const entries = mergeIssueSources(
+    githubEntries,
+    showLinear ? (linearList.data?.entries ?? []) : [],
+  );
+  const hasMore = showGitHub && (extra === null ? (list.data?.hasMore ?? false) : extra.hasMore);
+  const loading =
+    (showGitHub && list.data === null && list.error === null) ||
+    (showLinear && linearList.data === null && linearList.error === null);
 
   const loadMore = async () => {
     const pages = extra?.pages ?? 1;
@@ -281,22 +473,41 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           };
     setMore((current) => (current?.key === filterKey ? next : current));
   };
-  const selected = entries.find((issue) => issueKey(issue) === selectedKey) ?? null;
-  const selectedProject = selected === null ? undefined : projectFor(selected);
 
-  const dispatchIssue = async (issue: IssueSummary) => {
-    setDispatchingKey(issueKey(issue));
-    try {
-      await dispatch(issue, picked);
-    } finally {
-      setDispatchingKey(null);
-    }
+  /** The project a Linear team's issues go to: the last one picked, while it still exists. */
+  const linearProjectFor = (issue: LinearIssueSummary) => {
+    const id = linearProjects[issue.team.id];
+    return id === undefined ? undefined : projects.find((project) => project.id === id);
+  };
+  const projectOf = (entry: IssueEntry) =>
+    entry.source === "github" ? projectFor(entry.issue) : linearProjectFor(entry.issue);
+  const branchOf = (entry: IssueEntry) =>
+    entry.source === "github" ? issueBranchName(entry.issue) : linearBranchName(entry.issue);
+  const blockedReason = (entry: IssueEntry) =>
+    projectOf(entry) !== undefined
+      ? null
+      : entry.source === "github"
+        ? `Add ${entry.issue.repository} as a project first`
+        : "Choose a project in the issue details";
+
+  const selected = entries.find((entry) => entry.key === selectedKey) ?? null;
+  const selectedProject = selected === null ? undefined : projectOf(selected);
+
+  const dispatchEntry = async (entry: IssueEntry) => {
+    const project = entry.source === "linear" ? linearProjectFor(entry.issue) : undefined;
+    if (entry.source === "linear" && project === undefined) return;
+    setDispatchingKey(entry.key);
+    // Both report their own failures and never reject.
+    if (entry.source === "github") await dispatch(entry.issue, picked);
+    else if (project !== undefined) await dispatchLinear(entry.issue, project, picked);
+    setDispatchingKey(null);
   };
 
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
       <WorkspacePageHeader electron={isElectron} className="border-b">
         <h1 className="font-medium text-sm">Issues</h1>
+        <FilterGroup label="Source" value={source} options={SOURCES} onChange={setSource} />
         <FilterGroup
           label="Involvement"
           value={involvement}
@@ -311,19 +522,24 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           aria-label="Refresh issues"
           onClick={() => {
             setMore(null);
-            list.refresh();
+            if (showGitHub) list.refresh();
+            if (showLinear) linearList.refresh();
           }}
         >
-          <RefreshCwIcon className={cn(list.isPending && "animate-spin")} />
+          <RefreshCwIcon
+            className={cn((list.isPending || linearList.isPending) && "animate-spin")}
+          />
         </Button>
       </WorkspacePageHeader>
       <div className="flex min-h-0 flex-1">
         <div className="w-[28rem] max-w-[45%] shrink-0 overflow-y-auto border-r">
-          {list.error !== null && entries.length === 0 ? (
-            <p role="alert" className="p-4 text-destructive-foreground text-sm">
-              {list.error}
-            </p>
-          ) : list.data === null ? (
+          {showGitHub && list.error !== null && githubEntries.length === 0 ? (
+            <SourceNotice source="GitHub" error={list.error} />
+          ) : null}
+          {showLinear && linearList.error !== null ? (
+            <SourceNotice source="Linear" error={linearList.error} />
+          ) : null}
+          {entries.length === 0 && loading ? (
             <p role="status" className="p-4 text-muted-foreground text-sm">
               Loading issues…
             </p>
@@ -338,21 +554,36 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           ) : (
             <>
               <ul>
-                {entries.map((issue) => {
-                  const key = issueKey(issue);
-                  return (
-                    <IssueRow
-                      key={key}
-                      issue={issue}
-                      selected={key === selectedKey}
-                      dispatching={dispatchingKey === key}
-                      hasProject={projectFor(issue) !== undefined}
-                      onSelect={() => setSelectedKey(key)}
-                      onDispatch={() => void dispatchIssue(issue)}
-                    />
-                  );
-                })}
+                {entries.map((entry) => (
+                  <IssueRow
+                    key={entry.key}
+                    title={entry.issue.title}
+                    meta={
+                      entry.source === "github" ? (
+                        <GitHubIssueMeta issue={entry.issue} />
+                      ) : (
+                        <LinearIssueMeta issue={entry.issue} />
+                      )
+                    }
+                    selected={entry.key === selectedKey}
+                    dispatching={dispatchingKey === entry.key}
+                    blocked={blockedReason(entry)}
+                    environmentId={environmentId}
+                    dispatchedThreadId={dispatchedThreadId(
+                      threads,
+                      projectOf(entry)?.id,
+                      branchOf(entry),
+                    )}
+                    onSelect={() => setSelectedKey(entry.key)}
+                    onDispatch={() => void dispatchEntry(entry)}
+                  />
+                ))}
               </ul>
+              {showLinear && linearList.data?.hasMore ? (
+                <p className="px-3 pt-3 text-muted-foreground text-xs">
+                  Showing the 100 most recently updated Linear issues for each filter.
+                </p>
+              ) : null}
               {hasMore ? (
                 <div className="flex flex-col items-start gap-2 p-3">
                   <Button
@@ -388,6 +619,35 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           ) : (
             <div>
               <div className="flex items-center justify-end gap-2 border-b px-6 py-2">
+                {selected.source === "linear" ? (
+                  <Select
+                    value={selectedProject?.id ?? null}
+                    disabled={dispatchingKey === selectedKey}
+                    onValueChange={(value) => {
+                      if (typeof value !== "string") return;
+                      setLinearProjects((current) => ({
+                        ...current,
+                        [selected.issue.team.id]: value,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger size="sm" aria-label="Project">
+                      <SelectValue>
+                        {(value: string | null) =>
+                          projects.find((project) => project.id === value)?.title ??
+                          "Choose a project"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectPopup>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.title}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                ) : null}
                 {selectedProject === undefined ? null : (
                   <IssueModelPicker
                     environmentId={environmentId}
@@ -400,18 +660,18 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
                 <Button
                   type="button"
                   disabled={dispatchingKey === selectedKey || selectedProject === undefined}
-                  title={
-                    selectedProject === undefined
-                      ? `Add ${selected.repository} as a project first`
-                      : "Start an agent on this issue"
-                  }
-                  onClick={() => void dispatchIssue(selected)}
+                  title={blockedReason(selected) ?? "Start an agent on this issue"}
+                  onClick={() => void dispatchEntry(selected)}
                 >
                   <PlayIcon />
                   Dispatch agent
                 </Button>
               </div>
-              <IssueDetailPane environmentId={environmentId} issue={selected} />
+              {selected.source === "github" ? (
+                <IssueDetailPane environmentId={environmentId} issue={selected.issue} />
+              ) : (
+                <LinearIssueDetailPane environmentId={environmentId} issue={selected.issue} />
+              )}
             </div>
           )}
         </div>

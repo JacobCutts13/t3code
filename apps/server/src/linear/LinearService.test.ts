@@ -175,7 +175,7 @@ it.effect.each([
     const failure = yield* Effect.flip(
       run(apiKey, api, (linear) => linear.list({ involvement: "assigned" })),
     );
-    expect(failure.reason).toBe(reason);
+    expect(failure).toMatchObject({ _tag: "LinearOperationError", reason });
   }),
 );
 
@@ -269,6 +269,6 @@ it.effect("start fails when Linear reports the update unsuccessful", () =>
       body: { data: { issueUpdate: { success: false, issue: null } } },
     });
     const failure = yield* Effect.flip(run("lin_api_secret", api, (linear) => linear.start("1")));
-    expect(failure.reason).toBe("request-failed");
+    expect(failure).toMatchObject({ _tag: "LinearOperationError", reason: "request-failed" });
   }),
 );

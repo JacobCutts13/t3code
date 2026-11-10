@@ -1103,6 +1103,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "linear",
+    title: "Linear",
+    to: "/settings/source-control",
+    scope: "environment-defaults",
+    searchTerms: ["linear issues issue tracker api key token dispatch"],
+    environmentOnly: true,
+  },
+  {
     id: "git-fetch-interval",
     title: "Git fetch interval",
     to: "/settings/maintenance",
