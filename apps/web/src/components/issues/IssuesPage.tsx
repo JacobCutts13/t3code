@@ -279,6 +279,11 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
                   disabled={
                     dispatchingKey === issueKey(selected) || projectFor(selected) === undefined
                   }
+                  title={
+                    projectFor(selected) === undefined
+                      ? `Add ${selected.repository} as a project first`
+                      : "Start an agent on this issue"
+                  }
                   onClick={() => void dispatchIssue(selected)}
                 >
                   <PlayIcon />
