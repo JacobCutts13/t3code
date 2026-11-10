@@ -11,6 +11,7 @@ export const WorktreeSetupStageId = Schema.Literals([
   "fetch",
   "checkout",
   "submodules",
+  "nested-repos",
   "setup-script",
   "agent",
 ]);
@@ -83,6 +84,7 @@ export const WORKTREE_SETUP_STAGE_ORDER: ReadonlyArray<WorktreeSetupStageId> = [
   "fetch",
   "checkout",
   "submodules",
+  "nested-repos",
   "setup-script",
   "agent",
 ];
@@ -95,6 +97,8 @@ export function worktreeSetupStageLabel(id: WorktreeSetupStageId): string {
       return "Check out files";
     case "submodules":
       return "Init submodules";
+    case "nested-repos":
+      return "Add repo worktrees";
     case "setup-script":
       return "Run setup script";
     case "agent":
