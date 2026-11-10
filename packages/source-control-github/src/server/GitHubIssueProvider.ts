@@ -11,6 +11,7 @@ import * as Schema from "effect/Schema";
 
 import * as GitHubRequestPolicy from "./GitHubRequestPolicy.ts";
 import * as GitHubRest from "./GitHubRest.ts";
+import { fromGitHubApiError } from "./GitHubSourceControlProvider.ts";
 
 const User = Schema.NullOr(Schema.Struct({ login: Schema.String }));
 
@@ -48,11 +49,19 @@ const RestComment = Schema.Struct({
   created_at: Schema.String,
 });
 
-const decodeIssues = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(RestIssue)));
+const RestRepository = Schema.Struct({
+  default_branch: Schema.optional(Schema.NullOr(Schema.String)),
+});
+const decodeRepository = Schema.decodeUnknownOption(Schema.fromJsonString(RestRepository));
+// Rows decode one at a time, so a single odd row from GitHub cannot blank the whole list.
+const decodeRows = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)));
+const decodeRow = Schema.decodeUnknownOption(RestIssue);
 const decodeIssue = Schema.decodeUnknownOption(Schema.fromJsonString(RestIssue));
 const decodeComments = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(RestComment)));
 
-const DEFAULT_LIMIT = 50;
+// The most GitHub serves per request, and the most a list shows. GitHub counts pull requests
+// against `per_page` and they are dropped afterwards, so a smaller page could come back empty.
+const PAGE_SIZE = 100;
 const SEGMENT = /^[\w.-]+$/;
 // "." and ".." match SEGMENT and would walk the request path out of repos/.
 const isRepository = (value: string) => {
@@ -69,10 +78,12 @@ const failure = (operation: string, detail: string, notFound = false) =>
     ...(notFound ? { reason: "not-found" as const } : {}),
   });
 
+const ISSUE_NOT_FOUND = "Issue not found. Check the repository and issue number and try again.";
+
 const fromGitHub = (operation: string) => (error: GitHubRequestPolicy.GitHubApiError) =>
   new PullRequestOperationError({
     operation,
-    detail: error.message.trim() === "" ? `GitHub request failed (${error._tag}).` : error.message,
+    detail: fromGitHubApiError(error, ISSUE_NOT_FOUND).detail,
     ...(error._tag === "GitHubApiNotFoundError" ? { reason: "not-found" as const } : {}),
     cause: error,
   });
@@ -123,40 +134,34 @@ export const make = Effect.gen(function* () {
   const readIssues = Effect.fn("GitHubIssueProvider.readIssues")(function* (
     host: string,
     path: string,
-    fallback?: string,
   ) {
     const operation = "listIssues";
     const response = yield* read(host, operation, path);
-    const decoded = decodeIssues(response.body);
-    if (Option.isNone(decoded)) {
+    const rows = decodeRows(response.body);
+    if (Option.isNone(rows)) {
+      yield* Effect.logWarning("GitHub sent a list this server cannot read", { host, path });
       return yield* failure(operation, "GitHub sent issues in a shape this server cannot read.");
     }
-    return decoded.value.flatMap((issue) => toSummary(host, issue, fallback) ?? []);
+    const issues = rows.value.flatMap((row) => Option.toArray(decodeRow(row)));
+    if (issues.length < rows.value.length) {
+      yield* Effect.logWarning("Skipped GitHub issues this server cannot read", {
+        host,
+        path,
+        skipped: rows.value.length - issues.length,
+      });
+    }
+    return issues.flatMap((issue) => toSummary(host, issue, undefined) ?? []);
   });
 
   const list: IssueProviderApi["list"] = Effect.fn("GitHubIssueProvider.list")(function* (input) {
-    const limit = input.limit ?? DEFAULT_LIMIT;
-    const query = (extra: string) =>
-      `state=${input.state ?? "open"}&sort=updated&per_page=${limit}${extra}`;
-
-    if (input.involvement === "repository") {
-      if (input.repository === undefined || !isRepository(input.repository)) {
-        return yield* failure("listIssues", "Name the repository as owner/name.");
-      }
-      return yield* readIssues(
-        input.host,
-        `repos/${input.repository}/issues?${query("")}`,
-        input.repository,
-      );
-    }
-
-    const filters = filtersFor(input.involvement);
+    const query = (filter: string) =>
+      `issues?state=${input.state ?? "open"}&sort=updated&per_page=${PAGE_SIZE}&filter=${filter}`;
     const lists = yield* Effect.all(
-      filters.map((filter) => readIssues(input.host, `issues?${query(`&filter=${filter}`)}`)),
+      filtersFor(input.involvement).map((filter) => readIssues(input.host, query(filter))),
       { concurrency: 2 },
     );
     const unique = new Map(lists.flat().map((issue) => [issue.url, issue] as const));
-    return [...unique.values()].toSorted(byNewestUpdate).slice(0, limit);
+    return [...unique.values()].toSorted(byNewestUpdate).slice(0, PAGE_SIZE);
   });
 
   const get: IssueProviderApi["get"] = Effect.fn("GitHubIssueProvider.get")(function* (input) {
@@ -165,16 +170,23 @@ export const make = Effect.gen(function* () {
       return yield* failure(operation, "Name the repository as owner/name.");
     }
     const path = `repos/${input.repository}/issues/${input.number}`;
-    const [issueResponse, commentsResponse] = yield* Effect.all(
+    const [issueResponse, commentsResponse, repositoryResponse] = yield* Effect.all(
       [
         read(input.host, operation, path),
         read(input.host, operation, `${path}/comments?per_page=100`),
+        read(input.host, operation, `repos/${input.repository}`),
       ],
-      { concurrency: 2 },
+      { concurrency: 3 },
     );
     const issue = decodeIssue(issueResponse.body);
     const comments = decodeComments(commentsResponse.body);
-    if (Option.isNone(issue) || Option.isNone(comments)) {
+    const repository = decodeRepository(repositoryResponse.body);
+    if (Option.isNone(issue) || Option.isNone(comments) || Option.isNone(repository)) {
+      yield* Effect.logWarning("GitHub sent an issue this server cannot read", {
+        host: input.host,
+        repository: input.repository,
+        number: input.number,
+      });
       return yield* failure(operation, "GitHub sent the issue in a shape this server cannot read.");
     }
     const summary = toSummary(input.host, issue.value, input.repository);
@@ -182,6 +194,7 @@ export const make = Effect.gen(function* () {
     return {
       issue: summary,
       body: issue.value.body ?? "",
+      defaultBranch: repository.value.default_branch ?? null,
       comments: comments.value.map((comment) => ({
         author: comment.user?.login ?? null,
         body: comment.body ?? "",
@@ -194,7 +207,7 @@ export const make = Effect.gen(function* () {
 });
 
 /** `/issues` answers for the signed-in account only, one relationship at a time. */
-function filtersFor(involvement: Exclude<IssueListInput["involvement"], "repository">) {
+function filtersFor(involvement: IssueListInput["involvement"]) {
   switch (involvement) {
     case "assigned":
       return ["assigned"] as const;

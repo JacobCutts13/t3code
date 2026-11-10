@@ -2,7 +2,7 @@ import type { IssueDetail } from "@t3tools/contracts";
 
 const SLUG_MAX = 40;
 
-/** Lowercase words joined by dashes, at most 40 characters, as cockpit names its branches. */
+/** Lowercase words joined by dashes, at most 40 characters. */
 export function issueSlug(title: string): string {
   return (
     title
@@ -22,8 +22,8 @@ export function issueBranchName(issue: { readonly number: number; readonly title
 
 /**
  * The first message of a dispatched thread: `/complete-task` plans the work, asks for approval,
- * builds it and opens a draft pull request. T3 chooses where the worktree lives, so unlike
- * cockpit's version this names no workspace paths.
+ * builds it and opens a draft pull request. T3 chooses where the worktree lives, so the prompt
+ * names no workspace paths.
  */
 export function buildIssuePrompt(detail: IssueDetail, branch: string): string {
   const { issue } = detail;

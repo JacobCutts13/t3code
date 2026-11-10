@@ -48,11 +48,11 @@ const provider = (answers: Record<string, unknown>) => {
 it.effect("merges assigned and authored issues, drops pull requests, newest first", () =>
   Effect.gen(function* () {
     const { make } = provider({
-      "issues?state=open&sort=updated&per_page=50&filter=assigned": [
+      "issues?state=open&sort=updated&per_page=100&filter=assigned": [
         issue(1),
         issue(3, { pull_request: {} }),
       ],
-      "issues?state=open&sort=updated&per_page=50&filter=created": [issue(1), issue(2)],
+      "issues?state=open&sort=updated&per_page=100&filter=created": [issue(1), issue(2)],
     });
     const issues = yield* make;
     const entries = yield* issues.list({ involvement: "mine", host: "github.com" });
@@ -69,24 +69,38 @@ it.effect("merges assigned and authored issues, drops pull requests, newest firs
   }),
 );
 
-it.effect("lists one repository's issues and names it when GitHub omits repository_url", () =>
+it.effect("lists only the requested state and relationship", () =>
   Effect.gen(function* () {
     const { make, asked } = provider({
-      "repos/acme/api/issues?state=closed&sort=updated&per_page=5": [
-        issue(4, { repository_url: undefined, state: "closed" }),
+      "issues?state=closed&sort=updated&per_page=100&filter=created": [
+        issue(4, { state: "closed" }),
       ],
     });
     const issues = yield* make;
     const entries = yield* issues.list({
-      involvement: "repository",
-      repository: "acme/api",
+      involvement: "authored",
       state: "closed",
-      limit: 5,
       host: "github.com",
     });
-    assert.deepStrictEqual(asked, ["repos/acme/api/issues?state=closed&sort=updated&per_page=5"]);
-    assert.strictEqual(entries[0]?.repository, "acme/api");
+    assert.deepStrictEqual(asked, ["issues?state=closed&sort=updated&per_page=100&filter=created"]);
     assert.strictEqual(entries[0]?.state, "closed");
+  }),
+);
+
+it.effect("skips a row it cannot read and keeps the rest", () =>
+  Effect.gen(function* () {
+    const { make } = provider({
+      "issues?state=open&sort=updated&per_page=100&filter=assigned": [
+        { number: "not a number" },
+        issue(2),
+      ],
+    });
+    const issues = yield* make;
+    const entries = yield* issues.list({ involvement: "assigned", host: "github.com" });
+    assert.deepStrictEqual(
+      entries.map((entry) => entry.number),
+      [2],
+    );
   }),
 );
 
@@ -95,7 +109,7 @@ it.effect("refuses a repository that is not owner/name before asking GitHub", ()
     const { make, asked } = provider({});
     const issues = yield* make;
     const exit = yield* Effect.exit(
-      issues.list({ involvement: "repository", repository: "../orgs", host: "github.com" }),
+      issues.get({ host: "github.com", repository: "../orgs", number: 1 }),
     );
     assert.isTrue(Exit.isFailure(exit));
     assert.deepStrictEqual(asked, []);
@@ -109,12 +123,14 @@ it.effect("reads an issue with its comments, and refuses a pull request", () =>
       "repos/acme/api/issues/7/comments?per_page=100": [
         { user: { login: "grace" }, body: "On it", created_at: "2026-01-08T00:00:00Z" },
       ],
+      "repos/acme/api": { default_branch: "develop" },
       "repos/acme/api/issues/8": issue(8, { pull_request: {} }),
       "repos/acme/api/issues/8/comments?per_page=100": [],
     });
     const issues = yield* make;
     const detail = yield* issues.get({ host: "github.com", repository: "acme/api", number: 7 });
     assert.strictEqual(detail.body, "Steps to reproduce");
+    assert.strictEqual(detail.defaultBranch, "develop");
     assert.deepStrictEqual(detail.comments, [
       { author: "grace", body: "On it", createdAt: "2026-01-08T00:00:00Z" },
     ]);
@@ -122,5 +138,25 @@ it.effect("reads an issue with its comments, and refuses a pull request", () =>
       issues.get({ host: "github.com", repository: "acme/api", number: 8 }),
     );
     assert.isTrue(Exit.isFailure(pull));
+  }),
+);
+
+it.effect("drops the pull requests that share a page with issues", () =>
+  Effect.gen(function* () {
+    const { make } = provider({
+      "issues?state=open&sort=updated&per_page=100&filter=assigned": [
+        issue(9, { pull_request: {} }),
+        issue(8, { pull_request: {} }),
+        issue(3),
+        issue(2),
+        issue(1),
+      ],
+    });
+    const issues = yield* make;
+    const entries = yield* issues.list({ involvement: "assigned", host: "github.com" });
+    assert.deepStrictEqual(
+      entries.map((entry) => entry.number),
+      [3, 2, 1],
+    );
   }),
 );

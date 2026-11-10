@@ -5,6 +5,8 @@ import type { EnvironmentRegistry } from "../connection/registry.ts";
 import * as Persistence from "../platform/persistence.ts";
 import { createEnvironmentRpcQueryAtomFamily } from "./runtime.ts";
 
+const ISSUE_STALE_TIME_MS = 30_000;
+
 export function createIssueEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | Persistence.EnvironmentCacheStore | R, E>,
 ) {
@@ -12,12 +14,12 @@ export function createIssueEnvironmentAtoms<R, E>(
     list: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:issues:list",
       tag: WS_METHODS.issuesList,
-      staleTimeMs: 30_000,
+      staleTimeMs: ISSUE_STALE_TIME_MS,
     }),
     get: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:issues:get",
       tag: WS_METHODS.issuesGet,
-      staleTimeMs: 30_000,
+      staleTimeMs: ISSUE_STALE_TIME_MS,
     }),
   };
 }

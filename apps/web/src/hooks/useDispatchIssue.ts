@@ -4,12 +4,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type {
-  EnvironmentId,
-  IssueSummary,
-  ModelSelection,
-  ServerProvider,
-} from "@t3tools/contracts";
+import type { EnvironmentId, IssueSummary, ModelSelection } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
 import { findProjectForRepository } from "~/components/pullRequest/pullRequestList.logic";
@@ -23,17 +18,13 @@ import {
 import { useProjects } from "~/state/entities";
 import { useEnvironmentProviders } from "~/state/environments";
 import { issueEnvironment } from "~/state/issues";
+import { EMPTY_SERVER_PROVIDERS } from "~/state/server";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE } from "~/types";
 import { buildThreadRouteParams } from "~/threadRoutes";
 import { useEnvironmentSettings } from "./useSettings";
-
-const NO_PROVIDERS: ReadonlyArray<ServerProvider> = [];
-
-// T3 does not record a repository's default branch; this matches cockpit's `origin/main`.
-const BASE_BRANCH = "main";
 
 const errorMessage = (error: unknown) =>
   error instanceof Error && error.message.trim().length > 0 ? error.message : "An error occurred.";
@@ -50,7 +41,7 @@ function fail(title: string, description: string): false {
 export function useDispatchIssue(environmentId: EnvironmentId) {
   const projects = useProjects();
   const settings = useEnvironmentSettings(environmentId);
-  const providers = useEnvironmentProviders().get(environmentId) ?? NO_PROVIDERS;
+  const providers = useEnvironmentProviders().get(environmentId) ?? EMPTY_SERVER_PROVIDERS;
   const readIssue = useAtomQueryRunner(issueEnvironment.get, {
     reportFailure: false,
     reportDefect: false,
@@ -68,20 +59,26 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     );
 
   /**
-   * The model a new thread in the project starts with: the pick when its provider is enabled for
-   * the project, else the project's default, else the server's.
+   * The model a new thread in the project starts with: the pick, else the project's default, each
+   * only while its provider is enabled and available for the project, else the server's default.
    */
   const modelFor = (
     project: NonNullable<ReturnType<typeof projectFor>>,
     picked: ModelSelection | null = null,
-  ): ModelSelection | null =>
-    picked !== null &&
-    providerInstanceEntriesFor(providers, settings, project.id).some(
-      (entry) => entry.instanceId === picked.instanceId && entry.enabled,
-    )
-      ? picked
-      : (resolveProjectSettings(settings, project.id, project).settings.defaultModelSelection ??
-        resolveProjectDefaultProviderModelSelection(providers, settings, project.id));
+  ): ModelSelection | null => {
+    const entries = providerInstanceEntriesFor(providers, settings, project.id);
+    const usable = (selection: ModelSelection | null | undefined) =>
+      selection != null &&
+      entries.some(
+        (entry) => entry.instanceId === selection.instanceId && entry.enabled && entry.isAvailable,
+      );
+    const configured = resolveProjectSettings(settings, project.id, project).settings
+      .defaultModelSelection;
+    return (
+      [picked, configured].find(usable) ??
+      resolveProjectDefaultProviderModelSelection(providers, settings, project.id)
+    );
+  };
 
   const dispatch = async (
     issue: IssueSummary,
@@ -104,6 +101,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
           fail("Could not read the issue", errorMessage(squashAtomCommandFailure(detail)));
         }
         return false;
+      }
+      // Branching from a guessed base could start the work on the wrong history.
+      const baseBranch = detail.value.defaultBranch;
+      if (baseBranch === null) {
+        return fail(
+          "Cannot dispatch",
+          `GitHub did not report ${issue.repository}'s default branch.`,
+        );
       }
 
       const branch = issueBranchName(issue);
@@ -137,7 +142,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
             },
             prepareWorktree: {
               projectCwd: project.workspaceRoot,
-              baseBranch: BASE_BRANCH,
+              baseBranch,
               branch,
               startFromOrigin: true,
             },

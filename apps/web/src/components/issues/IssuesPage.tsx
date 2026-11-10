@@ -23,11 +23,10 @@ import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
 import { Spinner } from "../ui/spinner";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 
-type ListInvolvement = Exclude<IssueInvolvement, "repository">;
-
-const INVOLVEMENTS: ReadonlyArray<{ readonly value: ListInvolvement; readonly label: string }> = [
+const INVOLVEMENTS: ReadonlyArray<{ readonly value: IssueInvolvement; readonly label: string }> = [
   { value: "mine", label: "Mine" },
   { value: "assigned", label: "Assigned" },
   { value: "authored", label: "Opened by me" },
@@ -48,20 +47,24 @@ function FilterGroup<T extends string>(props: {
   readonly onChange: (value: T) => void;
 }) {
   return (
-    <div role="group" aria-label={props.label} className="flex items-center gap-1">
+    <ToggleGroup
+      aria-label={props.label}
+      className="shrink-0"
+      size="segmented"
+      variant="segmented"
+      value={[props.value]}
+      onValueChange={(next) => {
+        // Deselecting the active option sends an empty list; keep the current one.
+        const option = props.options.find((candidate) => candidate.value === next[0]);
+        if (option) props.onChange(option.value);
+      }}
+    >
       {props.options.map((option) => (
-        <Button
-          key={option.value}
-          type="button"
-          size="compact"
-          variant={props.value === option.value ? "outline" : "ghost-muted"}
-          aria-pressed={props.value === option.value}
-          onClick={() => props.onChange(option.value)}
-        >
+        <Toggle key={option.value} value={option.value}>
           {option.label}
-        </Button>
+        </Toggle>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 
@@ -76,7 +79,10 @@ function IssueRow(props: {
   const { issue } = props;
   return (
     <li
-      className={cn("flex items-start gap-2 border-b px-3 py-2.5", props.selected && "bg-accent")}
+      className={cn(
+        "flex items-start gap-2 border-b px-3 py-2.5 transition-colors hover:bg-accent/50",
+        props.selected && "bg-accent",
+      )}
     >
       <button
         type="button"
@@ -190,7 +196,7 @@ function IssueDetailPane(props: {
 
 function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const { environmentId } = props;
-  const [involvement, setInvolvement] = useState<ListInvolvement>("mine");
+  const [involvement, setInvolvement] = useState<IssueInvolvement>("mine");
   const [state, setState] = useState<IssueState>("open");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dispatchingKey, setDispatchingKey] = useState<string | null>(null);
@@ -289,17 +295,15 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
                     environmentId={environmentId}
                     projectId={selectedProject.id}
                     value={modelFor(selectedProject, picked)}
-                    disabled={dispatchingKey === issueKey(selected)}
+                    disabled={dispatchingKey === selectedKey}
                     onChange={setPicked}
                   />
                 )}
                 <Button
                   type="button"
-                  disabled={
-                    dispatchingKey === issueKey(selected) || projectFor(selected) === undefined
-                  }
+                  disabled={dispatchingKey === selectedKey || selectedProject === undefined}
                   title={
-                    projectFor(selected) === undefined
+                    selectedProject === undefined
                       ? `Add ${selected.repository} as a project first`
                       : "Start an agent on this issue"
                   }

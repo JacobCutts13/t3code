@@ -2,8 +2,8 @@ import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
-/** `mine` is assigned to or opened by the signed-in account; `repository` lists one repository. */
-export const IssueInvolvement = Schema.Literals(["mine", "assigned", "authored", "repository"]);
+/** `mine` is assigned to or opened by the signed-in account. */
+export const IssueInvolvement = Schema.Literals(["mine", "assigned", "authored"]);
 export type IssueInvolvement = typeof IssueInvolvement.Type;
 
 export const IssueState = Schema.Literals(["open", "closed"]);
@@ -35,11 +35,8 @@ export type IssueSummary = typeof IssueSummary.Type;
 
 export const IssueListInput = Schema.Struct({
   involvement: IssueInvolvement,
-  /** Required when `involvement` is `repository`. */
-  repository: Schema.optional(TrimmedNonEmptyString),
   state: Schema.optional(IssueState),
   host: Schema.optional(TrimmedNonEmptyString),
-  limit: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 }))),
 });
 export type IssueListInput = typeof IssueListInput.Type;
 
@@ -65,6 +62,8 @@ export type IssueComment = typeof IssueComment.Type;
 export const IssueDetail = Schema.Struct({
   issue: IssueSummary,
   body: Schema.String,
+  /** The repository's default branch, which a worktree for the issue starts from. */
+  defaultBranch: Schema.NullOr(TrimmedNonEmptyString),
   /** Oldest first; the first 100 only. */
   comments: Schema.Array(IssueComment),
 });

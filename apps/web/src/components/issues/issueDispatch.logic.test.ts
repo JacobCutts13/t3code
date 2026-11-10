@@ -19,6 +19,7 @@ const detail = (overrides: Partial<IssueDetail> = {}): IssueDetail => ({
     updatedAt: "2026-01-02T00:00:00Z",
   },
   body: "Steps to reproduce",
+  defaultBranch: "main",
   comments: [],
   ...overrides,
 });
