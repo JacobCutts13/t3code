@@ -45,7 +45,7 @@ vi.mock(import("../chat/ProviderModelPicker"), () => ({
     <button
       type="button"
       disabled={disabled}
-      onClick={() => onInstanceModelChange("agent", "deep")}
+      onClick={() => onInstanceModelChange("agent", "plain")}
     >
       Pick model
     </button>
@@ -122,7 +122,7 @@ it("clears a picked effort when the model changes", async () => {
     onChange,
   );
   await userEvent.click(screen.getByRole("button", { name: "Pick model" }));
-  expect(onChange).toHaveBeenLastCalledWith(createModelSelection(instanceId, "deep"));
+  expect(onChange).toHaveBeenLastCalledWith(createModelSelection(instanceId, "plain"));
 });
 
 it("shows no effort control for a model without one", async () => {
