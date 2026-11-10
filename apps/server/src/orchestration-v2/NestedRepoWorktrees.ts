@@ -10,7 +10,15 @@ import type * as GitWorkflow from "../git/GitWorkflowService.ts";
 
 type Git = GitWorkflow.GitWorkflowService["Service"];
 
-const DEFAULT_BASE = "origin/main";
+/** Tried in order when a repo has no explicit base: the remote's default, then common names, then the checkout. */
+const DEFAULT_BASE_CANDIDATES = [
+  "origin/HEAD",
+  "origin/main",
+  "origin/master",
+  "main",
+  "master",
+  "HEAD",
+] as const;
 const ENV_FILE_PREFIX = ".env";
 const ENV_SCAN_SKIPPED_DIRECTORIES: ReadonlySet<string> = new Set(["node_modules", ".git"]);
 const ENV_SCAN_MAX_DEPTH = 8;
@@ -32,6 +40,20 @@ export interface CreatedNestedWorktree {
 }
 
 const detailOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
+
+/** The first candidate that exists in the clone, so a repo without `origin/main` still gets a base. */
+const resolveDefaultBase = Effect.fn("NestedRepoWorktrees.defaultBase")(function* (
+  git: Git,
+  repoPath: string,
+) {
+  for (const candidate of DEFAULT_BASE_CANDIDATES) {
+    if (yield* git.hasCommit({ cwd: repoPath, refName: candidate })) return candidate;
+  }
+  return yield* new NestedRepoWorktreeError({
+    repo: repoPath,
+    detail: "has no commits to start a worktree from.",
+  });
+});
 
 /**
  * Keeps the nested checkouts out of the container's `git status`. Without this they read as untracked
@@ -101,7 +123,8 @@ export const addNestedRepoWorktrees = Effect.fn("NestedRepoWorktrees.add")(funct
     const isRepo = yield* git.isRepository(repoPath).pipe(Effect.orElseSucceed(() => false));
     if (!isRepo) return yield* fail(`${repo.path} is not a git repository.`);
 
-    const base = repo.base ?? DEFAULT_BASE;
+    const base =
+      repo.base ?? (yield* resolveDefaultBase(git, repoPath).pipe(Effect.mapError(fail)));
     let startRef = base;
     let baseRefName = base;
     if (input.startFromOrigin) {

@@ -78,6 +78,8 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
+import { CreateProjectFromRepos } from "./CreateProjectFromRepos";
+import { openCreateProjectFromRepos } from "./createProjectFromReposStore";
 import {
   useDeferredValue,
   useEffect,
@@ -319,6 +321,7 @@ export function CommandPalette({ children }: { children: ReactNode }) {
         <div className="contents" inert={state.open}>
           {children}
         </div>
+        <CreateProjectFromRepos />
         <CommandPaletteDialog
           mode={state.mode}
           session={state.session}
@@ -1050,6 +1053,19 @@ function OpenCommandPaletteDialog(props: {
         },
       });
     }
+
+    sourceItems.unshift({
+      kind: "action",
+      value: `action:add-project:${environmentId}:repos`,
+      searchTerms: ["repositories", "repos", "multiple", "clone", "existing", "workspace"],
+      title: "Choose repositories",
+      description: "Pick one or several repositories on this machine",
+      icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        setOpen(false);
+        openCreateProjectFromRepos({ environmentId });
+      },
+    });
 
     const orderedSources: ReadonlyArray<AddProjectRemoteSource> = [
       "url",
