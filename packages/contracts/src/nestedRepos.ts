@@ -6,13 +6,15 @@ import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 const NESTED_REPO_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 export const NESTED_REPO_MAX_COUNT = 20;
 
+export const isValidNestedRepoName = (name: string): boolean => NESTED_REPO_NAME_PATTERN.test(name);
+
 /** A git repository that every new worktree thread of a project also gets a worktree of. */
 export const ProjectNestedRepo = Schema.Struct({
   /** Folder name inside the thread's worktree. */
   name: Schema.String.check(Schema.isPattern(NESTED_REPO_NAME_PATTERN)),
   /** Existing clone on the environment; a leading `~` is the home folder. */
   path: TrimmedNonEmptyString,
-  /** Ref the worktree starts from; defaults to `origin/main`. */
+  /** Ref the worktree starts from; defaults to the first of origin/main, origin/master, main, master, HEAD the clone has. */
   base: Schema.optionalKey(TrimmedNonEmptyString),
 });
 export type ProjectNestedRepo = typeof ProjectNestedRepo.Type;

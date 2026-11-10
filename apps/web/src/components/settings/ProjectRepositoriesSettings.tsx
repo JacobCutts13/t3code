@@ -1,4 +1,8 @@
-import { NESTED_REPO_MAX_COUNT, type ProjectNestedRepo } from "@t3tools/contracts";
+import {
+  NESTED_REPO_MAX_COUNT,
+  type ProjectNestedRepo,
+  isValidNestedRepoName,
+} from "@t3tools/contracts";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
@@ -10,8 +14,6 @@ import {
   useScopedSettingsWriteAllowed,
   useUpdateScopedSettings,
 } from "./useScopedSettings";
-
-const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 /** Extra repositories every new worktree thread of a project also gets a worktree of. */
 export function ProjectRepositoriesSettings() {
@@ -35,7 +37,7 @@ export function ProjectRepositoriesSettings() {
       path: path.trim(),
       ...(base.trim() ? { base: base.trim() } : {}),
     };
-    if (!NAME_PATTERN.test(entry.name)) {
+    if (!isValidNestedRepoName(entry.name)) {
       setError("Use letters, numbers, dots, dashes or underscores for the folder name.");
     } else if (entry.path === "") {
       setError("Enter the path of the repository's clone.");
@@ -111,7 +113,7 @@ export function ProjectRepositoriesSettings() {
             />
             <Input
               value={base}
-              placeholder="origin/main"
+              placeholder="default branch"
               aria-label="Repository base branch"
               className="w-36"
               disabled={!canWriteSettings}

@@ -8,7 +8,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { AuthOrchestrationOperateScope, AuthSettingsWriteScope } from "@t3tools/contracts";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 
 import type { RepoCandidate } from "~/components/createProjectFromRepos.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
@@ -18,6 +18,8 @@ import { projectEnvironment } from "~/state/projects";
 import { serverEnvironment } from "~/state/server";
 import { readEnvironmentScope } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { useOrchestrationCommand } from "~/state/use-orchestration-command";
+import { reportProjectFailure } from "./useProjectGroupUpdate";
 import { useNewThreadHandler } from "./useHandleNewThread";
 
 function errorMessage(error: unknown): string {
@@ -42,10 +44,13 @@ export function useCreateProjectFromRepos() {
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
     reportFailure: false,
   });
+  const updateProject = useOrchestrationCommand(projectEnvironment.update, {
+    label: "project unarchive",
+  });
   const handleNewThread = useNewThreadHandler();
 
-  const openProject = async (environmentId: EnvironmentId, projectId: string) => {
-    const projectRef = scopeProjectRef(environmentId, projectId as never);
+  const openProject = async (environmentId: EnvironmentId, projectId: ProjectId) => {
+    const projectRef = scopeProjectRef(environmentId, projectId);
     // Wait for the stored project path; drafts use it as their key.
     await waitForProject(projectRef);
     await handleNewThread(projectRef);
@@ -70,6 +75,13 @@ export function useCreateProjectFromRepos() {
           repo.path,
         );
         if (existing) {
+          // Picking an archived project's folder again brings the project back, as Add project does.
+          if (existing.archivedAt != null) {
+            void updateProject({
+              environmentId,
+              input: { projectId: existing.id, archived: false },
+            }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+          }
           await openProject(environmentId, existing.id);
           return true;
         }

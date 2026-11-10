@@ -16,7 +16,12 @@ const [command, args] = bundleWatch
       ],
     ];
 
-const child = NodeChildProcess.spawn(command, args, { stdio: "inherit" });
+const child = NodeChildProcess.spawn(command, args, {
+  stdio: "inherit",
+  // On Windows `vp` is a .cmd shim, which spawn only runs through a shell.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone dev script has no Effect runtime.
+  shell: process.platform === "win32",
+});
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(signal, () => child.kill(signal));
 }

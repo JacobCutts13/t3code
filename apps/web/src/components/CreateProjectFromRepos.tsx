@@ -88,7 +88,7 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
         });
         return result._tag === "Success"
           ? result.value.entries.map((entry) => ({ name: entry.name, path: entry.fullPath }))
-          : [];
+          : null;
       },
       stat: async (paths) => {
         const result = await metadataStable({ environmentId, input: { paths: [...paths] } });

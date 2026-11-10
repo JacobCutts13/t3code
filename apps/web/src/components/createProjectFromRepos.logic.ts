@@ -1,11 +1,15 @@
-import type { FilesystemEntryMetadata } from "@t3tools/contracts";
+import {
+  FILESYSTEM_METADATA_BATCH_LIMIT,
+  NESTED_REPO_MAX_COUNT,
+  type FilesystemEntryMetadata,
+  isValidNestedRepoName,
+} from "@t3tools/contracts";
 
 /** Folders searched for clones, relative to the home folder of the machine that hosts the project. */
 const REPO_SCAN_ROOT = "~/dev";
 const REPO_SCAN_DEPTH = 2;
 const REPO_SCAN_CONCURRENCY = 8;
-/** Matches FILESYSTEM_METADATA_BATCH_LIMIT. */
-const METADATA_BATCH = 64;
+const METADATA_BATCH = FILESYSTEM_METADATA_BATCH_LIMIT;
 const SKIPPED_FOLDERS: ReadonlySet<string> = new Set(["node_modules", "dist", "build", "target"]);
 
 export interface RepoCandidate {
@@ -14,8 +18,8 @@ export interface RepoCandidate {
 }
 
 export interface RepoScanner {
-  /** Child folders of `path`; must tolerate a missing or unreadable folder by returning []. */
-  readonly listFolders: (path: string) => Promise<ReadonlyArray<RepoCandidate>>;
+  /** Child folders of `path`, or null when it cannot be read (missing, denied, or the connection failed). */
+  readonly listFolders: (path: string) => Promise<ReadonlyArray<RepoCandidate> | null>;
   /** Metadata per path in request order; null for missing or unreadable. */
   readonly stat: (
     paths: ReadonlyArray<string>,
@@ -49,7 +53,10 @@ export async function scanRepos(
   root: string = REPO_SCAN_ROOT,
 ): Promise<ReadonlyArray<RepoCandidate>> {
   const found = new Map<string, RepoCandidate>();
-  let level = (await scanner.listFolders(root)).filter(isScannable);
+  const top = await scanner.listFolders(root);
+  // An unreadable root is an error to show, not an empty list; an unreadable child folder is just skipped.
+  if (top === null) throw new Error(`Could not read ${root}.`);
+  let level = top.filter(isScannable);
   for (let depth = 1; depth <= REPO_SCAN_DEPTH && level.length > 0; depth++) {
     const { repos, plain } = await findGitClones(scanner, level);
     for (const repo of repos) found.set(repo.path, repo);
@@ -61,7 +68,7 @@ export async function scanRepos(
           .slice(start, start + REPO_SCAN_CONCURRENCY)
           .map((folder) => scanner.listFolders(folder.path)),
       );
-      for (const list of children) level.push(...list.filter(isScannable));
+      for (const list of children) level.push(...(list ?? []).filter(isScannable));
     }
   }
   return [...found.values()].toSorted((left, right) => left.name.localeCompare(right.name));
@@ -89,6 +96,8 @@ export function repoDisabledReason(
 ): string | null {
   if (selected.some((entry) => entry.path === repo.path)) return null;
   if (selected.length === 0) return null;
+  if (selected.length >= NESTED_REPO_MAX_COUNT)
+    return `Up to ${NESTED_REPO_MAX_COUNT} repositories can share a project.`;
   // Several repos share one project, so each name becomes a folder inside every thread's worktree.
   const unusable = [repo, ...selected].find((entry) => !isValidNestedRepoName(entry.name));
   if (unusable !== undefined)
@@ -99,13 +108,12 @@ export function repoDisabledReason(
     : `A repository named ${clash.name} is already selected; both would use the same folder.`;
 }
 
-/** Whether a repo name works as a folder name inside a thread's worktree (see ProjectNestedRepo). */
-function isValidNestedRepoName(name: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name);
-}
-
 export function defaultProjectName(repos: ReadonlyArray<RepoCandidate>): string {
-  return repos.map((repo) => repo.name).join("-");
+  // The server caps project names at 200 characters.
+  return repos
+    .map((repo) => repo.name)
+    .join("-")
+    .slice(0, 200);
 }
 
 export function toggleRepo(

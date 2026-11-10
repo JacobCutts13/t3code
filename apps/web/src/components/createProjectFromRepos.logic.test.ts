@@ -66,6 +66,20 @@ describe("scanRepos", () => {
     expect(await scanRepos(fakeDisk({}, {}))).toEqual([]);
   });
 
+  it("reports an unreadable root as an error but skips an unreadable child folder", async () => {
+    const unreadable: RepoScanner = {
+      listFolders: async () => null,
+      stat: async () => [],
+    };
+    await expect(scanRepos(unreadable)).rejects.toThrow(/Could not read/);
+    const disk = fakeDisk({ "~/dev": ["ok", "locked"] }, { "~/dev/ok": "directory" });
+    const withLockedChild: RepoScanner = {
+      ...disk,
+      listFolders: async (path) => (path === "~/dev/locked" ? null : disk.listFolders(path)),
+    };
+    expect((await scanRepos(withLockedChild)).map((repo) => repo.name)).toEqual(["ok"]);
+  });
+
   it("checks more than one batch of folders", async () => {
     const names = Array.from({ length: 150 }, (_, index) => `r${String(index).padStart(3, "0")}`);
     const gits = Object.fromEntries(names.map((name) => [`~/dev/${name}`, "directory" as const]));
@@ -101,7 +115,19 @@ describe("selection", () => {
     expect(repoDisabledReason(spaced, [web])).toMatch(/can't be combined/);
   });
 
-  it("names a multi-repo project from its repos", () => {
+  it("stops at the contract's repository limit, still allowing a deselect", () => {
+    const many = Array.from({ length: 20 }, (_, index) => folder(`~/dev/r${index}`));
+    const extra = folder("~/dev/extra");
+    expect(repoDisabledReason(extra, many)).toMatch(/Up to 20/);
+    expect(toggleRepo(many, extra)).toHaveLength(20);
+    expect(toggleRepo(many, many[0]!)).toHaveLength(19);
+  });
+
+  it("names a multi-repo project from its repos, within the server's name limit", () => {
     expect(defaultProjectName([api, web])).toBe("api-web");
+    const long = Array.from({ length: 10 }, (_, index) =>
+      folder(`~/dev/${"x".repeat(60)}${index}`),
+    );
+    expect(defaultProjectName(long).length).toBe(200);
   });
 });

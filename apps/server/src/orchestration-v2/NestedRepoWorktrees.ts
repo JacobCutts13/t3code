@@ -10,15 +10,8 @@ import type * as GitWorkflow from "../git/GitWorkflowService.ts";
 
 type Git = GitWorkflow.GitWorkflowService["Service"];
 
-/** Tried in order when a repo has no explicit base: the remote's default, then common names, then the checkout. */
-const DEFAULT_BASE_CANDIDATES = [
-  "origin/HEAD",
-  "origin/main",
-  "origin/master",
-  "main",
-  "master",
-  "HEAD",
-] as const;
+/** Tried in order when a repo has no explicit base: common remote names, then local ones, then the checkout. */
+const DEFAULT_BASE_CANDIDATES = ["origin/main", "origin/master", "main", "master", "HEAD"] as const;
 const ENV_FILE_PREFIX = ".env";
 const ENV_SCAN_SKIPPED_DIRECTORIES: ReadonlySet<string> = new Set(["node_modules", ".git"]);
 const ENV_SCAN_MAX_DEPTH = 8;
@@ -80,7 +73,8 @@ const excludeNestedFolders = Effect.fn("NestedRepoWorktrees.exclude")(function* 
   if (missing.length === 0) return;
   yield* fs.makeDirectory(path.dirname(excludePath), { recursive: true });
   const separator = existing === "" || existing.endsWith("\n") ? "" : "\n";
-  yield* fs.writeFileString(excludePath, `${existing}${separator}${missing.join("\n")}\n`);
+  // Append, never rewrite: threads launching together share this file, and a rewrite could drop a line.
+  yield* fs.writeFileString(excludePath, `${separator}${missing.join("\n")}\n`, { flag: "a" });
 });
 
 /**
@@ -173,6 +167,19 @@ export const addNestedRepoWorktrees = Effect.fn("NestedRepoWorktrees.add")(funct
   }
 });
 
+/** True for a symlink, including a dangling one; false for anything else, including a missing path. */
+const isSymbolicLink = (fs: FileSystem.FileSystem, target: string) =>
+  fs.readLink(target).pipe(
+    Effect.as(true),
+    Effect.catchIf(
+      (error) =>
+        error.cause instanceof Error &&
+        "code" in error.cause &&
+        (error.cause.code === "EINVAL" || error.cause.code === "ENOENT"),
+      () => Effect.succeed(false),
+    ),
+  );
+
 /** Copies untracked `.env*` files from the source clone; files the checkout already has are left alone. */
 const copyEnvFiles = Effect.fn("NestedRepoWorktrees.copyEnvFiles")(function* (
   fs: FileSystem.FileSystem,
@@ -184,22 +191,14 @@ const copyEnvFiles = Effect.fn("NestedRepoWorktrees.copyEnvFiles")(function* (
   for (const name of yield* fs.readDirectory(source)) {
     if (ENV_SCAN_SKIPPED_DIRECTORIES.has(name)) continue;
     const from = path.join(source, name);
-    // Effect's stat follows links; a link could point outside the clone or loop.
-    const isLink = yield* fs.readLink(from).pipe(
-      Effect.as(true),
-      Effect.catchIf(
-        (error) =>
-          error.cause instanceof Error && "code" in error.cause && error.cause.code === "EINVAL",
-        () => Effect.succeed(false),
-      ),
-    );
-    if (isLink) continue;
+    const to = path.join(destination, name);
+    // Effect's stat follows links: a source link could point outside the clone or loop, and a link in
+    // the new worktree (a committed symlink) would carry the copy out of it.
+    if ((yield* isSymbolicLink(fs, from)) || (yield* isSymbolicLink(fs, to))) continue;
     const info = yield* fs.stat(from);
     if (info.type === "Directory") {
-      if (depth < ENV_SCAN_MAX_DEPTH)
-        yield* copyEnvFiles(fs, path, from, path.join(destination, name), depth + 1);
+      if (depth < ENV_SCAN_MAX_DEPTH) yield* copyEnvFiles(fs, path, from, to, depth + 1);
     } else if (info.type === "File" && name.startsWith(ENV_FILE_PREFIX)) {
-      const to = path.join(destination, name);
       if (yield* fs.exists(to)) continue;
       yield* fs.makeDirectory(destination, { recursive: true });
       yield* fs.copyFile(from, to);
@@ -229,6 +228,8 @@ export const renameNestedBranches = Effect.fn("NestedRepoWorktrees.rename")(func
             nested.branch = renamed.branch;
           }),
         ),
+        // A cancel must see the renamed branch, or its cleanup deletes the old name.
+        Effect.uninterruptible,
         Effect.catchCause((cause) =>
           Effect.logWarning("Nested worktree branch rename failed", { path: nested.path, cause }),
         ),
