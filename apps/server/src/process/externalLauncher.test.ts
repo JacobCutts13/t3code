@@ -713,6 +713,32 @@ it.effect.skipIf(windowsHost)("ignores unusable app bundles and keeps PATH launc
     yield* fs.makeDirectory(env.PATH);
     yield* fs.writeFileString(path.join(env.PATH, "cursor"), "#!/bin/sh\n");
     yield* fs.chmod(path.join(env.PATH, "cursor"), 0o755);
+    let spawned: ChildProcess.StandardCommand | undefined;
+    yield* Effect.gen(function* () {
+      const launcher = yield* ExternalLauncher.ExternalLauncher;
+      yield* launcher.launchEditor({ editor: "cursor", cwd: "/workspace" });
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          platform: "darwin",
+          env: { ...env, PATH: `${env.PATH}:/usr/bin` },
+          onSpawn: (command) => {
+            spawned = command;
+          },
+        }),
+      ),
+    );
+    assert.equal(spawned?.command, "cursor");
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect.skipIf(windowsHost)("opens Cursor in its default window, not the classic editor", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const binDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cursor-" });
+    yield* fs.writeFileString(path.join(binDir, "cursor"), "#!/bin/sh\n");
+    yield* fs.chmod(path.join(binDir, "cursor"), 0o755);
     const spawned: ChildProcess.StandardCommand[] = [];
     yield* Effect.gen(function* () {
       const launcher = yield* ExternalLauncher.ExternalLauncher;
@@ -722,7 +748,7 @@ it.effect.skipIf(windowsHost)("ignores unusable app bundles and keeps PATH launc
       Effect.provide(
         layerTest({
           platform: "darwin",
-          env: { ...env, PATH: `${env.PATH}:/usr/bin` },
+          env: { PATH: binDir },
           onSpawn: (command) => {
             spawned.push(command);
           },
