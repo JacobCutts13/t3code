@@ -1,7 +1,9 @@
+import { deriveLocalBranchNameFromRemoteRef } from "@t3tools/shared/git";
 import type {
   IssueComment,
   IssueDetail,
   LinearIssueDetail,
+  LinearIssueSummary,
   ThreadId,
   VcsRef,
 } from "@t3tools/contracts";
@@ -61,12 +63,16 @@ export function buildIssuePrompt(detail: IssueDetail, branch: string): string {
   );
 }
 
-export function buildLinearIssuePrompt(detail: LinearIssueDetail, branch: string): string {
+export function buildLinearIssuePrompt(
+  issue: LinearIssueSummary,
+  detail: LinearIssueDetail,
+  branch: string,
+): string {
   return buildPrompt(
     {
-      identifier: detail.issue.identifier,
-      title: detail.issue.title,
-      url: detail.issue.url,
+      identifier: issue.identifier,
+      title: issue.title,
+      url: issue.url,
       description: detail.description,
       comments: detail.comments,
       commentsTruncated: detail.commentsTruncated,
@@ -112,16 +118,20 @@ export function worktreeBase(
 ): { readonly branch: string; readonly startFromOrigin: boolean } | null {
   const local = new Set(refs.filter((ref) => ref.isRemote !== true).map((ref) => ref.name));
   const remote = new Set(refs.filter((ref) => ref.isRemote === true).map((ref) => ref.name));
-  const remoteDefault = refs.find((ref) => ref.isRemote === true && ref.isDefault)?.name;
+  const originDefault = refs.find(
+    (ref) => ref.isRemote === true && ref.remoteName === "origin" && ref.isDefault,
+  );
   const branch =
     refs.find((ref) => ref.isRemote !== true && ref.isDefault)?.name ??
-    (remoteDefault?.startsWith("origin/") ? remoteDefault.slice("origin/".length) : undefined) ??
+    (originDefault ? deriveLocalBranchNameFromRemoteRef(originDefault.name) : undefined) ??
     ["main", "master"].find((name) => local.has(name) || remote.has(`origin/${name}`));
   return branch === undefined ? null : { branch, startFromOrigin: remote.has(`origin/${branch}`) };
 }
 
-/** The newest open thread already working on `branch` in the project, if any. */
-export function dispatchedThreadId(
+const branchKey = (projectId: string, branch: string) => `${projectId}\0${branch}`;
+
+/** The newest open thread on each project branch, for looking up many issues at once. */
+export function threadsByBranch(
   threads: ReadonlyArray<{
     readonly id: ThreadId;
     readonly projectId: string;
@@ -129,15 +139,22 @@ export function dispatchedThreadId(
     readonly archivedAt: string | null;
     readonly updatedAt: string;
   }>,
+): ReadonlyMap<string, { readonly id: ThreadId; readonly updatedAt: string }> {
+  const byBranch = new Map<string, { readonly id: ThreadId; readonly updatedAt: string }>();
+  for (const thread of threads) {
+    if (thread.branch === null || thread.archivedAt !== null) continue;
+    const key = branchKey(thread.projectId, thread.branch);
+    const current = byBranch.get(key);
+    if (current === undefined || thread.updatedAt > current.updatedAt) byBranch.set(key, thread);
+  }
+  return byBranch;
+}
+
+/** The thread already working on `branch` in the project, if any. */
+export function dispatchedThreadId(
+  byBranch: ReturnType<typeof threadsByBranch>,
   projectId: string | undefined,
   branch: string,
 ): ThreadId | null {
-  if (projectId === undefined) return null;
-  const matches = threads.filter(
-    (thread) =>
-      thread.projectId === projectId && thread.branch === branch && thread.archivedAt === null,
-  );
-  return (
-    matches.toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]?.id ?? null
-  );
+  return projectId === undefined ? null : (byBranch.get(branchKey(projectId, branch))?.id ?? null);
 }

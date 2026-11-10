@@ -9,6 +9,7 @@ import {
   type LinearViewer,
 } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -42,9 +43,9 @@ export class LinearService extends Context.Service<
 >()("t3/linear/LinearService") {}
 
 const ISSUE_FIELDS = `
-  id identifier title url priority createdAt updatedAt
+  id identifier title url priority updatedAt
   state { name type color }
-  team { id key name }
+  team { id name }
   project { name }
   assignee { displayName }
 `;
@@ -66,7 +67,6 @@ query T3LinearIssues($assigned: IssueFilter, $created: IssueFilter, $withAssigne
 const GET_QUERY = `
 query T3LinearIssue($id: String!, $first: Int!) {
   issue(id: $id) {
-    ${ISSUE_FIELDS}
     description
     comments(first: $first) {
       nodes { body createdAt user { displayName } }
@@ -100,17 +100,15 @@ const IssueNode = Schema.Struct({
   title: Schema.String,
   url: Schema.String,
   priority: Schema.Number,
-  createdAt: Schema.String,
   updatedAt: Schema.String,
-  state: Schema.Struct({ name: Schema.String, type: Schema.String, color: Schema.String }),
-  team: Schema.Struct({ id: Schema.String, key: Schema.String, name: Schema.String }),
+  state: Schema.Struct({ name: Schema.String, type: LinearStateType, color: Schema.String }),
+  team: Schema.Struct({ id: Schema.String, name: Schema.String }),
   project: Schema.optional(Named),
   assignee: Schema.optional(Schema.NullOr(Schema.Struct({ displayName: Schema.String }))),
 });
 type IssueNode = typeof IssueNode.Type;
 // Rows decode one at a time, so one odd issue cannot blank the whole list.
 const decodeNode = Schema.decodeUnknownOption(IssueNode);
-const decodeStateType = Schema.decodeUnknownOption(LinearStateType);
 
 const Connection = Schema.Struct({
   nodes: Schema.Array(Schema.Unknown),
@@ -139,8 +137,6 @@ const GetData = Schema.Struct({
     }),
   ),
 });
-const decodeGetData = Schema.decodeUnknownOption(GetData);
-const RawGetData = Schema.Struct({ issue: Schema.NullOr(Schema.Unknown) });
 const StatesData = Schema.Struct({
   issue: Schema.NullOr(
     Schema.Struct({
@@ -217,37 +213,25 @@ export function listVariables(input: LinearIssueListInput) {
   };
 }
 
-function toSummary(node: IssueNode): LinearIssueSummary | null {
-  const type = decodeStateType(node.state.type);
-  if (Option.isNone(type)) return null;
+function toSummary(node: IssueNode): LinearIssueSummary {
   return {
     id: node.id,
     identifier: node.identifier,
     title: node.title,
     url: node.url,
     priority: Math.max(0, Math.round(node.priority)),
-    state: { name: node.state.name, type: type.value, color: node.state.color },
+    state: node.state,
     team: node.team,
     project: node.project?.name ?? null,
     assignee: node.assignee?.displayName ?? null,
-    createdAt: node.createdAt,
     updatedAt: node.updatedAt,
   };
 }
 
-const byNewestUpdate = (left: LinearIssueSummary, right: LinearIssueSummary) =>
-  right.updatedAt.localeCompare(left.updatedAt);
-
-export interface LinearServiceOptions {
-  /** The server's environment; `LINEAR_API_KEY` there is used when settings hold no key. */
-  readonly env?: Readonly<Record<string, string | undefined>>;
-}
-
-export const make = Effect.fn("LinearService.make")(function* (options: LinearServiceOptions = {}) {
+export const make = Effect.gen(function* () {
   const settingsService = yield* ServerSettings.ServerSettingsService;
   const secrets = yield* SecretResolver.SecretResolver;
   const http = yield* HttpClient.HttpClient;
-  const env = options.env ?? process.env;
 
   const apiKey = Effect.fn("LinearService.apiKey")(function* (operation: string) {
     const settings = yield* settingsService.getSettings.pipe(
@@ -262,7 +246,7 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
       );
       return key.trim();
     }
-    const fromEnv = env.LINEAR_API_KEY?.trim();
+    const fromEnv = (yield* HostProcess.Environment).LINEAR_API_KEY?.trim();
     if (fromEnv) return fromEnv;
     return yield* fail(
       operation,
@@ -278,7 +262,8 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
     schema: S,
   ) {
     const key = yield* apiKey(operation);
-    const response = yield* http
+    // The timeout covers the body too: headers can arrive while the body stalls.
+    const { response, body } = yield* http
       .execute(
         HttpClientRequest.post(ENDPOINT).pipe(
           // Personal API keys go in the header as they are, without `Bearer`.
@@ -287,6 +272,12 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
         ),
       )
       .pipe(
+        Effect.flatMap((response) =>
+          response.json.pipe(
+            Effect.orElseSucceed((): unknown => undefined),
+            Effect.map((body) => ({ response, body })),
+          ),
+        ),
         // A redirect could carry the key to another origin.
         Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
         Effect.provideService(HttpClient.TracerPropagationEnabled, false),
@@ -295,7 +286,6 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
           fail(operation, "request-failed", "Couldn't reach Linear. Check your connection.", cause),
         ),
       );
-    const body = yield* response.json.pipe(Effect.orElseSucceed((): unknown => undefined));
     const envelope = decodeEnvelope(body);
     const errors = Option.isSome(envelope) ? (envelope.value.errors ?? []) : [];
     if (response.status === 401 || response.status === 403 || errors.some(isAuthenticationError)) {
@@ -331,12 +321,9 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
   ) {
     const issues: Array<LinearIssueSummary> = [];
     for (const node of nodes) {
-      const summary = Option.getOrNull(Option.map(decodeNode(node), toSummary));
-      if (summary === null) {
-        yield* Effect.logWarning("Linear sent an issue this server cannot read");
-      } else {
-        issues.push(summary);
-      }
+      const decoded = decodeNode(node);
+      if (Option.isSome(decoded)) issues.push(toSummary(decoded.value));
+      else yield* Effect.logWarning("Linear sent an issue this server cannot read");
     }
     return issues;
   });
@@ -357,31 +344,32 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
     const rows = yield* decodeNodes(connections.flatMap((connection) => connection.nodes));
     const unique = new Map(rows.map((issue) => [issue.id, issue] as const));
     return {
-      entries: [...unique.values()].toSorted(byNewestUpdate),
+      entries: [...unique.values()],
       hasMore: connections.some((connection) => connection.pageInfo.hasNextPage),
     } satisfies LinearIssueListResult;
   });
 
   const get = Effect.fn("LinearService.get")(function* (id: string) {
     const operation = "linear.issuesGet";
-    const raw = yield* request(operation, GET_QUERY, { id, first: LINEAR_PAGE_SIZE }, RawGetData);
-    const detail = Option.getOrNull(decodeGetData(raw));
-    const summary =
-      raw.issue === null ? null : Option.getOrNull(Option.map(decodeNode(raw.issue), toSummary));
-    if (detail?.issue == null || summary === null) {
+    const { issue } = yield* request(
+      operation,
+      GET_QUERY,
+      { id, first: LINEAR_PAGE_SIZE },
+      GetData,
+    );
+    if (issue === null) {
       return yield* fail(operation, "request-failed", "Linear has no issue with that id.");
     }
     return {
-      issue: summary,
-      description: detail.issue.description ?? "",
-      comments: detail.issue.comments.nodes
+      description: issue.description ?? "",
+      comments: issue.comments.nodes
         .map((comment) => ({
           author: comment.user?.displayName ?? null,
           body: comment.body,
           createdAt: comment.createdAt,
         }))
         .toSorted((left, right) => left.createdAt.localeCompare(right.createdAt)),
-      commentsTruncated: detail.issue.comments.pageInfo.hasNextPage,
+      commentsTruncated: issue.comments.pageInfo.hasNextPage,
     } satisfies LinearIssueDetail;
   });
 
@@ -418,6 +406,6 @@ export const make = Effect.fn("LinearService.make")(function* (options: LinearSe
   return LinearService.of({ viewer, list, get, start });
 });
 
-export const layer = Layer.effect(LinearService, make()).pipe(
+export const layer = Layer.effect(LinearService, make).pipe(
   Layer.provide([SecretResolverLayer.layer, FetchHttpClient.layer]),
 );

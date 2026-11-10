@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
+  type AtomCommandResult,
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
@@ -44,6 +45,24 @@ const errorMessage = (error: unknown) =>
 
 function fail(title: string, description: string): false {
   toastManager.add(stackedThreadToast({ type: "error", title, description }));
+  return false;
+}
+
+/** Toasts a failed command unless it was interrupted. */
+function reportFailure(
+  result: AtomCommandResult<unknown, unknown> & { readonly _tag: "Failure" },
+  title: string,
+  type: "error" | "warning" = "error",
+): false {
+  if (!isAtomCommandInterrupted(result)) {
+    toastManager.add(
+      stackedThreadToast({
+        type,
+        title,
+        description: errorMessage(squashAtomCommandFailure(result)),
+      }),
+    );
+  }
   return false;
 }
 
@@ -154,12 +173,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         createdAt,
       },
     });
-    if (started._tag === "Failure") {
-      if (!isAtomCommandInterrupted(started)) {
-        fail("Could not start the agent", errorMessage(squashAtomCommandFailure(started)));
-      }
-      return false;
-    }
+    if (started._tag === "Failure") return reportFailure(started, "Could not start the agent");
     await navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(scopeThreadRef(environmentId, threadId)),
@@ -183,12 +197,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         environmentId,
         input: { host: issue.host, repository: issue.repository, number: issue.number },
       });
-      if (detail._tag === "Failure") {
-        if (!isAtomCommandInterrupted(detail)) {
-          fail("Could not read the issue", errorMessage(squashAtomCommandFailure(detail)));
-        }
-        return false;
-      }
+      if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
       // Branching from a guessed base could start the work on the wrong history.
       const baseBranch = detail.value.defaultBranch;
       if (baseBranch === null) {
@@ -227,14 +236,13 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     try {
       const [detail, refs] = await Promise.all([
         readLinearIssue({ environmentId, input: { id: issue.id } }),
-        readRefs({ environmentId, input: { cwd: project.workspaceRoot, limit: 100 } }),
+        // Without matching remote refs, a local default hides origin's and the worktree misses a fetch.
+        readRefs({
+          environmentId,
+          input: { cwd: project.workspaceRoot, limit: 100, includeMatchingRemoteRefs: true },
+        }),
       ]);
-      if (detail._tag === "Failure") {
-        if (!isAtomCommandInterrupted(detail)) {
-          fail("Could not read the issue", errorMessage(squashAtomCommandFailure(detail)));
-        }
-        return false;
-      }
+      if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
       if (refs._tag === "Failure" || !refs.value.isRepo) {
         return fail("Cannot dispatch", `${project.title} is not a git repository.`);
       }
@@ -248,7 +256,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         project,
         modelSelection,
         title: `${issue.identifier} ${issue.title}`,
-        text: buildLinearIssuePrompt(detail.value, branch),
+        text: buildLinearIssuePrompt(issue, detail.value, branch),
         baseBranch: base.branch,
         branch,
         startFromOrigin: base.startFromOrigin,
@@ -256,15 +264,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       if (!launched) return false;
       const moved = await startLinearIssue({ environmentId, input: { id: issue.id } });
       if (moved._tag === "Failure") {
-        if (!isAtomCommandInterrupted(moved)) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "warning",
-              title: `Could not move ${issue.identifier} in Linear`,
-              description: errorMessage(squashAtomCommandFailure(moved)),
-            }),
-          );
-        }
+        reportFailure(moved, `Could not move ${issue.identifier} in Linear`, "warning");
       } else if (moved.value.moved) {
         toastManager.add(
           stackedThreadToast({

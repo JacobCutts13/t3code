@@ -1,6 +1,7 @@
 import {
   type IssueDetail,
   type LinearIssueDetail,
+  type LinearIssueSummary,
   ThreadId,
   type VcsRef,
 } from "@t3tools/contracts";
@@ -13,6 +14,7 @@ import {
   issueBranchName,
   issueSlug,
   linearBranchName,
+  threadsByBranch,
   worktreeBase,
 } from "./issueDispatch.logic";
 
@@ -132,20 +134,20 @@ On it
   });
 });
 
+const linearIssue: LinearIssueSummary = {
+  id: "uuid-1",
+  identifier: "ENG-123",
+  title: "Fix login",
+  url: "https://linear.app/acme/issue/ENG-123/fix-login",
+  priority: 2,
+  state: { name: "Todo", type: "unstarted", color: "#e2e2e2" },
+  team: { id: "team-1", name: "Engineering" },
+  project: null,
+  assignee: null,
+  updatedAt: "2026-01-02T00:00:00Z",
+};
+
 const linearDetail: LinearIssueDetail = {
-  issue: {
-    id: "uuid-1",
-    identifier: "ENG-123",
-    title: "Fix login",
-    url: "https://linear.app/acme/issue/ENG-123/fix-login",
-    priority: 2,
-    state: { name: "Todo", type: "unstarted", color: "#e2e2e2" },
-    team: { id: "team-1", key: "ENG", name: "Engineering" },
-    project: null,
-    assignee: null,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-02T00:00:00Z",
-  },
   description: "",
   comments: [],
   commentsTruncated: false,
@@ -153,11 +155,11 @@ const linearDetail: LinearIssueDetail = {
 
 describe("Linear dispatch", () => {
   it("branches as <identifier>-<slug>", () => {
-    expect(linearBranchName(linearDetail.issue)).toBe("eng-123-fix-login");
+    expect(linearBranchName(linearIssue)).toBe("eng-123-fix-login");
   });
 
   it("uses the GitHub template with the Linear identifier", () => {
-    expect(buildLinearIssuePrompt(linearDetail, "eng-123-fix-login")).toBe(
+    expect(buildLinearIssuePrompt(linearIssue, linearDetail, "eng-123-fix-login")).toBe(
       `/complete-task # Source: ENG-123 - Fix login
 
 Source: https://linear.app/acme/issue/ENG-123/fix-login
@@ -191,7 +193,7 @@ describe("worktreeBase", () => {
     },
     {
       name: "origin's default when no local branch is marked",
-      refs: [ref("origin/develop", { isRemote: true, isDefault: true })],
+      refs: [ref("origin/develop", { isRemote: true, remoteName: "origin", isDefault: true })],
       expected: { branch: "develop", startFromOrigin: true },
     },
     {
@@ -226,8 +228,9 @@ describe("dispatchedThreadId", () => {
       thread("new", "p1", "2026-01-02T00:00:00Z"),
       thread("archived", "p1", "2026-01-08T00:00:00Z", "2026-01-08T00:00:00Z"),
     ];
-    expect(dispatchedThreadId(threads, "p1", "fix/12-crash")).toBe("new");
-    expect(dispatchedThreadId(threads, "p3", "fix/12-crash")).toBeNull();
-    expect(dispatchedThreadId(threads, undefined, "fix/12-crash")).toBeNull();
+    const byBranch = threadsByBranch(threads);
+    expect(dispatchedThreadId(byBranch, "p1", "fix/12-crash")).toBe("new");
+    expect(dispatchedThreadId(byBranch, "p3", "fix/12-crash")).toBeNull();
+    expect(dispatchedThreadId(byBranch, undefined, "fix/12-crash")).toBeNull();
   });
 });

@@ -45,10 +45,9 @@ describe("mergeIssueSources", () => {
       url: `https://linear.app/acme/issue/ENG-${id}`,
       priority: 0,
       state: { name: "Todo", type: "unstarted", color: "#e2e2e2" },
-      team: { id: "t", key: "ENG", name: "Engineering" },
+      team: { id: "t", name: "Engineering" },
       project: null,
       assignee: null,
-      createdAt: "2026-01-01T00:00:00Z",
       updatedAt,
     });
     const merged = mergeIssueSources(

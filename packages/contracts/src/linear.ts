@@ -29,10 +29,9 @@ export const LinearIssueSummary = Schema.Struct({
     /** Hex with the leading `#`. */
     color: Schema.String,
   }),
-  team: Schema.Struct({ id: TrimmedNonEmptyString, key: Schema.String, name: Schema.String }),
+  team: Schema.Struct({ id: TrimmedNonEmptyString, name: Schema.String }),
   project: Schema.NullOr(Schema.String),
   assignee: Schema.NullOr(Schema.String),
-  createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
 export type LinearIssueSummary = typeof LinearIssueSummary.Type;
@@ -53,8 +52,8 @@ export type LinearIssueListResult = typeof LinearIssueListResult.Type;
 export const LinearIssueInput = Schema.Struct({ id: TrimmedNonEmptyString });
 export type LinearIssueInput = typeof LinearIssueInput.Type;
 
+/** What the list's summary does not carry. */
 export const LinearIssueDetail = Schema.Struct({
-  issue: LinearIssueSummary,
   description: Schema.String,
   /** Oldest first. */
   comments: Schema.Array(IssueComment),

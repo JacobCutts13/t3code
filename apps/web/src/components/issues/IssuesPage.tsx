@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   type EnvironmentId,
+  type IssueComment,
   type IssueInvolvement,
   type IssueState,
   type IssueSummary,
@@ -32,7 +33,12 @@ import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 import ChatMarkdown from "../ChatMarkdown";
 import { RelativeTime } from "../RelativeTime";
 import { IssueModelPicker } from "./IssueModelPicker";
-import { dispatchedThreadId, issueBranchName, linearBranchName } from "./issueDispatch.logic";
+import {
+  dispatchedThreadId,
+  issueBranchName,
+  linearBranchName,
+  threadsByBranch,
+} from "./issueDispatch.logic";
 import { type IssueEntry, mergeIssuePages, mergeIssueSources } from "./issueList.logic";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -201,23 +207,44 @@ function LinearIssueMeta(props: { readonly issue: LinearIssueSummary }) {
   );
 }
 
-function IssueComments(props: {
+/** An issue's description and comments, whichever tracker it comes from. */
+function IssueDetailBody(props: {
   readonly environmentId: EnvironmentId;
-  readonly comments: ReadonlyArray<{
-    readonly author: string | null;
-    readonly body: string;
-    readonly createdAt: string;
-  }>;
-  readonly truncated: boolean;
+  readonly error: string | null;
+  readonly detail: {
+    readonly description: string;
+    readonly comments: ReadonlyArray<IssueComment>;
+    readonly commentsTruncated: boolean;
+  } | null;
 }) {
+  const { environmentId, error, detail } = props;
+  if (error !== null) {
+    return (
+      <p role="alert" className="text-destructive-foreground text-sm">
+        {error}
+      </p>
+    );
+  }
+  if (detail === null) {
+    return (
+      <p role="status" className="text-muted-foreground text-sm">
+        Loading…
+      </p>
+    );
+  }
   return (
     <>
-      {props.truncated ? (
+      {detail.description.trim() === "" ? (
+        <p className="text-muted-foreground text-sm">No description.</p>
+      ) : (
+        <ChatMarkdown text={detail.description} cwd={undefined} environmentId={environmentId} />
+      )}
+      {detail.commentsTruncated ? (
         <p className="text-muted-foreground text-xs">
-          Showing the first {props.comments.length} comments.
+          Showing the first {detail.comments.length} comments.
         </p>
       ) : null}
-      {props.comments.map((comment) => (
+      {detail.comments.map((comment) => (
         <section
           key={`${comment.createdAt}:${comment.author ?? ""}`}
           className="flex flex-col gap-1 border-t pt-3"
@@ -225,7 +252,7 @@ function IssueComments(props: {
           <h3 className="text-muted-foreground text-xs">
             {comment.author ?? "unknown"} · <RelativeTime timestamp={comment.createdAt} />
           </h3>
-          <ChatMarkdown text={comment.body} cwd={undefined} environmentId={props.environmentId} />
+          <ChatMarkdown text={comment.body} cwd={undefined} environmentId={environmentId} />
         </section>
       ))}
     </>
@@ -258,32 +285,11 @@ function LinearIssueDetailPane(props: {
           </a>
         </div>
       </header>
-      {detail.error !== null ? (
-        <p role="alert" className="text-destructive-foreground text-sm">
-          {detail.error}
-        </p>
-      ) : detail.data === null ? (
-        <p role="status" className="text-muted-foreground text-sm">
-          Loading…
-        </p>
-      ) : (
-        <>
-          {detail.data.description.trim() === "" ? (
-            <p className="text-muted-foreground text-sm">No description.</p>
-          ) : (
-            <ChatMarkdown
-              text={detail.data.description}
-              cwd={undefined}
-              environmentId={environmentId}
-            />
-          )}
-          <IssueComments
-            environmentId={environmentId}
-            comments={detail.data.comments}
-            truncated={detail.data.commentsTruncated}
-          />
-        </>
-      )}
+      <IssueDetailBody
+        environmentId={environmentId}
+        error={detail.error}
+        detail={detail.data === null ? null : detail.data}
+      />
     </article>
   );
 }
@@ -328,28 +334,11 @@ function IssueDetailPane(props: {
           ))}
         </div>
       </header>
-      {detail.error !== null ? (
-        <p role="alert" className="text-destructive-foreground text-sm">
-          {detail.error}
-        </p>
-      ) : detail.data === null ? (
-        <p role="status" className="text-muted-foreground text-sm">
-          Loading…
-        </p>
-      ) : (
-        <>
-          {detail.data.body.trim() === "" ? (
-            <p className="text-muted-foreground text-sm">No description.</p>
-          ) : (
-            <ChatMarkdown text={detail.data.body} cwd={undefined} environmentId={environmentId} />
-          )}
-          <IssueComments
-            environmentId={environmentId}
-            comments={detail.data.comments}
-            truncated={detail.data.commentsTruncated}
-          />
-        </>
-      )}
+      <IssueDetailBody
+        environmentId={environmentId}
+        error={detail.error}
+        detail={detail.data === null ? null : { ...detail.data, description: detail.data.body }}
+      />
     </article>
   );
 }
@@ -405,7 +394,9 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const projects = useProjects().filter(
     (project) => project.environmentId === environmentId && project.isScratch !== true,
   );
-  const threads = useThreadShells().filter((thread) => thread.environmentId === environmentId);
+  const byBranch = threadsByBranch(
+    useThreadShells().filter((thread) => thread.environmentId === environmentId),
+  );
   const showGitHub = source !== "linear";
   const showLinear = source !== "github";
   const list = useEnvironmentQuery(
@@ -497,12 +488,12 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const selectedProject = selected === null ? undefined : projectOf(selected);
 
   const dispatchEntry = async (entry: IssueEntry) => {
-    const project = entry.source === "linear" ? linearProjectFor(entry.issue) : undefined;
-    if (entry.source === "linear" && project === undefined) return;
+    const project = projectOf(entry);
+    if (project === undefined) return;
     setDispatchingKey(entry.key);
     // Both report their own failures and never reject.
     if (entry.source === "github") await dispatch(entry.issue, picked);
-    else if (project !== undefined) await dispatchLinear(entry.issue, project, picked);
+    else await dispatchLinear(entry.issue, project, picked);
     setDispatchingKey(null);
   };
 
@@ -573,7 +564,7 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
                     blocked={blockedReason(entry)}
                     environmentId={environmentId}
                     dispatchedThreadId={dispatchedThreadId(
-                      threads,
+                      byBranch,
                       projectOf(entry)?.id,
                       branchOf(entry),
                     )}

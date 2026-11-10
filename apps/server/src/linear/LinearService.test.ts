@@ -1,5 +1,6 @@
 import { it } from "@effect/vitest";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
@@ -8,8 +9,8 @@ import { expect, vi } from "vite-plus/test";
 import * as ServerSettings from "../serverSettings.ts";
 import * as LinearService from "./LinearService.ts";
 
-const layer = (apiKey: string, env: Record<string, string> = {}) =>
-  Layer.effect(LinearService.LinearService, LinearService.make({ env })).pipe(
+const layer = (apiKey: string) =>
+  Layer.effect(LinearService.LinearService, LinearService.make).pipe(
     Layer.provideMerge(ServerSettings.layerTest({ linear: { apiKey } })),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Layer.mock(SecretResolver.SecretResolver)({})),
@@ -21,10 +22,9 @@ const node = (id: string, updatedAt: string, stateType = "unstarted") => ({
   title: `Issue ${id}`,
   url: `https://linear.app/acme/issue/ENG-${id}`,
   priority: 2,
-  createdAt: "2026-11-01T00:00:00.000Z",
   updatedAt,
   state: { name: "Todo", type: stateType, color: "#e2e2e2" },
-  team: { id: "team-1", key: "ENG", name: "Engineering" },
+  team: { id: "team-1", name: "Engineering" },
   project: { name: "Login" },
   assignee: null,
 });
@@ -50,12 +50,13 @@ const run = <A, E>(
   apiKey: string,
   api: ReturnType<typeof linearApi>,
   use: (service: LinearService.LinearService["Service"]) => Effect.Effect<A, E>,
-  env?: Record<string, string>,
+  env: Record<string, string> = {},
 ) =>
   LinearService.LinearService.pipe(
     Effect.flatMap(use),
-    Effect.provide(layer(apiKey, env)),
+    Effect.provide(layer(apiKey)),
     Effect.provideService(FetchHttpClient.Fetch, api.fetch),
+    Effect.provideService(HostProcess.Environment, env),
   );
 
 it.each([
@@ -96,7 +97,7 @@ it.each([
   },
 );
 
-it.effect("lists assigned and created issues once each, newest first, skipping odd rows", () =>
+it.effect("lists assigned and created issues once each, skipping odd rows", () =>
   Effect.gen(function* () {
     const api = linearApi({
       body: {
@@ -117,10 +118,10 @@ it.effect("lists assigned and created issues once each, newest first, skipping o
     const result = yield* run("lin_api_secret", api, (linear) =>
       linear.list({ involvement: "mine", state: "open" }),
     );
-    expect(result.entries.map((issue) => issue.identifier)).toEqual(["ENG-2", "ENG-1"]);
+    expect(result.entries.map((issue) => issue.identifier)).toEqual(["ENG-1", "ENG-2"]);
     expect(result.entries[0]).toMatchObject({
       state: { name: "Todo", type: "unstarted", color: "#e2e2e2" },
-      team: { key: "ENG" },
+      team: { id: "team-1", name: "Engineering" },
       project: "Login",
       assignee: null,
     });
@@ -197,7 +198,6 @@ it.effect("reads an issue with its comments oldest first", () =>
       body: {
         data: {
           issue: {
-            ...node("1", "2026-11-02T00:00:00.000Z"),
             description: "Steps",
             comments: {
               nodes: [
