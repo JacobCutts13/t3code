@@ -120,13 +120,16 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    const created = await createFromRepos({
-      environmentId,
-      repos: selected,
-      name: projectName.trim(),
-    });
-    setSaving(false);
-    if (created) closeCreateProjectFromRepos();
+    try {
+      const created = await createFromRepos({
+        environmentId,
+        repos: selected,
+        name: projectName.trim(),
+      });
+      if (created) closeCreateProjectFromRepos();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveStable = useStableCallback(save);
