@@ -40,11 +40,10 @@ const make = Effect.gen(function* () {
 
   return IssueService.of({
     list: Effect.fn("IssueService.list")(function* (input) {
-      const entries = yield* (yield* provider("issues.list")).list({
+      return yield* (yield* provider("issues.list")).list({
         ...input,
         host: input.host ?? DEFAULT_HOST,
       });
-      return { entries };
     }),
     get: Effect.fn("IssueService.get")(function* (input) {
       return yield* (yield* provider("issues.get")).get({

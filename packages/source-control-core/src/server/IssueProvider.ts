@@ -2,7 +2,7 @@ import type {
   IssueDetail,
   IssueGetInput,
   IssueListInput,
-  IssueSummary,
+  IssueListResult,
   PullRequestOperationError,
 } from "@t3tools/contracts";
 import type * as Effect from "effect/Effect";
@@ -11,7 +11,7 @@ import type * as Effect from "effect/Effect";
 export interface IssueProviderApi {
   readonly list: (
     input: IssueListInput & { readonly host: string },
-  ) => Effect.Effect<ReadonlyArray<IssueSummary>, PullRequestOperationError>;
+  ) => Effect.Effect<IssueListResult, PullRequestOperationError>;
   readonly get: (
     input: IssueGetInput & { readonly host: string },
   ) => Effect.Effect<IssueDetail, PullRequestOperationError>;

@@ -62,6 +62,8 @@ const decodeComments = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.A
 // The most GitHub serves per request, and the most a list shows. GitHub counts pull requests
 // against `per_page` and they are dropped afterwards, so a smaller page could come back empty.
 const PAGE_SIZE = 100;
+// Comments are read this many pages deep; a longer thread is reported as truncated.
+const MAX_COMMENT_PAGES = 5;
 const SEGMENT = /^[\w.-]+$/;
 // "." and ".." match SEGMENT and would walk the request path out of repos/.
 const isRepository = (value: string) => {
@@ -150,18 +152,52 @@ export const make = Effect.gen(function* () {
         skipped: rows.value.length - issues.length,
       });
     }
-    return issues.flatMap((issue) => toSummary(host, issue, undefined) ?? []);
+    return {
+      issues: issues.flatMap((issue) => toSummary(host, issue, undefined) ?? []),
+      full: rows.value.length >= PAGE_SIZE,
+    };
+  });
+
+  const readComments = Effect.fn("GitHubIssueProvider.readComments")(function* (
+    host: string,
+    path: string,
+  ) {
+    const operation = "getIssue";
+    const comments: Array<typeof RestComment.Type> = [];
+    for (let page = 1; page <= MAX_COMMENT_PAGES; page++) {
+      const response = yield* read(
+        host,
+        operation,
+        `${path}/comments?per_page=${PAGE_SIZE}&page=${page}`,
+      );
+      const decoded = decodeComments(response.body);
+      if (Option.isNone(decoded)) {
+        yield* Effect.logWarning("GitHub sent comments this server cannot read", { host, path });
+        return yield* failure(
+          operation,
+          "GitHub sent comments in a shape this server cannot read.",
+        );
+      }
+      comments.push(...decoded.value);
+      if (decoded.value.length < PAGE_SIZE) return { comments, truncated: false };
+    }
+    return { comments, truncated: true };
   });
 
   const list: IssueProviderApi["list"] = Effect.fn("GitHubIssueProvider.list")(function* (input) {
     const query = (filter: string) =>
-      `issues?state=${input.state ?? "open"}&sort=updated&per_page=${PAGE_SIZE}&filter=${filter}`;
-    const lists = yield* Effect.all(
+      `issues?state=${input.state ?? "open"}&sort=updated&per_page=${PAGE_SIZE}&page=${input.page ?? 1}&filter=${filter}`;
+    const pages = yield* Effect.all(
       filtersFor(input.involvement).map((filter) => readIssues(input.host, query(filter))),
       { concurrency: 2 },
     );
-    const unique = new Map(lists.flat().map((issue) => [issue.url, issue] as const));
-    return [...unique.values()].toSorted(byNewestUpdate).slice(0, PAGE_SIZE);
+    const unique = new Map(
+      pages.flatMap((page) => page.issues).map((issue) => [issue.url, issue] as const),
+    );
+    return {
+      entries: [...unique.values()].toSorted(byNewestUpdate),
+      hasMore: pages.some((page) => page.full),
+    };
   });
 
   const get: IssueProviderApi["get"] = Effect.fn("GitHubIssueProvider.get")(function* (input) {
@@ -170,18 +206,17 @@ export const make = Effect.gen(function* () {
       return yield* failure(operation, "Name the repository as owner/name.");
     }
     const path = `repos/${input.repository}/issues/${input.number}`;
-    const [issueResponse, commentsResponse, repositoryResponse] = yield* Effect.all(
+    const [issueResponse, repositoryResponse, comments] = yield* Effect.all(
       [
         read(input.host, operation, path),
-        read(input.host, operation, `${path}/comments?per_page=100`),
         read(input.host, operation, `repos/${input.repository}`),
+        readComments(input.host, path),
       ],
       { concurrency: 3 },
     );
     const issue = decodeIssue(issueResponse.body);
-    const comments = decodeComments(commentsResponse.body);
     const repository = decodeRepository(repositoryResponse.body);
-    if (Option.isNone(issue) || Option.isNone(comments) || Option.isNone(repository)) {
+    if (Option.isNone(issue) || Option.isNone(repository)) {
       yield* Effect.logWarning("GitHub sent an issue this server cannot read", {
         host: input.host,
         repository: input.repository,
@@ -195,11 +230,12 @@ export const make = Effect.gen(function* () {
       issue: summary,
       body: issue.value.body ?? "",
       defaultBranch: repository.value.default_branch ?? null,
-      comments: comments.value.map((comment) => ({
+      comments: comments.comments.map((comment) => ({
         author: comment.user?.login ?? null,
         body: comment.body ?? "",
         createdAt: comment.created_at,
       })),
+      commentsTruncated: comments.truncated,
     } satisfies IssueDetail;
   });
 

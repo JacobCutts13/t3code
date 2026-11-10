@@ -8,16 +8,23 @@ import type {
 import { CircleDotIcon, ExternalLinkIcon, PlayIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 
+import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+} from "@t3tools/client-runtime/state/runtime";
+
 import { useDispatchIssue } from "~/hooks/useDispatchIssue";
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
 import { usePrimaryEnvironmentId } from "~/state/environments";
 import { issueEnvironment } from "~/state/issues";
 import { useEnvironmentQuery } from "~/state/query";
+import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 
 import ChatMarkdown from "../ChatMarkdown";
 import { RelativeTime } from "../RelativeTime";
 import { IssueModelPicker } from "./IssueModelPicker";
+import { mergeIssuePages } from "./issueList.logic";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
@@ -177,6 +184,11 @@ function IssueDetailPane(props: {
           ) : (
             <ChatMarkdown text={detail.data.body} cwd={undefined} environmentId={environmentId} />
           )}
+          {detail.data.commentsTruncated ? (
+            <p className="text-muted-foreground text-xs">
+              Showing the first {detail.data.comments.length} comments.
+            </p>
+          ) : null}
           {detail.data.comments.map((comment) => (
             <section
               key={`${comment.createdAt}:${comment.author ?? ""}`}
@@ -194,6 +206,21 @@ function IssueDetailPane(props: {
   );
 }
 
+interface MorePages {
+  readonly key: string;
+  readonly entries: ReadonlyArray<IssueSummary>;
+  /** Pages read so far, the first included. */
+  readonly pages: number;
+  readonly hasMore: boolean;
+  readonly loading: boolean;
+  readonly error: string | null;
+}
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error && error.message.trim().length > 0
+    ? error.message
+    : "Could not load more issues.";
+
 function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const { environmentId } = props;
   const [involvement, setInvolvement] = useState<IssueInvolvement>("mine");
@@ -206,7 +233,54 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const list = useEnvironmentQuery(
     issueEnvironment.list({ environmentId, input: { involvement, state } }),
   );
-  const entries = list.data?.entries ?? [];
+  const loadPage = useAtomQueryRunner(issueEnvironment.list, {
+    reportFailure: false,
+    reportDefect: false,
+  });
+  // Pages after the first, read by "Load more" under the filters in `key`.
+  const [more, setMore] = useState<MorePages | null>(null);
+  const filterKey = `${involvement}:${state}`;
+  const extra = more?.key === filterKey ? more : null;
+  const entries = mergeIssuePages([list.data?.entries ?? [], extra?.entries ?? []]);
+  const hasMore = extra === null ? (list.data?.hasMore ?? false) : extra.hasMore;
+
+  const loadMore = async () => {
+    const pages = extra?.pages ?? 1;
+    const previous = extra?.entries ?? [];
+    setMore({
+      key: filterKey,
+      entries: previous,
+      pages,
+      hasMore: true,
+      loading: true,
+      error: null,
+    });
+    const result = await loadPage({
+      environmentId,
+      input: { involvement, state, page: pages + 1 },
+    });
+    const next: MorePages =
+      result._tag === "Success"
+        ? {
+            key: filterKey,
+            entries: mergeIssuePages([previous, result.value.entries]),
+            pages: pages + 1,
+            hasMore: result.value.hasMore,
+            loading: false,
+            error: null,
+          }
+        : {
+            key: filterKey,
+            entries: previous,
+            pages,
+            hasMore: true,
+            loading: false,
+            error: isAtomCommandInterrupted(result)
+              ? null
+              : errorMessage(squashAtomCommandFailure(result)),
+          };
+    setMore((current) => (current?.key === filterKey ? next : current));
+  };
   const selected = entries.find((issue) => issueKey(issue) === selectedKey) ?? null;
   const selectedProject = selected === null ? undefined : projectFor(selected);
 
@@ -235,7 +309,10 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           size="icon-sm"
           variant="ghost-muted"
           aria-label="Refresh issues"
-          onClick={list.refresh}
+          onClick={() => {
+            setMore(null);
+            list.refresh();
+          }}
         >
           <RefreshCwIcon className={cn(list.isPending && "animate-spin")} />
         </Button>
@@ -259,22 +336,43 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
               </EmptyHeader>
             </Empty>
           ) : (
-            <ul>
-              {entries.map((issue) => {
-                const key = issueKey(issue);
-                return (
-                  <IssueRow
-                    key={key}
-                    issue={issue}
-                    selected={key === selectedKey}
-                    dispatching={dispatchingKey === key}
-                    hasProject={projectFor(issue) !== undefined}
-                    onSelect={() => setSelectedKey(key)}
-                    onDispatch={() => void dispatchIssue(issue)}
-                  />
-                );
-              })}
-            </ul>
+            <>
+              <ul>
+                {entries.map((issue) => {
+                  const key = issueKey(issue);
+                  return (
+                    <IssueRow
+                      key={key}
+                      issue={issue}
+                      selected={key === selectedKey}
+                      dispatching={dispatchingKey === key}
+                      hasProject={projectFor(issue) !== undefined}
+                      onSelect={() => setSelectedKey(key)}
+                      onDispatch={() => void dispatchIssue(issue)}
+                    />
+                  );
+                })}
+              </ul>
+              {hasMore ? (
+                <div className="flex flex-col items-start gap-2 p-3">
+                  <Button
+                    type="button"
+                    size="compact"
+                    variant="outline"
+                    disabled={extra?.loading === true}
+                    onClick={() => void loadMore()}
+                  >
+                    {extra?.loading === true ? <Spinner /> : null}
+                    Load more
+                  </Button>
+                  {extra?.error ? (
+                    <p role="alert" className="text-destructive-foreground text-xs">
+                      {extra.error}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
           )}
         </div>
         <div className="min-w-0 flex-1 overflow-y-auto">

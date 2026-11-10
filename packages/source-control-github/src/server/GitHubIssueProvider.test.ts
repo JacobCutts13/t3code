@@ -48,14 +48,14 @@ const provider = (answers: Record<string, unknown>) => {
 it.effect("merges assigned and authored issues, drops pull requests, newest first", () =>
   Effect.gen(function* () {
     const { make } = provider({
-      "issues?state=open&sort=updated&per_page=100&filter=assigned": [
+      "issues?state=open&sort=updated&per_page=100&page=1&filter=assigned": [
         issue(1),
         issue(3, { pull_request: {} }),
       ],
-      "issues?state=open&sort=updated&per_page=100&filter=created": [issue(1), issue(2)],
+      "issues?state=open&sort=updated&per_page=100&page=1&filter=created": [issue(1), issue(2)],
     });
     const issues = yield* make;
-    const entries = yield* issues.list({ involvement: "mine", host: "github.com" });
+    const { entries } = yield* issues.list({ involvement: "mine", host: "github.com" });
     assert.deepStrictEqual(
       entries.map((entry) => entry.number),
       [2, 1],
@@ -72,17 +72,19 @@ it.effect("merges assigned and authored issues, drops pull requests, newest firs
 it.effect("lists only the requested state and relationship", () =>
   Effect.gen(function* () {
     const { make, asked } = provider({
-      "issues?state=closed&sort=updated&per_page=100&filter=created": [
+      "issues?state=closed&sort=updated&per_page=100&page=1&filter=created": [
         issue(4, { state: "closed" }),
       ],
     });
     const issues = yield* make;
-    const entries = yield* issues.list({
+    const { entries } = yield* issues.list({
       involvement: "authored",
       state: "closed",
       host: "github.com",
     });
-    assert.deepStrictEqual(asked, ["issues?state=closed&sort=updated&per_page=100&filter=created"]);
+    assert.deepStrictEqual(asked, [
+      "issues?state=closed&sort=updated&per_page=100&page=1&filter=created",
+    ]);
     assert.strictEqual(entries[0]?.state, "closed");
   }),
 );
@@ -90,13 +92,13 @@ it.effect("lists only the requested state and relationship", () =>
 it.effect("skips a row it cannot read and keeps the rest", () =>
   Effect.gen(function* () {
     const { make } = provider({
-      "issues?state=open&sort=updated&per_page=100&filter=assigned": [
+      "issues?state=open&sort=updated&per_page=100&page=1&filter=assigned": [
         { number: "not a number" },
         issue(2),
       ],
     });
     const issues = yield* make;
-    const entries = yield* issues.list({ involvement: "assigned", host: "github.com" });
+    const { entries } = yield* issues.list({ involvement: "assigned", host: "github.com" });
     assert.deepStrictEqual(
       entries.map((entry) => entry.number),
       [2],
@@ -120,12 +122,12 @@ it.effect("reads an issue with its comments, and refuses a pull request", () =>
   Effect.gen(function* () {
     const { make } = provider({
       "repos/acme/api/issues/7": issue(7, { body: "Steps to reproduce" }),
-      "repos/acme/api/issues/7/comments?per_page=100": [
+      "repos/acme/api/issues/7/comments?per_page=100&page=1": [
         { user: { login: "grace" }, body: "On it", created_at: "2026-01-08T00:00:00Z" },
       ],
       "repos/acme/api": { default_branch: "develop" },
       "repos/acme/api/issues/8": issue(8, { pull_request: {} }),
-      "repos/acme/api/issues/8/comments?per_page=100": [],
+      "repos/acme/api/issues/8/comments?per_page=100&page=1": [],
     });
     const issues = yield* make;
     const detail = yield* issues.get({ host: "github.com", repository: "acme/api", number: 7 });
@@ -144,7 +146,7 @@ it.effect("reads an issue with its comments, and refuses a pull request", () =>
 it.effect("drops the pull requests that share a page with issues", () =>
   Effect.gen(function* () {
     const { make } = provider({
-      "issues?state=open&sort=updated&per_page=100&filter=assigned": [
+      "issues?state=open&sort=updated&per_page=100&page=1&filter=assigned": [
         issue(9, { pull_request: {} }),
         issue(8, { pull_request: {} }),
         issue(3),
@@ -153,10 +155,78 @@ it.effect("drops the pull requests that share a page with issues", () =>
       ],
     });
     const issues = yield* make;
-    const entries = yield* issues.list({ involvement: "assigned", host: "github.com" });
+    const { entries } = yield* issues.list({ involvement: "assigned", host: "github.com" });
     assert.deepStrictEqual(
       entries.map((entry) => entry.number),
       [3, 2, 1],
     );
   }),
+);
+
+it.effect(
+  "reports another page only when a feed filled its page, and asks for the page given",
+  () =>
+    Effect.gen(function* () {
+      const full = Array.from({ length: 100 }, (_, index) => issue(index + 1));
+      const { make, asked } = provider({
+        "issues?state=open&sort=updated&per_page=100&page=1&filter=assigned": full,
+        "issues?state=open&sort=updated&per_page=100&page=2&filter=assigned": [issue(101)],
+      });
+      const issues = yield* make;
+      const first = yield* issues.list({ involvement: "assigned", host: "github.com" });
+      assert.strictEqual(first.entries.length, 100);
+      assert.isTrue(first.hasMore);
+      const second = yield* issues.list({ involvement: "assigned", host: "github.com", page: 2 });
+      assert.deepStrictEqual(
+        second.entries.map((entry) => entry.number),
+        [101],
+      );
+      assert.isFalse(second.hasMore);
+      assert.strictEqual(asked.length, 2);
+    }),
+);
+
+const comment = (index: number) => ({
+  user: { login: "grace" },
+  body: `Comment ${index}`,
+  created_at: "2026-01-08T00:00:00Z",
+});
+
+it.effect(
+  "reads every page of comments and reports a thread longer than the cap as truncated",
+  () =>
+    Effect.gen(function* () {
+      const base = {
+        "repos/acme/api": { default_branch: "main" },
+      };
+      const pages = (count: number) =>
+        Object.fromEntries(
+          Array.from({ length: count }, (_, page) => [
+            `repos/acme/api/issues/7/comments?per_page=100&page=${page + 1}`,
+            Array.from({ length: 100 }, (_, index) => comment(page * 100 + index)),
+          ]),
+        );
+      const short = provider({
+        ...base,
+        "repos/acme/api/issues/7": issue(7),
+        ...pages(1),
+        "repos/acme/api/issues/7/comments?per_page=100&page=2": [comment(100), comment(101)],
+      });
+      const detail = yield* (yield* short.make).get({
+        host: "github.com",
+        repository: "acme/api",
+        number: 7,
+      });
+      assert.strictEqual(detail.comments.length, 102);
+      assert.isFalse(detail.commentsTruncated);
+
+      const long = provider({ ...base, "repos/acme/api/issues/7": issue(7), ...pages(5) });
+      const capped = yield* (yield* long.make).get({
+        host: "github.com",
+        repository: "acme/api",
+        number: 7,
+      });
+      assert.strictEqual(capped.comments.length, 500);
+      assert.isTrue(capped.commentsTruncated);
+    }),
 );

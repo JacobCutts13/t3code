@@ -37,11 +37,15 @@ export const IssueListInput = Schema.Struct({
   involvement: IssueInvolvement,
   state: Schema.optional(IssueState),
   host: Schema.optional(TrimmedNonEmptyString),
+  /** 1-based; each page is up to 100 issues per relationship. */
+  page: Schema.optional(PositiveInt),
 });
 export type IssueListInput = typeof IssueListInput.Type;
 
 export const IssueListResult = Schema.Struct({
   entries: Schema.Array(IssueSummary),
+  /** Another page may follow. The same issue can appear on two pages of a merged list. */
+  hasMore: Schema.Boolean,
 });
 export type IssueListResult = typeof IssueListResult.Type;
 
@@ -64,7 +68,9 @@ export const IssueDetail = Schema.Struct({
   body: Schema.String,
   /** The repository's default branch, which a worktree for the issue starts from. */
   defaultBranch: Schema.NullOr(TrimmedNonEmptyString),
-  /** Oldest first; the first 100 only. */
+  /** Oldest first. */
   comments: Schema.Array(IssueComment),
+  /** The thread has more comments than were read. */
+  commentsTruncated: Schema.Boolean,
 });
 export type IssueDetail = typeof IssueDetail.Type;

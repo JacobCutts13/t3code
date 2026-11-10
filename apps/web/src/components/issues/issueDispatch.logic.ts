@@ -36,6 +36,9 @@ export function buildIssuePrompt(detail: IssueDetail, branch: string): string {
               `### ${comment.author ?? "unknown"} - ${comment.createdAt}\n\n${comment.body}`,
           )
           .join("\n\n---\n\n")}`;
+  const truncated = detail.commentsTruncated
+    ? "\n\n(The thread has more comments than are shown here.)"
+    : "";
   const description = detail.body.trim() === "" ? "(no description)" : detail.body;
   return `/complete-task # Source: #${issue.number} - ${issue.title}
 
@@ -48,5 +51,5 @@ Branch: ${branch}
 
 ## Description
 
-${description}${comments}`;
+${description}${comments}${truncated}`;
 }

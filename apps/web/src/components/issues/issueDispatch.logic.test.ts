@@ -21,6 +21,7 @@ const detail = (overrides: Partial<IssueDetail> = {}): IssueDetail => ({
   body: "Steps to reproduce",
   defaultBranch: "main",
   comments: [],
+  commentsTruncated: false,
   ...overrides,
 });
 
@@ -58,6 +59,18 @@ describe("buildIssuePrompt", () => {
     expect(prompt).toContain("Branch: fix/12-crash");
     expect(prompt).toContain("## Description\n\nSteps to reproduce");
     expect(prompt).not.toContain("## Comments");
+  });
+
+  it("says when the thread has more comments than the prompt carries", () => {
+    const prompt = buildIssuePrompt(
+      detail({
+        comments: [{ author: "grace", body: "On it", createdAt: "2026-01-03T00:00:00Z" }],
+        commentsTruncated: true,
+      }),
+      "fix/12-crash",
+    );
+    expect(prompt).toContain("more comments than are shown");
+    expect(buildIssuePrompt(detail(), "fix/12-crash")).not.toContain("more comments");
   });
 
   it("appends comments oldest first and says so when there is no description", () => {
