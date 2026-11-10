@@ -696,22 +696,29 @@ it.effect.skipIf(windowsHost)("ignores unusable app bundles and keeps PATH launc
     yield* fs.makeDirectory(env.PATH);
     yield* fs.writeFileString(path.join(env.PATH, "cursor"), "#!/bin/sh\n");
     yield* fs.chmod(path.join(env.PATH, "cursor"), 0o755);
-    let spawned: ChildProcess.StandardCommand | undefined;
+    const spawned: ChildProcess.StandardCommand[] = [];
     yield* Effect.gen(function* () {
       const launcher = yield* ExternalLauncher.ExternalLauncher;
       yield* launcher.launchEditor({ editor: "cursor", cwd: "/workspace" });
+      yield* launcher.launchEditor({ editor: "cursor", cwd: "/workspace/file.ts:12:4" });
     }).pipe(
       Effect.provide(
         layerTest({
           platform: "darwin",
           env: { ...env, PATH: `${env.PATH}:/usr/bin` },
           onSpawn: (command) => {
-            spawned = command;
+            spawned.push(command);
           },
         }),
       ),
     );
-    assert.equal(spawned?.command, "cursor");
+    assert.deepEqual(
+      spawned.map((command) => ({ command: command.command, args: command.args })),
+      [
+        { command: "cursor", args: ["/workspace"] },
+        { command: "cursor", args: ["--goto", "/workspace/file.ts:12:4"] },
+      ],
+    );
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
