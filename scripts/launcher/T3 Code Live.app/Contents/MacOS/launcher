@@ -1,0 +1,32 @@
+#!/bin/zsh
+# T3 Code Live: starts the hot-reload T3 (`vp run live` in ~/dev/t3code) or brings the running one forward.
+# This app has no window or Dock icon of its own (LSUIElement); it starts the app and exits.
+
+LOG="$HOME/.t3/live.log"
+APP_PATTERN='T3 Code \(Dev\)\.app/Contents/MacOS/Electron --t3code-dev-root'
+
+notify() { osascript -e "display notification \"$1\" with title \"T3 Code Live\"" >/dev/null 2>&1; }
+
+# Already running: bring the window forward. `open -b` activates the running app like a Dock click,
+# with no automation permission prompt and no second instance.
+if pgrep -f "$APP_PATTERN" >/dev/null; then
+  open -b com.t3tools.t3code.dev.t3code
+  exit 0
+fi
+
+# Started but the window is not up yet.
+if pgrep -f 'scripts/dev-runner.ts dev:desktop' >/dev/null; then
+  notify "Already starting. Log: ~/.t3/live.log"
+  exit 0
+fi
+
+# The stock T3 service would hold the data lock and the app would quit on start.
+if pgrep -f 'runtime/versions/.*/t3 (serve|__service-launcher)' >/dev/null; then
+  notify "The stock T3 service is running. Stop it: launchctl bootout gui/$(id -u)/com.t3tools.t3code.service"
+  exit 1
+fi
+
+# An interactive login shell loads your PATH (nvm, vp). Detach so closing this app does not stop T3.
+nohup /bin/zsh -ilc 'cd ~/dev/t3code && exec vp run live' > "$LOG" 2>&1 < /dev/null &
+disown
+notify "Starting T3 (hot reload). Log: ~/.t3/live.log"
