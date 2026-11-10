@@ -120,7 +120,10 @@ export class ElectronWindow extends Context.Service<
     readonly setMain: (window: Electron.BrowserWindow) => Effect.Effect<void>;
     readonly clearMain: (window: Option.Option<Electron.BrowserWindow>) => Effect.Effect<void>;
     readonly prepareReveal: (window: Electron.BrowserWindow) => Effect.Effect<boolean>;
-    readonly reveal: (window: Electron.BrowserWindow) => Effect.Effect<void>;
+    readonly reveal: (
+      window: Electron.BrowserWindow,
+      options?: { readonly focus?: boolean },
+    ) => Effect.Effect<void>;
     readonly sendAll: (channel: string, ...args: readonly unknown[]) => Effect.Effect<void>;
     readonly destroyAll: Effect.Effect<void>;
     readonly syncAllAppearance: <E, R>(
@@ -273,7 +276,8 @@ export const make = Effect.gen(function* () {
           .catch(() => false);
       });
     }),
-    reveal: Effect.fn("ElectronWindow.reveal")(function (window) {
+    reveal: Effect.fn("ElectronWindow.reveal")(function (window, options) {
+      const focus = options?.focus ?? true;
       return Effect.tryPromise({
         try: async () => {
           if (window.isDestroyed()) {
@@ -293,7 +297,12 @@ export const make = Effect.gen(function* () {
           }
 
           if (captureReveal || !window.isVisible()) {
-            window.show();
+            if (focus) window.show();
+            else window.showInactive();
+          }
+
+          if (!focus) {
+            return;
           }
 
           if (captureReveal) {

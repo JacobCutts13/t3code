@@ -821,9 +821,28 @@ const make = Effect.gen(function* () {
     cwd: string,
   ) {
     const found: Array<{ path: string; source: string }> = [];
-    for (const name of yield* fs.readDirectory(cwd)) {
+    // A worktree whose folder is already gone has nothing nested; other read errors propagate.
+    const names = yield* fs.readDirectory(cwd).pipe(
+      Effect.catchIf(
+        (error) =>
+          error.cause instanceof Error && "code" in error.cause && error.cause.code === "ENOENT",
+        () => Effect.succeed([] as string[]),
+      ),
+    );
+    for (const name of names) {
       const child = path.join(cwd, name);
-      // Plain files and dangling links hold no worktree, and probing under a file fails with ENOTDIR.
+      // A link can lead to a worktree outside this one, and Git would remove that target.
+      // Effect's stat follows links, so probe with readLink first to get lstat semantics.
+      const isLink = yield* fs.readLink(child).pipe(
+        Effect.as(true),
+        Effect.catchIf(
+          (error) =>
+            error.cause instanceof Error && "code" in error.cause && error.cause.code === "EINVAL",
+          () => Effect.succeed(false),
+        ),
+      );
+      if (isLink) continue;
+      // Plain files hold no worktree, and probing under a file fails with ENOTDIR.
       const isFolder = yield* fs.stat(child).pipe(
         Effect.map((info) => info.type === "Directory"),
         Effect.orElseSucceed(() => false),

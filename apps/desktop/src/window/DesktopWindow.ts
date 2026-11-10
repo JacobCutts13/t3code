@@ -857,8 +857,7 @@ export const make = Effect.gen(function* () {
       window.webContents.setBackgroundThrottling(true);
       if (persistedSettings.mainWindowMaximized) window.maximize();
       // Dev rebuilds relaunch Electron constantly; showing without focus keeps them from stealing it.
-      if (environment.isDevelopment) window.showInactive();
-      else yield* electronWindow.reveal(window);
+      yield* electronWindow.reveal(window, { focus: !environment.isDevelopment });
       yield* dismissConnectingSplash;
     });
     pendingMainReveals.set(window, revealWhenReady);
