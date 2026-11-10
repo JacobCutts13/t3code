@@ -70,8 +70,8 @@ const SOURCES: ReadonlyArray<{ readonly value: IssueSource; readonly label: stri
 
 const PRIORITY_LABELS = ["", "Urgent", "High", "Medium", "Low"] as const;
 
-// Per viewer: the project each Linear team's issues were last dispatched into.
-const LinearProjectsSchema = Schema.Record(Schema.String, Schema.String);
+// Per viewer: the project each Linear team's or GitHub repository's issues were last dispatched into.
+const PickedProjectsSchema = Schema.Record(Schema.String, Schema.String);
 
 function FilterGroup<T extends string>(props: {
   readonly label: string;
@@ -381,10 +381,10 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const [dispatchingKey, setDispatchingKey] = useState<string | null>(null);
   // The model picked in this session; each dispatch uses it where the project offers it.
   const [picked, setPicked] = useState<ModelSelection | null>(null);
-  const [linearProjects, setLinearProjects] = useLocalStorage(
-    `t3code:issues:linear-projects:${environmentId}`,
+  const [pickedProjects, setPickedProjects] = useLocalStorage(
+    `t3code:issues:projects:${environmentId}`,
     {},
-    LinearProjectsSchema,
+    PickedProjectsSchema,
   );
   const { projectFor, modelFor, dispatch, dispatchLinear } = useDispatchIssue(environmentId);
   const projects = useProjects().filter(
@@ -466,20 +466,26 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
     setMore((current) => (current?.key === filterKey ? next : current));
   };
 
-  /** The project a Linear team's issues go to: the last one picked, while it still exists. */
-  const linearProjectFor = (issue: LinearIssueSummary) => {
-    const id = linearProjects[issue.team.id];
-    return id === undefined ? undefined : projects.find((project) => project.id === id);
+  const pickKey = (entry: IssueEntry) =>
+    entry.source === "github"
+      ? `github:${entry.issue.host}/${entry.issue.repository}`
+      : `linear:${entry.issue.team.id}`;
+  /**
+   * The project an issue goes to: the last one picked for its team or repository while it still
+   * exists, else for GitHub the repository's own project.
+   */
+  const projectOf = (entry: IssueEntry) => {
+    const id = pickedProjects[pickKey(entry)];
+    const picked = id === undefined ? undefined : projects.find((project) => project.id === id);
+    return picked ?? (entry.source === "github" ? projectFor(entry.issue) : undefined);
   };
-  const projectOf = (entry: IssueEntry) =>
-    entry.source === "github" ? projectFor(entry.issue) : linearProjectFor(entry.issue);
   const branchOf = (entry: IssueEntry) =>
     entry.source === "github" ? issueBranchName(entry.issue) : linearBranchName(entry.issue);
   const blockedReason = (entry: IssueEntry) =>
     projectOf(entry) !== undefined
       ? null
       : entry.source === "github"
-        ? `Add ${entry.issue.repository} as a project first`
+        ? `Add ${entry.issue.repository} as a project, or choose one in the issue details`
         : "Choose a project in the issue details";
 
   const selected = entries.find((entry) => entry.key === selectedKey) ?? null;
@@ -490,7 +496,7 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
     if (project === undefined) return;
     setDispatchingKey(entry.key);
     // Both report their own failures and never reject.
-    if (entry.source === "github") await dispatch(entry.issue, picked);
+    if (entry.source === "github") await dispatch(entry.issue, project, picked);
     else await dispatchLinear(entry.issue, project, picked);
     setDispatchingKey(null);
   };
@@ -623,35 +629,30 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           ) : (
             <div>
               <div className="flex items-center justify-end gap-2 border-b px-6 py-2">
-                {selected.source === "linear" ? (
-                  <Select
-                    value={selectedProject?.id ?? null}
-                    disabled={dispatchingKey === selectedKey}
-                    onValueChange={(value) => {
-                      if (typeof value !== "string") return;
-                      setLinearProjects((current) => ({
-                        ...current,
-                        [selected.issue.team.id]: value,
-                      }));
-                    }}
-                  >
-                    <SelectTrigger size="sm" aria-label="Project">
-                      <SelectValue>
-                        {(value: string | null) =>
-                          projects.find((project) => project.id === value)?.title ??
-                          "Choose a project"
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectPopup>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.title}
-                        </SelectItem>
-                      ))}
-                    </SelectPopup>
-                  </Select>
-                ) : null}
+                <Select
+                  value={selectedProject?.id ?? null}
+                  disabled={dispatchingKey === selectedKey}
+                  onValueChange={(value) => {
+                    if (typeof value !== "string") return;
+                    setPickedProjects((current) => ({ ...current, [pickKey(selected)]: value }));
+                  }}
+                >
+                  <SelectTrigger size="sm" aria-label="Project">
+                    <SelectValue>
+                      {(value: string | null) =>
+                        projects.find((project) => project.id === value)?.title ??
+                        "Choose a project"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.title}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
                 {selectedProject === undefined ? null : (
                   <IssueModelPicker
                     environmentId={environmentId}

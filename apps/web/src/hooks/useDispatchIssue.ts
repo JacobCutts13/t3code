@@ -181,30 +181,64 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     return true;
   };
 
+  type Project = NonNullable<ReturnType<typeof projectFor>>;
+  type Base = { readonly branch: string; readonly startFromOrigin: boolean };
+
+  /** The branch a worktree in `project` starts from, read from its refs; false after a failure toast. */
+  const baseFromRefs = async (project: Project): Promise<Base | false> => {
+    // Without matching remote refs, a local default hides origin's and the worktree misses a fetch.
+    const refs = await readRefs({
+      environmentId,
+      input: { cwd: project.workspaceRoot, limit: 100, includeMatchingRemoteRefs: true },
+    });
+    if (refs._tag === "Failure")
+      return reportFailure(refs, "Could not read the project's branches");
+    if (!refs.value.isRepo) {
+      return fail("Cannot dispatch", `${project.title} is not a git repository.`);
+    }
+    // Branching from a guessed base could start the work on the wrong history.
+    return (
+      worktreeBase(refs.value.refs) ??
+      fail("Cannot dispatch", `${project.title} has no default, main or master branch.`)
+    );
+  };
+
+  /**
+   * Starts an agent on a GitHub issue in `project`, the issue's repository's project unless the
+   * user picked another; a picked project branches from its own default branch.
+   */
   const dispatch = async (
     issue: IssueSummary,
+    project: Project,
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
-    const project = projectFor(issue);
-    if (project === undefined) {
-      return fail("Cannot dispatch", `Add ${issue.repository} as a project first.`);
-    }
     const modelSelection = modelFor(project, picked);
     if (modelSelection === null) return fail("Cannot dispatch", "No model is available.");
+    const isIssueRepository = projectFor(issue)?.id === project.id;
 
     try {
-      const detail = await readIssue({
-        environmentId,
-        input: { host: issue.host, repository: issue.repository, number: issue.number },
-      });
+      const [detail, refsBase] = await Promise.all([
+        readIssue({
+          environmentId,
+          input: { host: issue.host, repository: issue.repository, number: issue.number },
+        }),
+        isIssueRepository ? null : baseFromRefs(project),
+      ]);
       if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
-      // Branching from a guessed base could start the work on the wrong history.
-      const baseBranch = detail.value.defaultBranch;
-      if (baseBranch === null) {
-        return fail(
-          "Cannot dispatch",
-          `GitHub did not report ${issue.repository}'s default branch.`,
-        );
+      if (refsBase === false) return false;
+      let base: Base;
+      if (refsBase !== null) {
+        base = refsBase;
+      } else {
+        // Branching from a guessed base could start the work on the wrong history.
+        const defaultBranch = detail.value.defaultBranch;
+        if (defaultBranch === null) {
+          return fail(
+            "Cannot dispatch",
+            `GitHub did not report ${issue.repository}'s default branch.`,
+          );
+        }
+        base = { branch: defaultBranch, startFromOrigin: true };
       }
 
       const branch = issueBranchName(issue);
@@ -213,9 +247,9 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `#${issue.number} ${issue.title}`,
         text: buildIssuePrompt(detail.value, branch),
-        baseBranch,
+        baseBranch: base.branch,
         branch,
-        startFromOrigin: true,
+        startFromOrigin: base.startFromOrigin,
       });
     } catch (error) {
       return fail("Could not dispatch the issue", errorMessage(error));
@@ -228,31 +262,18 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
    */
   const dispatchLinear = async (
     issue: LinearIssueSummary,
-    project: NonNullable<ReturnType<typeof projectFor>>,
+    project: Project,
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
     const modelSelection = modelFor(project, picked);
     if (modelSelection === null) return fail("Cannot dispatch", "No model is available.");
     try {
-      const [detail, refs] = await Promise.all([
+      const [detail, base] = await Promise.all([
         readLinearIssue({ environmentId, input: { id: issue.id } }),
-        // Without matching remote refs, a local default hides origin's and the worktree misses a fetch.
-        readRefs({
-          environmentId,
-          input: { cwd: project.workspaceRoot, limit: 100, includeMatchingRemoteRefs: true },
-        }),
+        baseFromRefs(project),
       ]);
       if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
-      if (refs._tag === "Failure")
-        return reportFailure(refs, "Could not read the project's branches");
-      if (!refs.value.isRepo) {
-        return fail("Cannot dispatch", `${project.title} is not a git repository.`);
-      }
-      const base = worktreeBase(refs.value.refs);
-      // Branching from a guessed base could start the work on the wrong history.
-      if (base === null) {
-        return fail("Cannot dispatch", `${project.title} has no default, main or master branch.`);
-      }
+      if (base === false) return false;
       const branch = linearBranchName(issue);
       const launched = await launch({
         project,

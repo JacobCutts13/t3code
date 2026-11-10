@@ -142,7 +142,7 @@ The key is stored on the server, like a GitHub token, and you can save a 1Passwo
 
 The **Issues** page lists your open GitHub and Linear issues. Use **Source** to show one tracker, and the other filters to switch between issues assigned to you and issues you opened.
 
-**Dispatch** starts a thread in a new worktree. The thread's first message is the issue, run through `/complete-task`. GitHub issues use the project whose repository they belong to. For a Linear issue, choose the project in the issue details; T3 Code remembers it for that Linear team. Dispatching a Linear issue also moves it to its team's first started state, such as In Progress.
+**Dispatch** starts a thread in a new worktree. The thread's first message is the issue, run through `/complete-task`. Choose the project in the issue details. A GitHub issue defaults to the project whose repository it belongs to, and T3 Code remembers your choice for each repository and Linear team. Dispatching a Linear issue also moves it to its team's first started state, such as In Progress.
 
 A **Dispatched** badge links to a thread that is already working on the issue's branch.
 
