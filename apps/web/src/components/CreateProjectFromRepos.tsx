@@ -174,7 +174,9 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
               <div className="mx-2.5 my-1.5 border-t" />
             </>
           ) : null}
-          <div className="px-2.5 py-1.5 font-medium text-muted-foreground text-xs">Repos</div>
+          {visible.length > 0 || selected.length === 0 ? (
+            <div className="px-2.5 py-1.5 font-medium text-muted-foreground text-xs">Repos</div>
+          ) : null}
           {visible.map((repo) => (
             <RepoRow
               key={repo.path}
@@ -196,7 +198,9 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
             <p className="px-2.5 py-3 text-muted-foreground text-sm">
               {repos.length === 0
                 ? "No git repositories found in ~/dev."
-                : "No repositories match."}
+                : selected.length > 0
+                  ? "No other repositories match."
+                  : "No repositories match."}
             </p>
           ) : null}
         </div>
