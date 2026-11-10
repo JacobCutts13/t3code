@@ -84,8 +84,25 @@ const layerTest = (input: {
     ),
   );
 
+  // Editor discovery also scans the host's /Applications; hide it so installed apps can't leak in.
+  const layerHermeticFileSystem = Layer.effect(
+    FileSystem.FileSystem,
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const hidden = (path: string) =>
+        path === "/Applications" || path.startsWith("/Applications/");
+      return FileSystem.FileSystem.of({
+        ...fs,
+        readDirectory: (path, options) =>
+          hidden(path) ? Effect.succeed([]) : fs.readDirectory(path, options),
+        stat: (path) => (hidden(path) ? fs.stat("/nonexistent-t3-test-path") : fs.stat(path)),
+      });
+    }),
+  ).pipe(Layer.provide(NodeServices.layer));
   return Layer.mergeAll(
-    ExternalLauncher.layer.pipe(Layer.provide(Layer.merge(NodeServices.layer, layerSpawner))),
+    ExternalLauncher.layer.pipe(
+      Layer.provide(Layer.mergeAll(NodeServices.layer, layerHermeticFileSystem, layerSpawner)),
+    ),
     Layer.succeed(HostProcess.Platform, input.platform),
     Layer.succeed(
       SpawnExecutableResolution,
@@ -712,6 +729,39 @@ it.effect.skipIf(windowsHost)("ignores unusable app bundles and keeps PATH launc
       ),
     );
     assert.equal(spawned?.command, "cursor");
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.effect.skipIf(windowsHost)("opens Cursor in its default window, not the classic editor", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const binDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cursor-" });
+    yield* fs.writeFileString(path.join(binDir, "cursor"), "#!/bin/sh\n");
+    yield* fs.chmod(path.join(binDir, "cursor"), 0o755);
+    const spawned: ChildProcess.StandardCommand[] = [];
+    yield* Effect.gen(function* () {
+      const launcher = yield* ExternalLauncher.ExternalLauncher;
+      yield* launcher.launchEditor({ editor: "cursor", cwd: "/workspace" });
+      yield* launcher.launchEditor({ editor: "cursor", cwd: "/workspace/file.ts:12:4" });
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          platform: "darwin",
+          env: { PATH: binDir },
+          onSpawn: (command) => {
+            spawned.push(command);
+          },
+        }),
+      ),
+    );
+    assert.deepEqual(
+      spawned.map((command) => ({ command: command.command, args: command.args })),
+      [
+        { command: "cursor", args: ["/workspace"] },
+        { command: "cursor", args: ["--goto", "/workspace/file.ts:12:4"] },
+      ],
+    );
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
