@@ -4,14 +4,22 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, IssueSummary, ServerProvider } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  IssueSummary,
+  ModelSelection,
+  ServerProvider,
+} from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
 import { findProjectForRepository } from "~/components/pullRequest/pullRequestList.logic";
 import { buildIssuePrompt, issueBranchName } from "~/components/issues/issueDispatch.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { newMessageId, newThreadId } from "~/lib/utils";
-import { resolveProjectDefaultProviderModelSelection } from "~/providerInstances";
+import {
+  providerInstanceEntriesFor,
+  resolveProjectDefaultProviderModelSelection,
+} from "~/providerInstances";
 import { useProjects } from "~/state/entities";
 import { useEnvironmentProviders } from "~/state/environments";
 import { issueEnvironment } from "~/state/issues";
@@ -59,14 +67,31 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       { repository: issue.repository, host: issue.host },
     );
 
-  const dispatch = async (issue: IssueSummary): Promise<boolean> => {
+  /**
+   * The model a new thread in the project starts with: the pick when its provider is enabled for
+   * the project, else the project's default, else the server's.
+   */
+  const modelFor = (
+    project: NonNullable<ReturnType<typeof projectFor>>,
+    picked: ModelSelection | null = null,
+  ): ModelSelection | null =>
+    picked !== null &&
+    providerInstanceEntriesFor(providers, settings, project.id).some(
+      (entry) => entry.instanceId === picked.instanceId && entry.enabled,
+    )
+      ? picked
+      : (resolveProjectSettings(settings, project.id, project).settings.defaultModelSelection ??
+        resolveProjectDefaultProviderModelSelection(providers, settings, project.id));
+
+  const dispatch = async (
+    issue: IssueSummary,
+    picked: ModelSelection | null = null,
+  ): Promise<boolean> => {
     const project = projectFor(issue);
     if (project === undefined) {
       return fail("Cannot dispatch", `Add ${issue.repository} as a project first.`);
     }
-    const modelSelection =
-      resolveProjectSettings(settings, project.id, project).settings.defaultModelSelection ??
-      resolveProjectDefaultProviderModelSelection(providers, settings, project.id);
+    const modelSelection = modelFor(project, picked);
     if (modelSelection === null) return fail("Cannot dispatch", "No model is available.");
 
     try {
@@ -137,5 +162,5 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     }
   };
 
-  return { projectFor, dispatch };
+  return { projectFor, modelFor, dispatch };
 }

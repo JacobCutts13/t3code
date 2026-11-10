@@ -1,4 +1,10 @@
-import type { EnvironmentId, IssueInvolvement, IssueState, IssueSummary } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  IssueInvolvement,
+  IssueState,
+  IssueSummary,
+  ModelSelection,
+} from "@t3tools/contracts";
 import { CircleDotIcon, ExternalLinkIcon, PlayIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -11,6 +17,7 @@ import { useEnvironmentQuery } from "~/state/query";
 
 import ChatMarkdown from "../ChatMarkdown";
 import { RelativeTime } from "../RelativeTime";
+import { IssueModelPicker } from "./IssueModelPicker";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
@@ -187,17 +194,20 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   const [state, setState] = useState<IssueState>("open");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dispatchingKey, setDispatchingKey] = useState<string | null>(null);
-  const { projectFor, dispatch } = useDispatchIssue(environmentId);
+  // The model picked in this session; each dispatch uses it where the project offers it.
+  const [picked, setPicked] = useState<ModelSelection | null>(null);
+  const { projectFor, modelFor, dispatch } = useDispatchIssue(environmentId);
   const list = useEnvironmentQuery(
     issueEnvironment.list({ environmentId, input: { involvement, state } }),
   );
   const entries = list.data?.entries ?? [];
   const selected = entries.find((issue) => issueKey(issue) === selectedKey) ?? null;
+  const selectedProject = selected === null ? undefined : projectFor(selected);
 
   const dispatchIssue = async (issue: IssueSummary) => {
     setDispatchingKey(issueKey(issue));
     try {
-      await dispatch(issue);
+      await dispatch(issue, picked);
     } finally {
       setDispatchingKey(null);
     }
@@ -273,7 +283,16 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
             </Empty>
           ) : (
             <div>
-              <div className="flex justify-end border-b px-6 py-2">
+              <div className="flex items-center justify-end gap-2 border-b px-6 py-2">
+                {selectedProject === undefined ? null : (
+                  <IssueModelPicker
+                    environmentId={environmentId}
+                    projectId={selectedProject.id}
+                    value={modelFor(selectedProject, picked)}
+                    disabled={dispatchingKey === issueKey(selected)}
+                    onChange={setPicked}
+                  />
+                )}
                 <Button
                   type="button"
                   disabled={
