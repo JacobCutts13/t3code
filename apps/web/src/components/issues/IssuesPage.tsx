@@ -432,6 +432,9 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
     showLinear ? (linearList.data?.entries ?? []) : [],
   );
   const hasMore = showGitHub && (extra === null ? (list.data?.hasMore ?? false) : extra.hasMore);
+  // With every shown tracker failing, its notice is the whole answer, not "no issues".
+  const failedEverySource =
+    (!showGitHub || list.error !== null) && (!showLinear || linearList.error !== null);
   const loading =
     (showGitHub && list.data === null && list.error === null) ||
     (showLinear && linearList.data === null && linearList.error === null);
@@ -543,7 +546,7 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
             <p role="status" className="p-4 text-muted-foreground text-sm">
               Loading issues…
             </p>
-          ) : entries.length === 0 ? (
+          ) : entries.length === 0 && failedEverySource ? null : entries.length === 0 ? (
             <Empty size="compact">
               <EmptyHeader>
                 <CircleDotIcon className="size-5 text-muted-foreground" />

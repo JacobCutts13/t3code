@@ -63,9 +63,9 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     reportFailure: false,
     reportDefect: false,
   });
-  const listRefs = useAtomQueryRunner(vcsEnvironment.listRefs, {
+  const readRefs = useAtomCommand(vcsEnvironment.readRefs, {
+    label: "read the project's branches",
     reportFailure: false,
-    reportDefect: false,
   });
   const startLinearIssue = useAtomCommand(issueEnvironment.linearStart, {
     label: "move the Linear issue to started",
@@ -227,7 +227,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     try {
       const [detail, refs] = await Promise.all([
         readLinearIssue({ environmentId, input: { id: issue.id } }),
-        listRefs({ environmentId, input: { cwd: project.workspaceRoot, limit: 100 } }),
+        readRefs({ environmentId, input: { cwd: project.workspaceRoot, limit: 100 } }),
       ]);
       if (detail._tag === "Failure") {
         if (!isAtomCommandInterrupted(detail)) {

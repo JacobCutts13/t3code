@@ -90,4 +90,8 @@ export class LinearOperationError extends Schema.TaggedError<LinearOperationErro
     detail: TrimmedNonEmptyString,
     cause: Schema.optionalKey(Schema.Defect()),
   },
-) {}
+) {
+  override get message(): string {
+    return this.detail;
+  }
+}
