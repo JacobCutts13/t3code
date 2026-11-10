@@ -243,7 +243,9 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         }),
       ]);
       if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
-      if (refs._tag === "Failure" || !refs.value.isRepo) {
+      if (refs._tag === "Failure")
+        return reportFailure(refs, "Could not read the project's branches");
+      if (!refs.value.isRepo) {
         return fail("Cannot dispatch", `${project.title} is not a git repository.`);
       }
       const base = worktreeBase(refs.value.refs);

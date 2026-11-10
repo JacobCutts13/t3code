@@ -107,7 +107,7 @@ function IssueRow(props: {
   readonly selected: boolean;
   readonly dispatching: boolean;
   /** Why Dispatch is unavailable, or null when it can run. */
-  readonly blocked: string | null;
+  readonly blockedReason: string | null;
   readonly environmentId: EnvironmentId;
   readonly dispatchedThreadId: ThreadId | null;
   readonly onSelect: () => void;
@@ -152,8 +152,8 @@ function IssueRow(props: {
         type="button"
         size="compact"
         variant="outline"
-        disabled={props.dispatching || props.blocked !== null}
-        title={props.blocked ?? "Start an agent on this issue"}
+        disabled={props.dispatching || props.blockedReason !== null}
+        title={props.blockedReason ?? "Start an agent on this issue"}
         onClick={props.onDispatch}
       >
         {props.dispatching ? <Spinner /> : <PlayIcon />}
@@ -285,11 +285,7 @@ function LinearIssueDetailPane(props: {
           </a>
         </div>
       </header>
-      <IssueDetailBody
-        environmentId={environmentId}
-        error={detail.error}
-        detail={detail.data === null ? null : detail.data}
-      />
+      <IssueDetailBody environmentId={environmentId} error={detail.error} detail={detail.data} />
     </article>
   );
 }
@@ -424,8 +420,10 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
   );
   const hasMore = showGitHub && (extra === null ? (list.data?.hasMore ?? false) : extra.hasMore);
   // With every shown tracker failing, its notice is the whole answer, not "no issues".
+  const linearDisconnected = linearList.data?.connected === false;
   const failedEverySource =
-    (!showGitHub || list.error !== null) && (!showLinear || linearList.error !== null);
+    (!showGitHub || list.error !== null) &&
+    (!showLinear || linearList.error !== null || linearDisconnected);
   const loading =
     (showGitHub && list.data === null && list.error === null) ||
     (showLinear && linearList.data === null && linearList.error === null);
@@ -533,6 +531,18 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           {showLinear && linearList.error !== null ? (
             <SourceNotice source="Linear" error={linearList.error} />
           ) : null}
+          {/* In All, an unconnected Linear stays quiet so GitHub-only users see no noise. */}
+          {source === "linear" && linearDisconnected ? (
+            <div className="flex flex-col gap-1 p-4 text-muted-foreground text-sm">
+              <p>Linear isn't connected.</p>
+              <Link
+                to="/settings/source-control"
+                className="text-xs underline underline-offset-2 hover:text-foreground"
+              >
+                Add a Linear API key in Settings → Source control
+              </Link>
+            </div>
+          ) : null}
           {entries.length === 0 && loading ? (
             <p role="status" className="p-4 text-muted-foreground text-sm">
               Loading issues…
@@ -561,7 +571,7 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
                     }
                     selected={entry.key === selectedKey}
                     dispatching={dispatchingKey === entry.key}
-                    blocked={blockedReason(entry)}
+                    blockedReason={blockedReason(entry)}
                     environmentId={environmentId}
                     dispatchedThreadId={dispatchedThreadId(
                       byBranch,
@@ -575,7 +585,7 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
               </ul>
               {showLinear && linearList.data?.hasMore ? (
                 <p className="px-3 pt-3 text-muted-foreground text-xs">
-                  Showing the 100 most recently updated Linear issues for each filter.
+                  Showing the most recently updated Linear issues; refine the filters to see others.
                 </p>
               ) : null}
               {hasMore ? (

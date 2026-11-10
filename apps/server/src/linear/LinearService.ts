@@ -10,8 +10,10 @@ import {
 } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -108,7 +110,7 @@ const IssueNode = Schema.Struct({
 });
 type IssueNode = typeof IssueNode.Type;
 // Rows decode one at a time, so one odd issue cannot blank the whole list.
-const decodeNode = Schema.decodeUnknownOption(IssueNode);
+const decodeNode = Schema.decodeUnknownExit(IssueNode);
 
 const Connection = Schema.Struct({
   nodes: Schema.Array(Schema.Unknown),
@@ -295,6 +297,16 @@ export const make = Effect.gen(function* () {
         "Linear rejected the API key. Check it in Settings → Source control.",
       );
     }
+    if (
+      response.status === 429 ||
+      errors.some((error) => error.extensions?.code === "RATELIMITED")
+    ) {
+      return yield* fail(
+        operation,
+        "request-failed",
+        "Linear is rate-limiting this API key. Try again in a minute.",
+      );
+    }
     // Linear can answer 200 with partial data and errors; a partial list would look complete.
     if (errors.length > 0 || response.status < 200 || response.status >= 300) {
       const message = errors
@@ -304,7 +316,11 @@ export const make = Effect.gen(function* () {
       return yield* fail(
         operation,
         "request-failed",
-        message ? `Linear: ${message}` : `Linear returned HTTP ${response.status}.`,
+        message
+          ? `Linear: ${message}`
+          : errors.length > 0
+            ? "Linear reported an error without a message."
+            : `Linear returned HTTP ${response.status}.`,
       );
     }
     return yield* Schema.decodeUnknownEffect(schema)(
@@ -322,8 +338,14 @@ export const make = Effect.gen(function* () {
     const issues: Array<LinearIssueSummary> = [];
     for (const node of nodes) {
       const decoded = decodeNode(node);
-      if (Option.isSome(decoded)) issues.push(toSummary(decoded.value));
-      else yield* Effect.logWarning("Linear sent an issue this server cannot read");
+      if (Exit.isSuccess(decoded)) {
+        issues.push(toSummary(decoded.value));
+      } else {
+        yield* Effect.logWarning("Linear sent an issue this server cannot read", {
+          id: typeof node === "object" && node !== null && "id" in node ? node.id : undefined,
+          cause: Cause.pretty(decoded.cause),
+        });
+      }
     }
     return issues;
   });
@@ -337,7 +359,19 @@ export const make = Effect.gen(function* () {
   );
 
   const list = Effect.fn("LinearService.list")(function* (input: LinearIssueListInput) {
-    const data = yield* request("linear.issuesList", LIST_QUERY, listVariables(input), ListData);
+    const data = yield* request(
+      "linear.issuesList",
+      LIST_QUERY,
+      listVariables(input),
+      ListData,
+    ).pipe(
+      Effect.catchIf(
+        (error) => error.reason === "not-connected",
+        () => Effect.succeed(null),
+      ),
+    );
+    // No key is a normal state for anyone who only uses GitHub, not a failure to show.
+    if (data === null) return { entries: [], hasMore: false, connected: false };
     const connections = [data.viewer.assignedIssues, data.viewer.createdIssues].filter(
       (connection) => connection !== undefined,
     );
@@ -346,6 +380,7 @@ export const make = Effect.gen(function* () {
     return {
       entries: [...unique.values()],
       hasMore: connections.some((connection) => connection.pageInfo.hasNextPage),
+      connected: true,
     } satisfies LinearIssueListResult;
   });
 

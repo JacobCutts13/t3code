@@ -36,6 +36,7 @@ export const LinearIssueSummary = Schema.Struct({
 });
 export type LinearIssueSummary = typeof LinearIssueSummary.Type;
 
+/** Linear's `mine` is assigned to you, or created by you and assigned to no one. */
 export const LinearIssueListInput = Schema.Struct({
   involvement: IssueInvolvement,
   state: Schema.optional(IssueState),
@@ -46,6 +47,8 @@ export const LinearIssueListResult = Schema.Struct({
   entries: Schema.Array(LinearIssueSummary),
   /** More issues match than the list reads. */
   hasMore: Schema.Boolean,
+  /** False when the server has no Linear API key; the list is then empty. */
+  connected: Schema.Boolean,
 });
 export type LinearIssueListResult = typeof LinearIssueListResult.Type;
 

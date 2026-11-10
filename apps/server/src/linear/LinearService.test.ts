@@ -126,16 +126,17 @@ it.effect("lists assigned and created issues once each, skipping odd rows", () =
       assignee: null,
     });
     expect(result.hasMore).toBe(true);
+    expect(result.connected).toBe(true);
     expect(api.requests[0]?.variables).toMatchObject({ withAssigned: true, withCreated: true });
   }),
 );
 
 it.effect.each([
   {
-    name: "no key anywhere",
-    apiKey: "",
-    replies: [],
-    reason: "not-connected",
+    name: "a 429",
+    apiKey: "lin_api_secret",
+    replies: [{ status: 429, body: { errors: [{ message: "Rate limit exceeded" }] } }],
+    reason: "request-failed",
   },
   {
     name: "HTTP 401",
@@ -177,6 +178,17 @@ it.effect.each([
       run(apiKey, api, (linear) => linear.list({ involvement: "assigned" })),
     );
     expect(failure).toMatchObject({ _tag: "LinearOperationError", reason });
+  }),
+);
+
+it.effect("with no key anywhere, the list is empty and not connected, and the viewer fails", () =>
+  Effect.gen(function* () {
+    const api = linearApi();
+    const result = yield* run("", api, (linear) => linear.list({ involvement: "mine" }));
+    expect(result).toEqual({ entries: [], hasMore: false, connected: false });
+    const failure = yield* Effect.flip(run("", api, (linear) => linear.viewer));
+    expect(failure).toMatchObject({ _tag: "LinearOperationError", reason: "not-connected" });
+    expect(api.requests).toHaveLength(0);
   }),
 );
 
