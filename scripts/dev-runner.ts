@@ -74,7 +74,15 @@ const MODE_ARGS = {
   ],
   "dev:server": ["run", "--filter=t3", "dev"],
   "dev:web": ["run", "--filter=@t3tools/web", "dev"],
-  "dev:desktop": ["run", "--filter=@t3tools/desktop", "--filter=@t3tools/web", "dev"],
+  // The server is bundled and watched, not run: Electron starts it from dist/bin.mjs and restarts when it changes.
+  "dev:desktop": [
+    "run",
+    "--filter=@t3tools/desktop",
+    "--filter=@t3tools/web",
+    "--filter=t3",
+    "--parallel",
+    "dev",
+  ],
 } as const satisfies Record<string, ReadonlyArray<string>>;
 
 // `--built`: the web package rebuilds into apps/web/dist and the backend serves
@@ -406,6 +414,7 @@ export const createDevRunnerEnv = Effect.fn("dev-runner.createDevRunnerEnv")(fun
   }
 
   if (isDesktopMode) {
+    output.T3CODE_SERVER_BUNDLE_WATCH = "1";
     output.HOST = DESKTOP_DEV_LOOPBACK_HOST;
     delete output.T3CODE_DESKTOP_WS_URL;
   }
