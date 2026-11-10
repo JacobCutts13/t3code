@@ -23,6 +23,10 @@
       "types": "./src/server/driver.ts",
       "import": "./src/server/driver.ts"
     },
+    "./server/IssueProvider": {
+      "types": "./src/server/IssueProvider.ts",
+      "import": "./src/server/IssueProvider.ts"
+    },
     "./server/mergeMessage": {
       "types": "./src/server/mergeMessage.ts",
       "import": "./src/server/mergeMessage.ts"

@@ -340,7 +340,7 @@ const failure = (detail: string, cause?: unknown) => new GitHubFailure({ detail,
 const PULL_REQUEST_NOT_FOUND = "Pull request not found. Check the PR number or URL and try again.";
 const REPOSITORY_NOT_FOUND = "Repository not found. Check the owner and name and try again.";
 
-function fromGitHubApiError(
+export function fromGitHubApiError(
   error: GitHubRequestPolicy.GitHubApiError,
   notFound = PULL_REQUEST_NOT_FOUND,
 ): GitHubFailure {
