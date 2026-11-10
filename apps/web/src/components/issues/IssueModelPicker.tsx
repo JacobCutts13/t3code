@@ -67,7 +67,7 @@ export function IssueModelPicker(props: {
       effortColumn={<ComposerEffortColumn traits={traits} />}
       footer={<ComposerPickerFooter traits={traits} />}
       onInstanceModelChange={(instanceId, nextModel) =>
-        props.onChange(createModelSelection(instanceId, nextModel))
+        props.onChange({ instanceId, model: nextModel })
       }
     />
   );

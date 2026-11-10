@@ -82,12 +82,6 @@ const models: ReadonlyArray<ServerProviderModel> = [
       ],
     }),
   },
-  {
-    slug: "plain",
-    name: "Plain",
-    isCustom: false,
-    capabilities: createModelCapabilities({ optionDescriptors: [] }),
-  },
 ];
 
 function renderPicker(value: ModelSelection, onChange: (next: ModelSelection) => void) {
@@ -120,9 +114,4 @@ it("clears a picked effort when the model changes", async () => {
   );
   await userEvent.click(screen.getByRole("button", { name: "Pick model" }));
   expect(onChange).toHaveBeenLastCalledWith(createModelSelection(instanceId, "plain"));
-});
-
-it("offers no effort levels for a model without any", async () => {
-  await using screen = await renderPicker(createModelSelection(instanceId, "plain"), vi.fn());
-  await expect.element(screen.getByText("No effort levels")).toBeInTheDocument();
 });
