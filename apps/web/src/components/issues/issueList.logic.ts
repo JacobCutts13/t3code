@@ -1,4 +1,4 @@
-import type { IssueSummary } from "@t3tools/contracts";
+import type { IssueSummary, LinearIssueSummary } from "@t3tools/contracts";
 
 /**
  * Pages of one list as a single list, newest update first. A merged list (assigned and opened by
@@ -11,4 +11,23 @@ export function mergeIssuePages(
   return [...unique.values()].toSorted((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt),
   );
+}
+
+export type IssueEntry =
+  | { readonly source: "github"; readonly key: string; readonly issue: IssueSummary }
+  | { readonly source: "linear"; readonly key: string; readonly issue: LinearIssueSummary };
+
+/** GitHub and Linear issues as one list, newest update first. */
+export function mergeIssueSources(
+  github: ReadonlyArray<IssueSummary>,
+  linear: ReadonlyArray<LinearIssueSummary>,
+): ReadonlyArray<IssueEntry> {
+  return [
+    ...github.map((issue): IssueEntry => ({
+      source: "github",
+      key: `${issue.host}/${issue.repository}#${issue.number}`,
+      issue,
+    })),
+    ...linear.map((issue): IssueEntry => ({ source: "linear", key: `linear:${issue.id}`, issue })),
+  ].toSorted((left, right) => right.issue.updatedAt.localeCompare(left.issue.updatedAt));
 }

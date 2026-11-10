@@ -255,6 +255,7 @@ import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
 import * as TextGenerators from "./textGeneration/TextGenerators.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as IssueService from "./issue/IssueService.ts";
+import * as LinearService from "./linear/LinearService.ts";
 import * as SourceControlSignIn from "./sourceControl/SourceControlSignIn.ts";
 import * as SourceControlBuiltInDrivers from "./sourceControl/builtInDrivers.ts";
 import * as SourceControlProviderRegistry from "./sourceControl/SourceControlProviderRegistry.ts";
@@ -1545,6 +1546,7 @@ export const layerWsRpc = (
         yield* SourceControlRepositoryService.SourceControlRepositoryService;
       const sourceControlSignIn = yield* SourceControlSignIn.SourceControlSignIn;
       const issues = yield* IssueService.IssueService;
+      const linear = yield* LinearService.LinearService;
       const withPullRequestViewer = pullRequests.withRoutingCredential;
       const bootstrapCredentials = yield* PairingGrantStore.PairingGrantStore;
       const sessions = yield* SessionStore.SessionStore;
@@ -2783,6 +2785,10 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.issuesList]: (input) => issues.list(input),
         [WS_METHODS.issuesGet]: (input) => issues.get(input),
+        [WS_METHODS.linearViewer]: () => linear.viewer,
+        [WS_METHODS.linearIssuesList]: (input) => linear.list(input),
+        [WS_METHODS.linearIssuesGet]: (input) => linear.get(input.id),
+        [WS_METHODS.linearIssueStart]: (input) => linear.start(input.id),
         [WS_METHODS.pullRequestsList]: (input) => pullRequests.list(input),
         [WS_METHODS.pullRequestsListStats]: (input) => pullRequests.listStats(input),
         [WS_METHODS.pullRequestsFilterOptions]: (input) => pullRequests.filterOptions(input),

@@ -129,6 +129,23 @@ sent to `git.cafe`; `CAFE_TOKEN` follows `CAFE_HOST` if you set it. Repositories
 Line comments are not available for GitCafe pull requests yet.
 Merging a stack lands it through GitCafe, and updating a branch restacks the layers above it.
 
+### Linear
+
+Linear issues appear on the **Issues** page next to GitHub issues once T3 Code has a Linear personal API key.
+
+1. In Linear, open **Settings → Account → Security & access** and create a personal API key. T3 Code needs read access, plus write access if dispatch should move issues; a key limited to those is enough.
+2. In T3 Code, open **Settings → Source control → Linear**, paste the key, and click **Save**. The section shows the Linear user and workspace it connected to.
+
+The key is stored on the server, like a GitHub token, and you can save a 1Password reference instead. A server without a saved key uses `LINEAR_API_KEY` from its environment.
+
+## Dispatch an agent on an issue
+
+The **Issues** page lists your open GitHub and Linear issues. Use **Source** to show one tracker, and the other filters to switch between issues assigned to you and issues you opened.
+
+**Dispatch** starts a thread in a new worktree. The thread's first message is the issue, run through `/complete-task`. Choose the project in the issue details. A GitHub issue defaults to the project whose repository it belongs to, and T3 Code remembers your choice for each repository and Linear team. Dispatching a Linear issue also moves it to its team's first started state, such as In Progress.
+
+A **Dispatched** badge links to a thread that is already working on the issue's branch.
+
 ## Start, clone, or publish a project
 
 To start from nothing, choose **New project** in the command palette (`Cmd/Ctrl+K`), or
