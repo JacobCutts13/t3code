@@ -36,6 +36,7 @@ export * from "./projectClone.ts";
 export * from "./nestedRepos.ts";
 export * from "./speech.ts";
 export * from "./issue.ts";
+export * from "./linear.ts";
 export * from "./pullRequest.ts";
 export * from "./pullRequestReviewGuide.ts";
 export * from "./orchestrationDispatch.ts";

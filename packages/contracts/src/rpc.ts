@@ -218,6 +218,15 @@ import {
 } from "./pullRequest.ts";
 import { IssueDetail, IssueGetInput, IssueListInput, IssueListResult } from "./issue.ts";
 import {
+  LinearIssueDetail,
+  LinearIssueInput,
+  LinearIssueListInput,
+  LinearIssueListResult,
+  LinearIssueStartResult,
+  LinearOperationError,
+  LinearViewer,
+} from "./linear.ts";
+import {
   RelayClientInstallFailedError,
   RelayClientInstallProgressEventSchema,
   RelayClientStatusSchema,
@@ -565,6 +574,11 @@ export const WS_METHODS = {
 
   issuesList: "issues.list",
   issuesGet: "issues.get",
+
+  linearViewer: "linear.viewer",
+  linearIssuesList: "linear.issuesList",
+  linearIssuesGet: "linear.issuesGet",
+  linearIssueStart: "linear.issueStart",
 
   pullRequestsList: "pullRequests.list",
   pullRequestsListStats: "pullRequests.listStats",
@@ -1047,6 +1061,32 @@ const WsIssuesGetRpc = Rpc.make(WS_METHODS.issuesGet, {
   payload: IssueGetInput,
   success: IssueDetail,
   error: IssueRpcError,
+});
+
+const LinearRpcError = Schema.Union([LinearOperationError, EnvironmentAuthorizationError]);
+
+const WsLinearViewerRpc = Rpc.make(WS_METHODS.linearViewer, {
+  payload: Schema.Struct({}),
+  success: LinearViewer,
+  error: LinearRpcError,
+});
+
+const WsLinearIssuesListRpc = Rpc.make(WS_METHODS.linearIssuesList, {
+  payload: LinearIssueListInput,
+  success: LinearIssueListResult,
+  error: LinearRpcError,
+});
+
+const WsLinearIssuesGetRpc = Rpc.make(WS_METHODS.linearIssuesGet, {
+  payload: LinearIssueInput,
+  success: LinearIssueDetail,
+  error: LinearRpcError,
+});
+
+const WsLinearIssueStartRpc = Rpc.make(WS_METHODS.linearIssueStart, {
+  payload: LinearIssueInput,
+  success: LinearIssueStartResult,
+  error: LinearRpcError,
 });
 
 const WsPullRequestsListRpc = Rpc.make(WS_METHODS.pullRequestsList, {
@@ -2151,6 +2191,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsCloudInstallRelayClientRpc,
   WsIssuesListRpc,
   WsIssuesGetRpc,
+  WsLinearViewerRpc,
+  WsLinearIssuesListRpc,
+  WsLinearIssuesGetRpc,
+  WsLinearIssueStartRpc,
   WsPullRequestsListRpc,
   WsPullRequestsListStatsRpc,
   WsPullRequestsFilterOptionsRpc,

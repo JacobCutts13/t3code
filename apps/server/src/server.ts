@@ -71,6 +71,7 @@ import * as NativeChildWorkQuery from "./orchestration-v2/NativeChildWorkQuery.t
 import * as CheckpointStore from "./checkpointing/CheckpointStore.ts";
 import * as SourceControlBuiltInDrivers from "./sourceControl/builtInDrivers.ts";
 import * as IssueService from "./issue/IssueService.ts";
+import * as LinearService from "./linear/LinearService.ts";
 import * as SourceControlSignIn from "./sourceControl/SourceControlSignIn.ts";
 import { BUILT_IN_SOURCE_CONTROL_DRIVER_LIST } from "./sourceControl/sourceControlDefinitions.ts";
 import * as TextGeneration from "./textGeneration/TextGeneration.ts";
@@ -472,6 +473,7 @@ const layerVcs = Layer.empty.pipe(
     SourceControlSignIn.layer.pipe(Layer.provide(layerSourceControlProviderRegistry)),
   ),
   Layer.provideMerge(IssueService.layer.pipe(Layer.provide(layerSourceControlProviderRegistry))),
+  Layer.provideMerge(LinearService.layer),
   Layer.provideMerge(layerProjectCloneTracker),
   Layer.provideMerge(
     VcsStatusBroadcaster.layer.pipe(

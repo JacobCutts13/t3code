@@ -23,6 +23,7 @@ type SecretUseSettings = Pick<
   | "easDeviceHosts"
   | "simlockDeviceHosts"
   | "cloudSpeechCredentials"
+  | "linear"
 >;
 
 interface SecretProviderUse {
@@ -113,5 +114,8 @@ export function secretProviderUses(
         ? [{ id: `voice:${provider}`, label: `Voice · ${CLOUD_SPEECH_LABELS[provider]}` }]
         : [];
     }),
+    ...(isSecretReference(settings.linear.apiKey) && settings.linear.apiKey.provider === providerId
+      ? [{ id: "linear:apiKey", label: "Linear · API key" }]
+      : []),
   ];
 }
