@@ -84,8 +84,25 @@ const layerTest = (input: {
     ),
   );
 
+  // Editor discovery also scans the host's /Applications; hide it so installed apps can't leak in.
+  const layerHermeticFileSystem = Layer.effect(
+    FileSystem.FileSystem,
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const hidden = (path: string) =>
+        path === "/Applications" || path.startsWith("/Applications/");
+      return FileSystem.FileSystem.of({
+        ...fs,
+        readDirectory: (path, options) =>
+          hidden(path) ? Effect.succeed([]) : fs.readDirectory(path, options),
+        stat: (path) => (hidden(path) ? fs.stat("/nonexistent-t3-test-path") : fs.stat(path)),
+      });
+    }),
+  ).pipe(Layer.provide(NodeServices.layer));
   return Layer.mergeAll(
-    ExternalLauncher.layer.pipe(Layer.provide(Layer.merge(NodeServices.layer, layerSpawner))),
+    ExternalLauncher.layer.pipe(
+      Layer.provide(Layer.mergeAll(NodeServices.layer, layerHermeticFileSystem, layerSpawner)),
+    ),
     Layer.succeed(HostProcess.Platform, input.platform),
     Layer.succeed(
       SpawnExecutableResolution,
