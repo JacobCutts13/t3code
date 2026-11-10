@@ -34,7 +34,9 @@ export default defineConfig({
       dev: {
         command:
           "node scripts/build-browser-secret.mjs && node scripts/build-preview-annotation-css.mjs && cross-env T3CODE_DESKTOP_DEV=1 vp pack --watch",
-        dependsOn: ["t3#build"],
+        // With the server bundle watched (dev-runner sets this), the watcher does the server build;
+        // a separate one-time build would race it over apps/server/dist.
+        dependsOn: process.env.T3CODE_SERVER_BUNDLE_WATCH === "1" ? [] : ["t3#build"],
         cache: false,
       },
       "dev:bundle": {

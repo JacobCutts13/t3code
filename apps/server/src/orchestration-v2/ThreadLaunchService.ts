@@ -26,8 +26,10 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
@@ -48,11 +50,13 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import type * as Orchestrator from "./Orchestrator.ts";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import { randomUuidV4 } from "@t3tools/provider-core/server/randomUuid";
 import { DispatchModeLimit } from "./DispatchModeLimit.ts";
 import * as ThreadManagement from "./ThreadManagementService.ts";
+import * as NestedRepoWorktrees from "./NestedRepoWorktrees.ts";
 
 export type ThreadLaunchWorkspaceStrategy =
   | { readonly type: "root"; readonly branch?: string | undefined }
@@ -207,6 +211,9 @@ const make = Effect.gen(function* () {
   const cloneTracker = yield* ProjectCloneTracker.ProjectCloneTracker;
   const terminals = yield* TerminalManager.TerminalManager;
   const git = yield* GitWorkflow.GitWorkflowService;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const home = yield* HostProcess.HomeDirectory;
   const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
   const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
@@ -314,6 +321,13 @@ const make = Effect.gen(function* () {
     let setupTerminalId: string | null = null;
     let workspaceRecorded = false;
     let runReleased = false;
+    // Repos the project adds to every new worktree thread; reused worktrees already have theirs.
+    const nestedRepos =
+      input.workspaceStrategy.type === "worktree"
+        ? resolveProjectSettings(yield* serverSettings.getSettings, input.projectId).settings
+            .nestedRepos
+        : [];
+    const createdNested: NestedRepoWorktrees.CreatedNestedWorktree[] = [];
     // Stop background renames before forgetting worktrees; completed renames record them again.
     let branchRename: Fiber.Fiber<unknown> | null = null;
     if (input.workspaceStrategy.type === "worktree") {
@@ -321,7 +335,10 @@ const make = Effect.gen(function* () {
         threadId,
         branch: input.workspaceStrategy.branch ?? null,
         baseRef: input.workspaceStrategy.baseRef,
-        stages: ["fetch", "checkout", "setup-script", "agent"],
+        stages:
+          nestedRepos.length > 0
+            ? ["fetch", "checkout", "nested-repos", "setup-script", "agent"]
+            : ["fetch", "checkout", "setup-script", "agent"],
         fiber: yield* Effect.fiber,
       });
     } else if (reused !== undefined) {
@@ -463,6 +480,26 @@ const make = Effect.gen(function* () {
         createdBranch = branch;
         yield* setupTracker.update(threadId, (snapshot) => ({ ...snapshot, worktreePath, branch }));
         yield* setupTracker.stageStatus(threadId, "checkout", "done");
+        if (nestedRepos.length > 0) {
+          // Before the workspace is recorded, so a failure here rolls everything back.
+          yield* setupTracker.stageStatus(threadId, "nested-repos", "running");
+          yield* NestedRepoWorktrees.addNestedRepoWorktrees({
+            git,
+            fs,
+            path,
+            home,
+            repos: nestedRepos,
+            worktreePath,
+            branch,
+            startFromOrigin: input.workspaceStrategy.startFromOrigin === true,
+            onCreated: (created) =>
+              Effect.sync(() => {
+                createdNested.push(created);
+              }),
+            onRepo: (name) => setupTracker.stage(threadId, "nested-repos", { detail: name }),
+          }).pipe(Effect.mapError(mapError(input, "provision-worktree", threadId)));
+          yield* setupTracker.stageStatus(threadId, "nested-repos", "done");
+        }
       }
 
       // Do not rewrite reused worktrees; that could undo the original branch rename.
@@ -509,6 +546,12 @@ const make = Effect.gen(function* () {
           ),
           Effect.flatMap((renamed) =>
             Effect.gen(function* () {
+              yield* NestedRepoWorktrees.renameNestedBranches({
+                git,
+                created: createdNested,
+                oldBranch,
+                newBranch: renamed.branch,
+              });
               yield* threads
                 .dispatch({
                   type: "thread.metadata.update",
@@ -694,6 +737,8 @@ const make = Effect.gen(function* () {
             if (branchRename !== null) yield* Fiber.interrupt(branchRename);
             const removedPath = createdWorktreePath;
             const removedBranch = createdBranch;
+            // Nested worktrees first, so removing the container does not orphan their registrations.
+            yield* NestedRepoWorktrees.removeNestedWorktrees({ git, created: createdNested });
             // Forget worktrees only after removal succeeds; failed removals must not reuse partially written checkouts.
             yield* git
               .removeWorktree({ cwd: project.workspaceRoot, path: removedPath, force: true })

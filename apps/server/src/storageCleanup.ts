@@ -814,6 +814,96 @@ const make = Effect.gen(function* () {
       });
   });
 
+  // Linked worktrees of other repositories placed directly inside a thread's worktree, as a
+  // multi-repo project does. Git in the thread's worktree cannot see into them, so they are
+  // checked and removed here, from the clone each one was created from.
+  const nestedLinkedWorktrees = Effect.fn("StorageCleanup.nestedLinkedWorktrees")(function* (
+    cwd: string,
+  ) {
+    const found: Array<{ path: string; source: string }> = [];
+    // A worktree whose folder is already gone has nothing nested; other read errors propagate.
+    const names = yield* fs.readDirectory(cwd).pipe(
+      Effect.catchIf(
+        (error) =>
+          error.cause instanceof Error && "code" in error.cause && error.cause.code === "ENOENT",
+        () => Effect.succeed([] as string[]),
+      ),
+    );
+    for (const name of names) {
+      const child = path.join(cwd, name);
+      // A link can lead to a worktree outside this one, and Git would remove that target.
+      // Effect's stat follows links, so probe with readLink first to get lstat semantics.
+      const isLink = yield* fs.readLink(child).pipe(
+        Effect.as(true),
+        Effect.catchIf(
+          (error) =>
+            error.cause instanceof Error && "code" in error.cause && error.cause.code === "EINVAL",
+          () => Effect.succeed(false),
+        ),
+      );
+      if (isLink) continue;
+      // Plain files hold no worktree, and probing under a file fails with ENOTDIR.
+      const isFolder = yield* fs.stat(child).pipe(
+        Effect.map((info) => info.type === "Directory"),
+        Effect.orElseSucceed(() => false),
+      );
+      if (!isFolder) continue;
+      // A linked worktree and a submodule both have a `.git` file, so ask Git which one this is:
+      // only a linked worktree has a git dir different from its common dir. Errors propagate and
+      // keep the worktree: a folder Git cannot read must not be skipped and then deleted.
+      const gitPath = path.join(child, ".git");
+      if (!(yield* fs.exists(gitPath)) || (yield* fs.stat(gitPath)).type !== "File") continue;
+      const dirs = yield* git.execute({
+        operation: "StorageCleanup.nestedLinkedWorktrees",
+        cwd: child,
+        args: ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
+      });
+      const [gitDir, commonDir] = dirs.stdout.trim().split("\n");
+      if (commonDir !== undefined && gitDir !== commonDir)
+        found.push({ path: child, source: commonDir });
+    }
+    return found;
+  });
+
+  // Why a nested worktree must stay, or null when it is safe to remove. Removing a worktree also
+  // drops its HEAD, so commits that only a detached HEAD points at would be lost with it.
+  const nestedKeepReason = Effect.fn("StorageCleanup.nestedKeepReason")(function* (
+    repo: { readonly path: string },
+    rules: WorktreeCleanupRules,
+  ) {
+    const name = path.basename(repo.path);
+    const changes = yield* localChangesReason(repo.path, rules);
+    if (changes !== null) return `nested repo ${name} ${changes}`;
+    const unsaved = yield* git.execute({
+      operation: "StorageCleanup.nestedKeepReason",
+      cwd: repo.path,
+      args: ["rev-list", "--max-count=1", "HEAD", "--not", "--branches", "--remotes", "--tags"],
+    });
+    return unsaved.stdout.trim() === ""
+      ? null
+      : `nested repo ${name} has commits not on any branch`;
+  });
+
+  // Removes only this worktree's folder and its registration in the source clone. The clone, its
+  // branches and its other worktrees stay, and `force: false` refuses to remove uncommitted work.
+  const removeNestedWorktree = Effect.fn("StorageCleanup.removeNestedWorktree")(function* (nested: {
+    readonly path: string;
+    readonly source: string;
+  }) {
+    yield* removeLinkedWorktree({
+      operation: "StorageCleanup.cleanupGit",
+      cwd: nested.source,
+      worktreePath: nested.path,
+      force: false,
+      execute: git.execute,
+      run: (args) => cleanupGit(nested.source, [...args], "git worktree remove"),
+    });
+    yield* Effect.logInfo("storage cleanup removed nested worktree", {
+      path: nested.path,
+      source: nested.source,
+    });
+  });
+
   const cleanWorktrees = Effect.fn("StorageCleanup.cleanWorktrees")(function* (
     serverSettings: ServerSettings,
     now: number,
@@ -1206,6 +1296,14 @@ const make = Effect.gen(function* () {
               )
             )
               return keep("settings changed since check");
+            // Nested repositories go first, and only when all of them are clean: the clean step
+            // below would delete their folders without unregistering them.
+            const nested = yield* nestedLinkedWorktrees(worktreePath);
+            for (const repo of nested) {
+              const reason = yield* nestedKeepReason(repo, settings);
+              if (reason !== null) return keep(reason);
+            }
+            for (const repo of nested) yield* removeNestedWorktree(repo);
             // Clean only untracked files. Ordinary worktrees retain Git's final tracked-edit check.
             if (settings.worktreeKeepWhen === "tracked-changes")
               yield* cleanupGit(worktreePath, ["clean", "-ffdx"], "git clean");

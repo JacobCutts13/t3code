@@ -94,6 +94,19 @@ export function useProjectGroupUpdate() {
   return { updateProjectGroup, canOrganizeProjectGroup };
 }
 
+/** Brings an archived project back when its folder is added or picked again. */
+export function useUnarchiveProject() {
+  const updateProject = useOrchestrationCommand(projectEnvironment.update, {
+    label: "project unarchive",
+  });
+  return (project: Pick<ProjectGroupMember, "environmentId" | "id">) => {
+    void updateProject({
+      environmentId: project.environmentId,
+      input: { projectId: project.id, archived: false },
+    }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+  };
+}
+
 /** Pin state for a project group, shared by every list that can pin or unpin a project. */
 export function useProjectPin() {
   const { updateProjectGroup, canOrganizeProjectGroup } = useProjectGroupUpdate();

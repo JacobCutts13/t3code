@@ -78,6 +78,8 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
+import { CreateProjectFromRepos } from "./CreateProjectFromRepos";
+import { openCreateProjectFromRepos } from "./createProjectFromReposStore";
 import {
   useDeferredValue,
   useEffect,
@@ -117,14 +119,13 @@ import { threadEnvironment } from "../state/threads";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { sourceControlEnvironment } from "../state/sourceControl";
 import { useAtomCommand } from "../state/use-atom-command";
-import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
 import { useScratchProject } from "../hooks/useScratchProject";
 import { useStartTriage } from "../hooks/useStartTriage";
 import { pickTriageEnvironment } from "../lib/triageTarget";
 import { useNewProject } from "../hooks/useNewProject";
 import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
-import { reportProjectFailure, useProjectPin } from "../hooks/useProjectGroupUpdate";
+import { useProjectPin, useUnarchiveProject } from "../hooks/useProjectGroupUpdate";
 import {
   useEnvironmentProviders,
   useEnvironments,
@@ -319,6 +320,7 @@ export function CommandPalette({ children }: { children: ReactNode }) {
         <div className="contents" inert={state.open}>
           {children}
         </div>
+        <CreateProjectFromRepos />
         <CommandPaletteDialog
           mode={state.mode}
           session={state.session}
@@ -440,9 +442,7 @@ function OpenCommandPaletteDialog(props: {
   const createProject = useAtomCommand(projectEnvironment.create, {
     reportFailure: false,
   });
-  const updateProject = useOrchestrationCommand(projectEnvironment.update, {
-    label: "project unarchive",
-  });
+  const unarchiveProject = useUnarchiveProject();
   const { scratchEnvironmentId, scratchWorkspaceRootFor, startScratchThread } = useScratchProject();
   const startTriage = useStartTriage();
   const lookupRepository = useAtomQueryRunner(sourceControlEnvironment.repository, {
@@ -1050,6 +1050,19 @@ function OpenCommandPaletteDialog(props: {
         },
       });
     }
+
+    sourceItems.unshift({
+      kind: "action",
+      value: `action:add-project:${environmentId}:repos`,
+      searchTerms: ["repositories", "repos", "multiple", "clone", "existing", "workspace"],
+      title: "Choose repositories",
+      description: "Pick one or several repositories on this machine",
+      icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        setOpen(false);
+        openCreateProjectFromRepos({ environmentId });
+      },
+    });
 
     const orderedSources: ReadonlyArray<AddProjectRemoteSource> = [
       "url",
@@ -1838,12 +1851,7 @@ function OpenCommandPaletteDialog(props: {
     );
     if (existing) {
       // Adding an archived project's folder again brings the project back.
-      if (existing.archivedAt != null) {
-        void updateProject({
-          environmentId: existing.environmentId,
-          input: { projectId: existing.id, archived: false },
-        }).then((result) => reportProjectFailure("Failed to unarchive project", result));
-      }
+      if (existing.archivedAt != null) unarchiveProject(existing);
       const latestThread = getLatestThreadForProject(
         threads.filter((thread) => thread.environmentId === existing.environmentId),
         existing.id,

@@ -856,7 +856,8 @@ export const make = Effect.gen(function* () {
       pendingMainReveals.delete(window);
       window.webContents.setBackgroundThrottling(true);
       if (persistedSettings.mainWindowMaximized) window.maximize();
-      yield* electronWindow.reveal(window);
+      // Dev rebuilds relaunch Electron constantly; showing without focus keeps them from stealing it.
+      yield* electronWindow.reveal(window, { focus: !environment.isDevelopment });
       yield* dismissConnectingSplash;
     });
     pendingMainReveals.set(window, revealWhenReady);
@@ -867,7 +868,7 @@ export const make = Effect.gen(function* () {
 
     loadApplication();
     if (environment.isDevelopment) {
-      window.webContents.openDevTools({ mode: "detach" });
+      window.webContents.openDevTools({ mode: "detach", activate: false });
     }
 
     window.on("closed", () => {
@@ -961,7 +962,8 @@ export const make = Effect.gen(function* () {
     });
     splash.once("ready-to-show", () => {
       if (!splash.isDestroyed()) {
-        splash.show();
+        if (environment.isDevelopment) splash.showInactive();
+        else splash.show();
       }
     });
     void splash.loadURL(buildConnectingSplashDataUrl(shouldUseDarkColors));

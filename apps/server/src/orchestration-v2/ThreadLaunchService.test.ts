@@ -238,6 +238,7 @@ function makeHarness(options: HarnessOptions = {}) {
         layerThreadManagement,
         layerReceipts,
         IdAllocator.layer,
+        NodeServices.layer,
       ),
     ),
   );
