@@ -12,10 +12,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import { render } from "../../../test/render";
 
-const state = vi.hoisted(() => ({
-  entries: [] as unknown[],
-  instanceId: "agent",
-}));
+const state = vi.hoisted(() => ({ entries: [] as unknown[] }));
 
 vi.mock(import("~/hooks/useSettings"), () => ({
   useEnvironmentSettings: (() => ({})) as never,
@@ -48,7 +45,7 @@ vi.mock(import("../chat/ProviderModelPicker"), () => ({
     <button
       type="button"
       disabled={disabled}
-      onClick={() => onInstanceModelChange(state.instanceId, "deep")}
+      onClick={() => onInstanceModelChange("agent", "deep")}
     >
       Pick model
     </button>
@@ -88,51 +85,53 @@ const models: ReadonlyArray<ServerProviderModel> = [
   },
 ];
 
-function setup(
-  model: string,
+function renderPicker(
+  value: ModelSelection,
   onChange: (next: ModelSelection) => void,
   disabled = false,
-): React.ReactElement {
+) {
   state.entries = [{ instanceId, driverKind: ProviderDriverKind.make("acpRegistry"), models }];
-  return (
+  return render(
     <IssueModelPicker
       environmentId={EnvironmentId.make("env")}
       projectId={ProjectId.make("project")}
-      value={createModelSelection(instanceId, model)}
+      value={value}
       disabled={disabled}
       onChange={onChange}
-    />
+    />,
+    { router: false }, // no routes involved
   );
 }
 
 const effortButton = () => page.getByRole("button", { name: /Thinking|Medium/ });
 
-it("sets the picked model's effort and clears it when the model changes", async () => {
+it("sets the picked model's effort", async () => {
   const onChange = vi.fn();
-  await using screen = await render(setup("deep", onChange), {
-    router: false, // no routes involved
-  });
+  await using _screen = await renderPicker(createModelSelection(instanceId, "deep"), onChange);
   await userEvent.click(effortButton());
   await userEvent.click(page.getByRole("menuitemradio", { name: "High" }));
   expect(onChange).toHaveBeenLastCalledWith(
     createModelSelection(instanceId, "deep", [{ id: "thought_level", value: "high" }]),
   );
+});
 
+it("clears a picked effort when the model changes", async () => {
+  const onChange = vi.fn();
+  await using screen = await renderPicker(
+    createModelSelection(instanceId, "deep", [{ id: "thought_level", value: "high" }]),
+    onChange,
+  );
   await userEvent.click(screen.getByRole("button", { name: "Pick model" }));
   expect(onChange).toHaveBeenLastCalledWith(createModelSelection(instanceId, "deep"));
 });
 
 it("shows no effort control for a model without one", async () => {
-  await using screen = await render(setup("plain", vi.fn()), {
-    router: false, // no routes involved
-  });
+  await using screen = await renderPicker(createModelSelection(instanceId, "plain"), vi.fn());
   await expect.element(screen.getByRole("button", { name: "Pick model" })).toBeInTheDocument();
   await expect.element(effortButton()).not.toBeInTheDocument();
 });
 
 it("disables the effort control while a dispatch is in flight", async () => {
-  await using _screen = await render(setup("deep", vi.fn(), true), {
-    router: false, // no routes involved
-  });
+  await using _screen = await renderPicker(createModelSelection(instanceId, "deep"), vi.fn(), true);
   await expect.element(effortButton()).toBeDisabled();
 });

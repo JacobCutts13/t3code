@@ -26,11 +26,12 @@ export function IssueModelPicker(props: {
   const activeInstanceId = props.value?.instanceId ?? first.instanceId;
   const activeEntry = instanceEntries.find((entry) => entry.instanceId === activeInstanceId);
   const model = props.value?.model ?? "";
+  const disabled = props.disabled === true;
   return (
     <div className="flex items-center gap-1.5">
       <ProviderModelPicker
         environmentId={props.environmentId}
-        disabled={props.disabled === true}
+        disabled={disabled}
         activeInstanceId={activeInstanceId}
         model={model}
         lockedProvider={null}
@@ -56,7 +57,7 @@ export function IssueModelPicker(props: {
           modelOptions={props.value?.options ?? []}
           // The first message starts with /complete-task, so a prompt-injected effort never applies.
           allowPromptInjectedEffort={false}
-          disabled={props.disabled === true}
+          disabled={disabled}
           onModelOptionsChange={(options) =>
             props.onChange(createModelSelection(activeInstanceId, model, options))
           }
