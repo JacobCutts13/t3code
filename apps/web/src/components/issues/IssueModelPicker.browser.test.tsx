@@ -7,8 +7,9 @@ import {
   type ServerProviderModel,
 } from "@t3tools/contracts";
 import { createModelCapabilities, createModelSelection } from "@t3tools/shared/model";
+import type { ReactNode } from "react";
 import { expect, it, vi } from "vite-plus/test";
-import { page, userEvent } from "vite-plus/test/browser";
+import { userEvent } from "vite-plus/test/browser";
 
 import { render } from "../../../test/render";
 
@@ -33,22 +34,26 @@ vi.mock(import("../../composerDraftStore"), () => ({
 vi.mock(import("~/providerInstances"), () => ({
   providerInstanceEntriesFor: (() => state.entries) as never,
 }));
-// The model menu has its own tests; here it only reports a model change.
-vi.mock(import("../chat/ProviderModelPicker"), () => ({
+// Only the permissions menu, which this picker leaves out, uses these footer controls.
+vi.mock(import("../chat/ComposerFooterControls"), () => ({
+  ComposerPermissionsSection: (() => null) as never,
+}));
+// The model menu has its own tests; here it reports a model change and docks the effort column.
+vi.mock(import("../chat/ProviderModelPicker"), async () => ({
+  DockedPickerContext: (await import("react")).createContext({ modelLabel: "" }),
   ProviderModelPicker: (({
-    disabled,
+    effortColumn,
     onInstanceModelChange,
   }: {
-    disabled: boolean;
+    effortColumn: ReactNode;
     onInstanceModelChange: (instanceId: string, model: string) => void;
   }) => (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onInstanceModelChange("agent", "plain")}
-    >
-      Pick model
-    </button>
+    <>
+      <button type="button" onClick={() => onInstanceModelChange("agent", "plain")}>
+        Pick model
+      </button>
+      {effortColumn}
+    </>
   )) as never,
 }));
 
@@ -85,31 +90,23 @@ const models: ReadonlyArray<ServerProviderModel> = [
   },
 ];
 
-function renderPicker(
-  value: ModelSelection,
-  onChange: (next: ModelSelection) => void,
-  disabled = false,
-) {
+function renderPicker(value: ModelSelection, onChange: (next: ModelSelection) => void) {
   state.entries = [{ instanceId, driverKind: ProviderDriverKind.make("acpRegistry"), models }];
   return render(
     <IssueModelPicker
       environmentId={EnvironmentId.make("env")}
       projectId={ProjectId.make("project")}
       value={value}
-      disabled={disabled}
       onChange={onChange}
     />,
     { router: false }, // no routes involved
   );
 }
 
-const effortButton = () => page.getByRole("button", { name: /Thinking|Medium/ });
-
 it("sets the picked model's effort", async () => {
   const onChange = vi.fn();
-  await using _screen = await renderPicker(createModelSelection(instanceId, "deep"), onChange);
-  await userEvent.click(effortButton());
-  await userEvent.click(page.getByRole("menuitemradio", { name: "High" }));
+  await using screen = await renderPicker(createModelSelection(instanceId, "deep"), onChange);
+  await userEvent.click(screen.getByRole("radio", { name: "High" }));
   expect(onChange).toHaveBeenLastCalledWith(
     createModelSelection(instanceId, "deep", [{ id: "thought_level", value: "high" }]),
   );
@@ -125,13 +122,7 @@ it("clears a picked effort when the model changes", async () => {
   expect(onChange).toHaveBeenLastCalledWith(createModelSelection(instanceId, "plain"));
 });
 
-it("shows no effort control for a model without one", async () => {
+it("offers no effort levels for a model without any", async () => {
   await using screen = await renderPicker(createModelSelection(instanceId, "plain"), vi.fn());
-  await expect.element(screen.getByRole("button", { name: "Pick model" })).toBeInTheDocument();
-  await expect.element(effortButton()).not.toBeInTheDocument();
-});
-
-it("disables the effort control while a dispatch is in flight", async () => {
-  await using _screen = await renderPicker(createModelSelection(instanceId, "deep"), vi.fn(), true);
-  await expect.element(effortButton()).toBeDisabled();
+  await expect.element(screen.getByText("No effort levels")).toBeInTheDocument();
 });
