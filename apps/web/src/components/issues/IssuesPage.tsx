@@ -476,13 +476,13 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
    */
   const projectOf = (entry: IssueEntry) => {
     const id = pickedProjects[pickKey(entry)];
-    const picked = id === undefined ? undefined : projects.find((project) => project.id === id);
-    return picked ?? (entry.source === "github" ? projectFor(entry.issue) : undefined);
+    const remembered = id === undefined ? undefined : projects.find((project) => project.id === id);
+    return remembered ?? (entry.source === "github" ? projectFor(entry.issue) : undefined);
   };
   const branchOf = (entry: IssueEntry) =>
     entry.source === "github" ? issueBranchName(entry.issue) : linearBranchName(entry.issue);
-  const blockedReason = (entry: IssueEntry) =>
-    projectOf(entry) !== undefined
+  const blockedReason = (entry: IssueEntry, project: ReturnType<typeof projectOf>) =>
+    project !== undefined
       ? null
       : entry.source === "github"
         ? `Add ${entry.issue.repository} as a project, or choose one in the issue details`
@@ -564,30 +564,33 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
           ) : (
             <>
               <ul>
-                {entries.map((entry) => (
-                  <IssueRow
-                    key={entry.key}
-                    title={entry.issue.title}
-                    meta={
-                      entry.source === "github" ? (
-                        <GitHubIssueMeta issue={entry.issue} />
-                      ) : (
-                        <LinearIssueMeta issue={entry.issue} />
-                      )
-                    }
-                    selected={entry.key === selectedKey}
-                    dispatching={dispatchingKey === entry.key}
-                    blockedReason={blockedReason(entry)}
-                    environmentId={environmentId}
-                    dispatchedThreadId={dispatchedThreadId(
-                      byBranch,
-                      projectOf(entry)?.id,
-                      branchOf(entry),
-                    )}
-                    onSelect={() => setSelectedKey(entry.key)}
-                    onDispatch={() => void dispatchEntry(entry)}
-                  />
-                ))}
+                {entries.map((entry) => {
+                  const project = projectOf(entry);
+                  return (
+                    <IssueRow
+                      key={entry.key}
+                      title={entry.issue.title}
+                      meta={
+                        entry.source === "github" ? (
+                          <GitHubIssueMeta issue={entry.issue} />
+                        ) : (
+                          <LinearIssueMeta issue={entry.issue} />
+                        )
+                      }
+                      selected={entry.key === selectedKey}
+                      dispatching={dispatchingKey === entry.key}
+                      blockedReason={blockedReason(entry, project)}
+                      environmentId={environmentId}
+                      dispatchedThreadId={dispatchedThreadId(
+                        byBranch,
+                        project?.id,
+                        branchOf(entry),
+                      )}
+                      onSelect={() => setSelectedKey(entry.key)}
+                      onDispatch={() => void dispatchEntry(entry)}
+                    />
+                  );
+                })}
               </ul>
               {showLinear && linearList.data?.hasMore ? (
                 <p className="px-3 pt-3 text-muted-foreground text-xs">
@@ -665,7 +668,7 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
                 <Button
                   type="button"
                   disabled={dispatchingKey === selectedKey || selectedProject === undefined}
-                  title={blockedReason(selected) ?? "Start an agent on this issue"}
+                  title={blockedReason(selected, selectedProject) ?? "Start an agent on this issue"}
                   onClick={() => void dispatchEntry(selected)}
                 >
                   <PlayIcon />

@@ -187,19 +187,19 @@ const ref = (name: string, overrides: Partial<VcsRef> = {}): VcsRef => ({
 describe("worktreeBase", () => {
   it.each([
     {
-      name: "the local default, from origin when origin has it",
+      name: "the local default",
       refs: [ref("trunk", { isDefault: true }), ref("origin/trunk", { isRemote: true })],
-      expected: { branch: "trunk", startFromOrigin: true },
+      expected: "trunk",
     },
     {
       name: "origin's default when no local branch is marked",
       refs: [ref("origin/develop", { isRemote: true, remoteName: "origin", isDefault: true })],
-      expected: { branch: "develop", startFromOrigin: true },
+      expected: "develop",
     },
     {
       name: "main without a remote, locally",
       refs: [ref("feature"), ref("main")],
-      expected: { branch: "main", startFromOrigin: false },
+      expected: "main",
     },
     { name: "nothing to start from", refs: [ref("feature")], expected: null },
   ])("picks $name", ({ refs, expected }) => {

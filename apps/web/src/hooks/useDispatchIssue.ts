@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   type AtomCommandResult,
@@ -107,7 +108,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
    * only while its provider is enabled and available for the project, else the server's default.
    */
   const modelFor = (
-    project: NonNullable<ReturnType<typeof projectFor>>,
+    project: EnvironmentProject,
     picked: ModelSelection | null = null,
   ): ModelSelection | null => {
     const entries = providerInstanceEntriesFor(providers, settings, project.id);
@@ -126,15 +127,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
 
   /** Starts the thread in a new worktree on `branch` and opens it; false after a failure toast. */
   const launch = async (input: {
-    readonly project: NonNullable<ReturnType<typeof projectFor>>;
+    readonly project: EnvironmentProject;
     readonly modelSelection: ModelSelection;
     readonly title: string;
     readonly text: string;
     readonly baseBranch: string;
     readonly branch: string;
-    readonly startFromOrigin: boolean;
   }): Promise<boolean> => {
-    const { project, modelSelection, title, text, baseBranch, branch, startFromOrigin } = input;
+    const { project, modelSelection, title, text, baseBranch, branch } = input;
     const threadId = newThreadId();
     const createdAt = new Date().toISOString();
     const started = await startThreadTurn({
@@ -166,7 +166,8 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
             projectCwd: project.workspaceRoot,
             baseBranch,
             branch,
-            startFromOrigin,
+            // The server fetches the base's upstream, or origin, and uses it locally without one.
+            startFromOrigin: true,
           },
           runSetupScript: true,
         },
@@ -181,11 +182,8 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     return true;
   };
 
-  type Project = NonNullable<ReturnType<typeof projectFor>>;
-  type Base = { readonly branch: string; readonly startFromOrigin: boolean };
-
   /** The branch a worktree in `project` starts from, read from its refs; false after a failure toast. */
-  const baseFromRefs = async (project: Project): Promise<Base | false> => {
+  const baseFromRefs = async (project: EnvironmentProject): Promise<string | false> => {
     // Without matching remote refs, a local default hides origin's and the worktree misses a fetch.
     const refs = await readRefs({
       environmentId,
@@ -209,7 +207,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
    */
   const dispatch = async (
     issue: IssueSummary,
-    project: Project,
+    project: EnvironmentProject,
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
     const modelSelection = modelFor(project, picked);
@@ -225,21 +223,13 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         isIssueRepository ? null : baseFromRefs(project),
       ]);
       if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
-      if (refsBase === false) return false;
-      let base: Base;
-      if (refsBase !== null) {
-        base = refsBase;
-      } else {
-        // Branching from a guessed base could start the work on the wrong history.
-        const defaultBranch = detail.value.defaultBranch;
-        if (defaultBranch === null) {
-          return fail(
-            "Cannot dispatch",
-            `GitHub did not report ${issue.repository}'s default branch.`,
-          );
-        }
-        base = { branch: defaultBranch, startFromOrigin: true };
-      }
+      const defaultBranch = detail.value.defaultBranch;
+      const base =
+        refsBase ??
+        (defaultBranch === null
+          ? fail("Cannot dispatch", `GitHub did not report ${issue.repository}'s default branch.`)
+          : defaultBranch);
+      if (base === false) return false;
 
       const branch = issueBranchName(issue);
       return await launch({
@@ -247,9 +237,8 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `#${issue.number} ${issue.title}`,
         text: buildIssuePrompt(detail.value, branch),
-        baseBranch: base.branch,
+        baseBranch: base,
         branch,
-        startFromOrigin: base.startFromOrigin,
       });
     } catch (error) {
       return fail("Could not dispatch the issue", errorMessage(error));
@@ -262,7 +251,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
    */
   const dispatchLinear = async (
     issue: LinearIssueSummary,
-    project: Project,
+    project: EnvironmentProject,
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
     const modelSelection = modelFor(project, picked);
@@ -280,9 +269,8 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `${issue.identifier} ${issue.title}`,
         text: buildLinearIssuePrompt(issue, detail.value, branch),
-        baseBranch: base.branch,
+        baseBranch: base,
         branch,
-        startFromOrigin: base.startFromOrigin,
       });
       if (!launched) return false;
       const moved = await startLinearIssue({ environmentId, input: { id: issue.id } });

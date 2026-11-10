@@ -110,12 +110,10 @@ ${description}${comments}${truncated}`;
 }
 
 /**
- * Where a worktree for an issue starts when no forge names a default branch: the repository's
- * default ref, else `main` or `master`. It starts from origin only when origin has that branch.
+ * The branch a worktree for an issue starts from when no forge names a default branch: the
+ * repository's default ref, else `main` or `master`.
  */
-export function worktreeBase(
-  refs: ReadonlyArray<VcsRef>,
-): { readonly branch: string; readonly startFromOrigin: boolean } | null {
+export function worktreeBase(refs: ReadonlyArray<VcsRef>): string | null {
   const local = new Set(refs.filter((ref) => ref.isRemote !== true).map((ref) => ref.name));
   const remote = new Set(refs.filter((ref) => ref.isRemote === true).map((ref) => ref.name));
   const originDefault = refs.find(
@@ -125,7 +123,7 @@ export function worktreeBase(
     refs.find((ref) => ref.isRemote !== true && ref.isDefault)?.name ??
     (originDefault ? deriveLocalBranchNameFromRemoteRef(originDefault.name) : undefined) ??
     ["main", "master"].find((name) => local.has(name) || remote.has(`origin/${name}`));
-  return branch === undefined ? null : { branch, startFromOrigin: remote.has(`origin/${branch}`) };
+  return branch ?? null;
 }
 
 const branchKey = (projectId: string, branch: string) => `${projectId}\0${branch}`;
