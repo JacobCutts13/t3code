@@ -114,7 +114,7 @@ export const addNestedRepoWorktrees = Effect.fn("NestedRepoWorktrees.add")(funct
     if (input.onRepo) yield* input.onRepo(repo.name);
 
     const repoPath = path.resolve(expandHomePath(repo.path, home));
-    const isRepo = yield* git.isRepository(repoPath).pipe(Effect.orElseSucceed(() => false));
+    const isRepo = yield* git.isRepository(repoPath).pipe(Effect.mapError(fail));
     if (!isRepo) return yield* fail(`${repo.path} is not a git repository.`);
 
     const base =

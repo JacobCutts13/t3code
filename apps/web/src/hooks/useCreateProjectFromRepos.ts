@@ -18,8 +18,7 @@ import { projectEnvironment } from "~/state/projects";
 import { serverEnvironment } from "~/state/server";
 import { readEnvironmentScope } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { useOrchestrationCommand } from "~/state/use-orchestration-command";
-import { reportProjectFailure } from "./useProjectGroupUpdate";
+import { useUnarchiveProject } from "./useProjectGroupUpdate";
 import { useNewThreadHandler } from "./useHandleNewThread";
 
 function errorMessage(error: unknown): string {
@@ -44,9 +43,7 @@ export function useCreateProjectFromRepos() {
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
     reportFailure: false,
   });
-  const updateProject = useOrchestrationCommand(projectEnvironment.update, {
-    label: "project unarchive",
-  });
+  const unarchiveProject = useUnarchiveProject();
   const handleNewThread = useNewThreadHandler();
 
   const openProject = async (environmentId: EnvironmentId, projectId: ProjectId) => {
@@ -76,12 +73,7 @@ export function useCreateProjectFromRepos() {
         );
         if (existing) {
           // Picking an archived project's folder again brings the project back, as Add project does.
-          if (existing.archivedAt != null) {
-            void updateProject({
-              environmentId,
-              input: { projectId: existing.id, archived: false },
-            }).then((result) => reportProjectFailure("Failed to unarchive project", result));
-          }
+          if (existing.archivedAt != null) unarchiveProject(existing);
           await openProject(environmentId, existing.id);
           return true;
         }

@@ -490,7 +490,7 @@ const make = Effect.gen(function* () {
             home,
             repos: nestedRepos,
             worktreePath,
-            branch: branch!,
+            branch,
             startFromOrigin: input.workspaceStrategy.startFromOrigin === true,
             onCreated: (created) =>
               Effect.sync(() => {
