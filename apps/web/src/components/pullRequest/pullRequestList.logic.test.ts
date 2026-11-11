@@ -386,7 +386,7 @@ describe("partitioning with the hosts' own priority reads", () => {
         ["others", [3]],
       ],
     );
-    expect(groupsFor({ involvement: "reviewing", baselineEmpty: false })).toEqual([]);
+    expect(groupsFor({ involvement: "reviewing", baselineEmpty: false })).toEqual([["others", []]]);
   });
 });
 

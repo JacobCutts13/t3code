@@ -848,9 +848,10 @@ function matchesUnsortedListing(
 
 const SEARCH_REPOSITORY = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
-/** Unquoted repo: values must not inject qualifiers. */
 // `review-requested:@me` also matches requests made to the viewer's teams.
 const REVIEW_REQUEST_SEARCH = "is:pr is:open archived:false review-requested:@me sort:updated-desc";
+
+/** Unquoted repo: values must not inject qualifiers. */
 
 function searchQuery(input: {
   readonly repositories: ReadonlyArray<string>;
@@ -1999,7 +2000,7 @@ export const make = Effect.gen(function* () {
         .PullRequestSearch({
           q: REVIEW_REQUEST_SEARCH,
           first: PULL_REQUEST_SEARCH_MAX_ROWS,
-          stacks: input.host.toLowerCase() === "github.com",
+          stacks: false,
           stats: false,
         })
         .pipe(

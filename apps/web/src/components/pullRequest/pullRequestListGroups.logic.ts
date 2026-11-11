@@ -15,10 +15,10 @@ import {
   partitionPullRequestsWithPriority,
   pullRequestEntryKey,
   pullRequestEntryViewer,
+  reviewRequestKey,
   type EnvironmentPullRequestEntry,
   type PullRequestPartitionsSnapshot,
 } from "./pullRequestList.logic";
-import { reviewRequestKey } from "./pullRequestReviewDispatch.logic";
 
 export const pullRequestListEntryId = (target: Parameters<typeof pullRequestSurfaceId>[0]) =>
   pullRequestSurfaceId({ ...target, repository: target.repository.toLowerCase() });
@@ -56,14 +56,21 @@ export function pullRequestGroups({
   /** Pull requests the review-request section already lists, by `reviewRequestKey`. */
   listedAbove: ReadonlySet<string>;
 }) {
-  const notListedAbove = (entry: EnvironmentPullRequestEntry) =>
-    !listedAbove.has(reviewRequestKey(entry));
+  // The section above owns these rows; dropping them from every input keeps them out of each group.
+  const unlisted = (rows: ReadonlyArray<EnvironmentPullRequestEntry>) =>
+    listedAbove.size === 0
+      ? rows
+      : rows.filter((entry) => !listedAbove.has(reviewRequestKey(entry)));
   const searchingHosts = new Set(
     providers.flatMap((provider) => (provider.searchesOnHost ? [provider.host] : [])),
   );
 
-  const allEntries = (() => {
-    const involvementEntries = filterPullRequestsByInvolvement(known, viewers, involvement);
+  const entries = (() => {
+    const involvementEntries = filterPullRequestsByInvolvement(
+      unlisted(known),
+      viewers,
+      involvement,
+    );
     // Host text searches cover fields absent from rows, so do not narrow their matches locally.
     // Filter text locally while results are pending or when the host has no text search.
     const narrowedEntries = hasLocalFilters
@@ -80,10 +87,8 @@ export function pullRequestGroups({
     );
   })();
 
-  const entries = listedAbove.size === 0 ? allEntries : allEntries.filter(notListedAbove);
-
   const listedPullRequestTabStatuses: Record<string, PullRequestTabStatusSeed> = Object.fromEntries(
-    allEntries.map((entry) => [
+    entries.map((entry) => [
       pullRequestSurfaceId(entry),
       {
         state: entry.state,
@@ -92,17 +97,20 @@ export function pullRequestGroups({
     ]),
   );
 
-  const allGroups = (() => {
+  const groups = (() => {
     if (involvement !== "all") return [{ key: "others" as const, label: "", entries }];
     if (baselineEmpty) {
       return groupPullRequestsByInvolvement(entries, viewers);
     }
-    const narrow = (rows: ReadonlyArray<EnvironmentPullRequestEntry> | undefined) =>
-      rows === undefined || !hasLocalFilters
-        ? rows
-        : rows.filter((entry) =>
+    const narrow = (rows: ReadonlyArray<EnvironmentPullRequestEntry> | undefined) => {
+      if (rows === undefined) return rows;
+      const shown = unlisted(rows);
+      return hasLocalFilters
+        ? shown.filter((entry) =>
             matchesPullRequestFilters(entry, localFilters, pullRequestEntryViewer(entry, viewers)),
-          );
+          )
+        : shown;
+    };
     const narrowedAuthored = narrow(partitionsWanted ? (authored ?? held?.authored) : undefined);
     const narrowedReviewing = narrow(partitionsWanted ? (reviewing ?? held?.reviewing) : undefined);
     if (narrowedAuthored === undefined || narrowedReviewing === undefined) {
@@ -110,14 +118,6 @@ export function pullRequestGroups({
     }
     return partitionPullRequestsWithPriority(entries, narrowedAuthored, narrowedReviewing);
   })();
-
-  const groups =
-    listedAbove.size === 0
-      ? allGroups
-      : allGroups.flatMap((group) => {
-          const shown = group.entries.filter(notListedAbove);
-          return shown.length === 0 ? [] : [{ ...group, entries: shown }];
-        });
 
   const entriesByStatsKey: ReadonlyMap<string, EnvironmentPullRequestEntry> = new Map(
     groups.flatMap((group) =>

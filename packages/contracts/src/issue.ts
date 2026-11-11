@@ -1,7 +1,6 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { PullRequestLabel } from "./pullRequest.ts";
 
 /** `mine` is assigned to or opened by the signed-in account. */
 export const IssueInvolvement = Schema.Literals(["mine", "assigned", "authored"]);
@@ -87,7 +86,6 @@ export const ReviewRequestSummary = Schema.Struct({
   author: Schema.NullOr(TrimmedNonEmptyString),
   isDraft: Schema.Boolean,
   headBranch: TrimmedNonEmptyString,
-  labels: Schema.Array(PullRequestLabel),
   updatedAt: IsoDateTime,
 });
 export type ReviewRequestSummary = typeof ReviewRequestSummary.Type;

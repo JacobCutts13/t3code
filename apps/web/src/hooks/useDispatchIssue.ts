@@ -14,6 +14,7 @@ import {
   type LinearIssueSummary,
   type ModelSelection,
   type ReviewRequestSummary,
+  type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
@@ -139,16 +140,20 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     );
   };
 
-  /** Starts the thread in a new worktree on `branch` and opens it; false after a failure toast. */
+  /**
+   * Starts the thread in a new worktree on `branch`, or in an existing checkout, and opens it;
+   * false after a failure toast.
+   */
   const launch = async (input: {
     readonly project: EnvironmentProject;
     readonly modelSelection: ModelSelection;
     readonly title: string;
     readonly text: string;
-    readonly baseBranch: string;
-    readonly branch: string;
-  }): Promise<boolean> => {
-    const { project, modelSelection, title, text, baseBranch, branch } = input;
+    readonly worktree:
+      | { readonly baseBranch: string; readonly branch: string }
+      | { readonly branch: string; readonly worktreePath: string | null };
+  }): Promise<ScopedThreadRef | false> => {
+    const { project, modelSelection, title, text, worktree } = input;
     const threadId = newThreadId();
     const createdAt = new Date().toISOString();
     const started = await startThreadTurn({
@@ -172,28 +177,31 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
             modelSelection,
             runtimeMode: DEFAULT_RUNTIME_MODE,
             interactionMode: DEFAULT_INTERACTION_MODE,
-            branch: null,
-            worktreePath: null,
+            ...("worktreePath" in worktree
+              ? { branch: worktree.branch, worktreePath: worktree.worktreePath }
+              : { branch: null, worktreePath: null }),
             createdAt,
           },
-          prepareWorktree: {
-            projectCwd: project.workspaceRoot,
-            baseBranch,
-            branch,
-            // The server fetches the base's upstream, or origin, and uses it locally without one.
-            startFromOrigin: true,
-          },
+          ...("worktreePath" in worktree
+            ? {}
+            : {
+                prepareWorktree: {
+                  projectCwd: project.workspaceRoot,
+                  baseBranch: worktree.baseBranch,
+                  branch: worktree.branch,
+                  // The server fetches the base's upstream, or origin, and uses it locally without one.
+                  startFromOrigin: true,
+                },
+              }),
           runSetupScript: true,
         },
         createdAt,
       },
     });
     if (started._tag === "Failure") return reportFailure(started, "Could not start the agent");
-    await navigate({
-      to: "/$environmentId/$threadId",
-      params: buildThreadRouteParams(scopeThreadRef(environmentId, threadId)),
-    });
-    return true;
+    const threadRef = scopeThreadRef(environmentId, threadId);
+    await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(threadRef) });
+    return threadRef;
   };
 
   /** The branch a worktree in `project` starts from, read from its refs; false after a failure toast. */
@@ -246,14 +254,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       if (base === false) return false;
 
       const branch = issueBranchName(issue);
-      return await launch({
+      const launched = await launch({
         project,
         modelSelection,
         title: `#${issue.number} ${issue.title}`,
         text: buildIssuePrompt(detail.value, branch),
-        baseBranch: base,
-        branch,
+        worktree: { baseBranch: base, branch },
       });
+      return launched !== false;
     } catch (error) {
       return fail("Could not dispatch the issue", errorMessage(error));
     }
@@ -283,10 +291,9 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `${issue.identifier} ${issue.title}`,
         text: buildLinearIssuePrompt(issue, detail.value, branch),
-        baseBranch: base,
-        branch,
+        worktree: { baseBranch: base, branch },
       });
-      if (!launched) return false;
+      if (launched === false) return false;
       const moved = await startLinearIssue({ environmentId, input: { id: issue.id } });
       if (moved._tag === "Failure") {
         reportFailure(moved, `Could not move ${issue.identifier} in Linear`, "warning");
@@ -347,46 +354,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         );
         return false;
       }
-      const threadId = newThreadId();
-      const createdAt = new Date().toISOString();
-      const title = `Review #${pr.number} ${pr.title}`;
-      const started = await startThreadTurn({
-        environmentId,
-        input: {
-          threadId,
-          message: {
-            messageId: newMessageId(),
-            role: "user",
-            text: buildReviewPrompt(pr),
-            attachments: [],
-          },
-          modelSelection,
-          titleSeed: title,
-          runtimeMode: DEFAULT_RUNTIME_MODE,
-          interactionMode: DEFAULT_INTERACTION_MODE,
-          bootstrap: {
-            createThread: {
-              projectId: project.id,
-              title,
-              modelSelection,
-              runtimeMode: DEFAULT_RUNTIME_MODE,
-              interactionMode: DEFAULT_INTERACTION_MODE,
-              branch,
-              worktreePath,
-              createdAt,
-            },
-            runSetupScript: true,
-          },
-          createdAt,
-        },
+      const threadRef = await launch({
+        project,
+        modelSelection,
+        title: `Review #${pr.number} ${pr.title}`,
+        text: buildReviewPrompt(pr),
+        worktree: { branch, worktreePath },
       });
-      if (started._tag === "Failure") {
-        return reportFailure(
-          started,
-          `Could not start the review; the checkout is ready on ${branch}`,
-        );
-      }
-      const threadRef = scopeThreadRef(environmentId, threadId);
+      if (threadRef === false) return false;
       await linking.changeLink(threadRef, pr.url, true).catch((error: unknown) => {
         toastManager.add(
           stackedThreadToast({
@@ -395,10 +370,6 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
             description: errorMessage(error),
           }),
         );
-      });
-      await navigate({
-        to: "/$environmentId/$threadId",
-        params: buildThreadRouteParams(threadRef),
       });
       return true;
     } catch (error) {
@@ -413,6 +384,5 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     dispatchLinear,
     dispatchReview,
     reviewBlockedReason,
-    isReviewLinked: linking.isLinked,
   };
 }

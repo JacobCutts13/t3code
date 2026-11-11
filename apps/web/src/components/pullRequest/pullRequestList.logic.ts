@@ -297,6 +297,15 @@ export function groupPullRequestsByInvolvement<Entry extends ScopedEntry>(
     .map((key) => ({ key, label: GROUP_LABELS[key], entries: buckets[key] }));
 }
 
+/** A pull request across servers and projects, ignoring case. */
+export function reviewRequestKey(pr: {
+  readonly host: string;
+  readonly repository: string;
+  readonly number: number;
+}) {
+  return `${pr.host.toLowerCase()}:${pr.repository.toLowerCase()}#${pr.number}`;
+}
+
 export function pullRequestEntryKey(entry: ScopedEntry): string {
   const scope = entry.environmentId === undefined ? "" : `${entry.environmentId}:`;
   return `${scope}${entry.host}:${entry.repository}#${entry.number}`;

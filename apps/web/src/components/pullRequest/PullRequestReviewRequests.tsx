@@ -1,8 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import type { EnvironmentId, ModelSelection, ReviewRequestSummary } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  ModelSelection,
+  ReviewRequestSummary,
+  ThreadId,
+} from "@t3tools/contracts";
+import { visibleThreadPullRequests } from "@t3tools/client-runtime/thread-pull-requests";
 import * as Schema from "effect/Schema";
-import { ExternalLinkIcon, EyeIcon, PlayIcon } from "lucide-react";
+import { ExternalLinkIcon, EyeIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useDispatchIssue } from "~/hooks/useDispatchIssue";
@@ -13,7 +19,6 @@ import { issueEnvironment } from "~/state/issues";
 import { useEnvironmentQuery } from "~/state/query";
 import { buildThreadRouteParams } from "~/threadRoutes";
 
-import { dispatchedThreadId, threadsByBranch } from "../issues/issueDispatch.logic";
 import { IssueModelPicker } from "../issues/IssueModelPicker";
 import { RelativeTime } from "../RelativeTime";
 import { Badge } from "../ui/badge";
@@ -22,7 +27,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Spinner } from "../ui/spinner";
 import { PullRequestGroupHeader } from "./PullRequestListGroups";
 import type { PullRequestRowTarget } from "./PullRequestRow";
-import { reviewRequestKey } from "./pullRequestReviewDispatch.logic";
+import { reviewRequestKey } from "./pullRequestList.logic";
 
 // Per environment: the project each repository's review requests were last dispatched into.
 const PickedProjectsSchema = Schema.Record(Schema.String, Schema.String);
@@ -36,7 +41,6 @@ export function useReviewRequests(environmentId: EnvironmentId | null) {
     entries: query.data?.entries ?? [],
     truncated: query.data?.truncated ?? false,
     error: query.error,
-    loading: query.data === null && query.error === null,
     refresh: query.refresh,
   };
 }
@@ -50,7 +54,7 @@ export function PullRequestReviewRequests(props: {
 }) {
   const { environmentId } = props;
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [dispatchingKey, setDispatchingKey] = useState<string | null>(null);
+  const [dispatchingKeys, setDispatchingKeys] = useState<ReadonlySet<string>>(() => new Set());
   // The model picked in this session; each review uses it where the project offers it.
   const [picked, setPicked] = useState<ModelSelection | null>(null);
   const [pickedProjects, setPickedProjects] = useLocalStorage(
@@ -58,15 +62,19 @@ export function PullRequestReviewRequests(props: {
     {},
     PickedProjectsSchema,
   );
-  const { projectFor, modelFor, dispatchReview, reviewBlockedReason, isReviewLinked } =
+  const { projectFor, modelFor, dispatchReview, reviewBlockedReason } =
     useDispatchIssue(environmentId);
   const projects = useProjects().filter(
     (project) => project.environmentId === environmentId && project.isScratch !== true,
   );
-  const threads = useThreadShells().filter(
-    (thread) => thread.environmentId === environmentId && thread.archivedAt === null,
-  );
-  const byBranch = threadsByBranch(threads);
+  // The thread each pull request is linked to; a review dispatch links its PR to the new thread.
+  const linkedThreads = new Map<string, ThreadId>();
+  for (const thread of useThreadShells()) {
+    if (thread.environmentId !== environmentId || thread.archivedAt !== null) continue;
+    for (const link of visibleThreadPullRequests(thread.pullRequests)) {
+      linkedThreads.set(reviewRequestKey(link), thread.id);
+    }
+  }
 
   const { entries } = props;
   if (entries.length === 0 && props.error === null) return null;
@@ -77,21 +85,19 @@ export function PullRequestReviewRequests(props: {
     const id = pickedProjects[pickKey(pr)];
     return projects.find((project) => project.id === id) ?? projectFor(pr);
   };
-  const blockedReason = (pr: ReviewRequestSummary) =>
-    reviewBlockedReason() ??
-    (projectOf(pr) === undefined ? `Add ${pr.repository} as a project, or choose one` : null);
-  const reviewThreadOf = (pr: ReviewRequestSummary, projectId: string | undefined) =>
-    threads.find((thread) => isReviewLinked(thread, pr.url))?.id ??
-    dispatchedThreadId(byBranch, projectId, pr.headBranch);
+  const connectionBlocked = reviewBlockedReason();
 
-  const review = async (pr: ReviewRequestSummary) => {
+  const review = async (pr: ReviewRequestSummary, key: string) => {
     const project = projectOf(pr);
-    if (project === undefined) return;
-    const key = reviewRequestKey(pr);
-    setDispatchingKey(key);
+    if (project === undefined || dispatchingKeys.has(key)) return;
+    setDispatchingKeys((current) => new Set(current).add(key));
     // Reports its own failures and never rejects.
     await dispatchReview(pr, project, picked);
-    setDispatchingKey(null);
+    setDispatchingKeys((current) => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
   };
 
   return (
@@ -110,9 +116,11 @@ export function PullRequestReviewRequests(props: {
           const key = reviewRequestKey(pr);
           const project = projectOf(pr);
           const selected = key === selectedKey;
-          const dispatching = dispatchingKey === key;
-          const blocked = blockedReason(pr);
-          const threadId = reviewThreadOf(pr, project?.id);
+          const dispatching = dispatchingKeys.has(key);
+          const blocked =
+            connectionBlocked ??
+            (project === undefined ? `Add ${pr.repository} as a project, or choose one` : null);
+          const threadId = linkedThreads.get(key);
           const ownProject = projectFor(pr);
           return (
             <li key={key} className={cn("rounded-md", selected && "bg-accent")}>
@@ -137,7 +145,7 @@ export function PullRequestReviewRequests(props: {
                     ) : null}
                   </span>
                 </button>
-                {threadId === null || threadId === undefined ? null : (
+                {threadId === undefined ? null : (
                   <Badge
                     variant="info"
                     size="sm"
@@ -158,7 +166,7 @@ export function PullRequestReviewRequests(props: {
                   variant="outline"
                   disabled={dispatching || blocked !== null}
                   title={blocked ?? "Start a read-only review agent on this pull request"}
-                  onClick={() => void review(pr)}
+                  onClick={() => void review(pr, key)}
                 >
                   {dispatching ? <Spinner /> : <EyeIcon />}
                   Review
@@ -201,16 +209,6 @@ export function PullRequestReviewRequests(props: {
                       onChange={setPicked}
                     />
                   </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    aria-label="Start review"
-                    disabled={dispatching || blocked !== null}
-                    title={blocked ?? "Start a read-only review agent on this pull request"}
-                    onClick={() => void review(pr)}
-                  >
-                    <PlayIcon />
-                  </Button>
                   {ownProject === undefined ? (
                     <Button
                       size="icon"

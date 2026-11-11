@@ -46,6 +46,7 @@ import {
   settlePullRequestOverrides,
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
+  reviewRequestKey,
 } from "./pullRequestList.logic";
 import {
   pullRequestListPreferences,
@@ -75,7 +76,7 @@ import {
 } from "./usePullRequestListView";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
 import { PullRequestReviewRequests, useReviewRequests } from "./PullRequestReviewRequests";
-import { matchesReviewRequestQuery, reviewRequestKey } from "./pullRequestReviewDispatch.logic";
+import { matchesReviewRequestQuery } from "./pullRequestReviewDispatch.logic";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
 import { type PullRequestRowTarget } from "./PullRequestRow";
@@ -688,18 +689,17 @@ export function PullRequestsPage() {
     search.state,
   );
 
-  // Review requests come from one GitHub-wide search on the primary server, so they show only
-  // while the page is not narrowed to something that search cannot honour.
+  // Review requests come from one GitHub-wide search, so they show only while the page is not
+  // narrowed to something that search cannot honour.
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const reviewEnvironmentId = scopedEnvironmentId ?? primaryEnvironmentId;
   const reviewRequestsShown =
-    primaryEnvironmentId !== null &&
-    (scopedEnvironmentId === null || scopedEnvironmentId === primaryEnvironmentId) &&
     (search.state === "open" || search.state === "all") &&
     search.involvement !== "authored" &&
     scopedProjectId === undefined &&
     (search.host === undefined || search.host.toLowerCase() === "github.com") &&
-    !menuFiltered;
-  const reviewRequests = useReviewRequests(reviewRequestsShown ? primaryEnvironmentId : null);
+    !hasLocalFilters;
+  const reviewRequests = useReviewRequests(reviewRequestsShown ? reviewEnvironmentId : null);
   const shownReviewRequests = reviewRequestsShown
     ? reviewRequests.entries.filter((pr) => matchesReviewRequestQuery(pr, typedParsed.text))
     : [];
@@ -889,6 +889,7 @@ export function PullRequestsPage() {
       actedEnvironmentId?: EnvironmentId,
     ) => {
       refreshList(true, actedEnvironmentId);
+      if (reviewRequestsShown) reviewRequests.refresh();
       const visible = visibleStatsKeys.current;
       const batches = pullRequestStatsRefreshBatches({
         requestedScope: requestedStatsScope,
@@ -1173,9 +1174,9 @@ export function PullRequestsPage() {
     typedQuery.length === 0 &&
     (!querySettled || (showingCarried && listQuery.isPending));
   const reviewSection =
-    primaryEnvironmentId !== null && reviewRequestsShown ? (
+    reviewEnvironmentId !== null && reviewRequestsShown ? (
       <PullRequestReviewRequests
-        environmentId={primaryEnvironmentId}
+        environmentId={reviewEnvironmentId}
         entries={shownReviewRequests}
         truncated={reviewRequests.truncated}
         error={reviewRequests.error}
@@ -1202,7 +1203,7 @@ export function PullRequestsPage() {
         />
       ) : carriedToNothing ? (
         <PullRequestListGhost rows={7} />
-      ) : shownCount === 0 && shownReviewRequests.length > 0 ? null : shownCount === 0 ? (
+      ) : shownCount === 0 && shownReviewRequests.length === 0 ? (
         <PullRequestListEmptyState
           hasProjects={!projectsKnown || projects.length > 0}
           refreshing={refreshing}

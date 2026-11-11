@@ -27,15 +27,6 @@ export function buildReviewPrompt(pr: { readonly repository: string; readonly nu
   );
 }
 
-/** Identifies a pull request across servers and projects, ignoring case. */
-export function reviewRequestKey(pr: {
-  readonly host: string;
-  readonly repository: string;
-  readonly number: number;
-}) {
-  return `${pr.host.toLowerCase()}:${pr.repository.toLowerCase()}#${pr.number}`;
-}
-
 export function matchesReviewRequestQuery(pr: ReviewRequestSummary, query: string): boolean {
   const normalized = query.trim().toLowerCase();
   return (
