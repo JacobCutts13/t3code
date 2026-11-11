@@ -46,6 +46,8 @@ import {
   settlePullRequestOverrides,
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
+  reviewRequestKey,
+  matchesPullRequestQuery,
 } from "./pullRequestList.logic";
 import {
   pullRequestListPreferences,
@@ -74,6 +76,7 @@ import {
   type PullRequestsSearch,
 } from "./usePullRequestListView";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
+import { PullRequestReviewRequests, useReviewRequests } from "./PullRequestReviewRequests";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
 import { type PullRequestRowTarget } from "./PullRequestRow";
@@ -112,6 +115,7 @@ import {
   type EnvironmentQueryTarget,
 } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { usePrimaryEnvironmentId } from "~/state/environments";
 import { cn } from "~/lib/utils";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
@@ -685,6 +689,22 @@ export function PullRequestsPage() {
     search.state,
   );
 
+  // Review requests come from one GitHub-wide search, so they show only while the page is not
+  // narrowed to something that search cannot honour.
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const reviewEnvironmentId = scopedEnvironmentId ?? primaryEnvironmentId;
+  const reviewRequestsShown =
+    (search.state === "open" || search.state === "all") &&
+    search.involvement !== "authored" &&
+    scopedProjectId === undefined &&
+    (search.host === undefined || search.host.toLowerCase() === "github.com") &&
+    !hasLocalFilters;
+  const reviewRequests = useReviewRequests(reviewRequestsShown ? reviewEnvironmentId : null);
+  const shownReviewRequests = reviewRequestsShown
+    ? reviewRequests.entries.filter((pr) => matchesPullRequestQuery(pr, typedParsed.text))
+    : [];
+  const listedAbove = new Set(shownReviewRequests.map(reviewRequestKey));
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     entries,
@@ -709,6 +729,7 @@ export function PullRequestsPage() {
     authored: partitionsWanted ? authoredQuery.data?.entries : undefined,
     reviewing: partitionsWanted ? reviewingQuery.data?.entries : undefined,
     partitionsWanted,
+    listedAbove,
   });
 
   const visibleStatsKeys = useRef({ key: filterKey, values: new Set<string>() });
@@ -868,6 +889,7 @@ export function PullRequestsPage() {
       actedEnvironmentId?: EnvironmentId,
     ) => {
       refreshList(true, actedEnvironmentId);
+      if (reviewRequestsShown) reviewRequests.refresh();
       const visible = visibleStatsKeys.current;
       const batches = pullRequestStatsRefreshBatches({
         requestedScope: requestedStatsScope,
@@ -1151,8 +1173,19 @@ export function PullRequestsPage() {
     shownCount === 0 &&
     typedQuery.length === 0 &&
     (!querySettled || (showingCarried && listQuery.isPending));
+  const reviewSection =
+    reviewEnvironmentId !== null && reviewRequestsShown ? (
+      <PullRequestReviewRequests
+        environmentId={reviewEnvironmentId}
+        entries={shownReviewRequests}
+        truncated={reviewRequests.truncated}
+        error={reviewRequests.error}
+        onOpen={selectEntry}
+      />
+    ) : null;
   const listBody = (
     <>
+      {reviewSection}
       {!capabilityKnown ? (
         <PullRequestListGhost rows={7} caption="Loading pull requests…" />
       ) : !pullRequestsSupported ? (
@@ -1170,7 +1203,7 @@ export function PullRequestsPage() {
         />
       ) : carriedToNothing ? (
         <PullRequestListGhost rows={7} />
-      ) : shownCount === 0 ? (
+      ) : shownCount === 0 && shownReviewRequests.length === 0 ? (
         <PullRequestListEmptyState
           hasProjects={!projectsKnown || projects.length > 0}
           refreshing={refreshing}

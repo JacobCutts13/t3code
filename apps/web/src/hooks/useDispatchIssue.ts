@@ -6,15 +6,23 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type {
-  EnvironmentId,
-  IssueSummary,
-  LinearIssueSummary,
-  ModelSelection,
+import {
+  AuthOrchestrationOperateScope,
+  AuthSourceControlWriteScope,
+  type EnvironmentId,
+  type IssueSummary,
+  type LinearIssueSummary,
+  type ModelSelection,
+  type ReviewRequestSummary,
+  type ScopedThreadRef,
 } from "@t3tools/contracts";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
+import { offHeadPullRequestCheckoutToast } from "~/components/pullRequest/pullRequestCheckoutToast";
+import { checkoutFailureDescription } from "~/components/pullRequest/pullRequestDetail.logic";
 import { findProjectForRepository } from "~/components/pullRequest/pullRequestList.logic";
+import { buildReviewPrompt } from "~/components/pullRequest/pullRequestReviewDispatch.logic";
 import {
   buildIssuePrompt,
   buildLinearIssuePrompt,
@@ -31,7 +39,9 @@ import {
 import { useProjects } from "~/state/entities";
 import { useEnvironmentProviders } from "~/state/environments";
 import { issueEnvironment } from "~/state/issues";
+import { gitEnvironment } from "~/state/git";
 import { EMPTY_SERVER_PROVIDERS } from "~/state/server";
+import { readEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
@@ -39,6 +49,7 @@ import { vcsEnvironment } from "~/state/vcs";
 import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE } from "~/types";
 import { buildThreadRouteParams } from "~/threadRoutes";
+import { usePullRequestLinking } from "./usePullRequestLinking";
 import { useEnvironmentSettings } from "./useSettings";
 
 const errorMessage = (error: unknown) =>
@@ -94,6 +105,10 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
   });
+  const preparePullRequestThread = useAtomCommand(gitEnvironment.preparePullRequestThread, {
+    reportFailure: false,
+  });
+  const linking = usePullRequestLinking(environmentId);
   const navigate = useNavigate();
 
   /** The added project whose clone is the issue's repository, if any. */
@@ -125,16 +140,37 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     );
   };
 
-  /** Starts the thread in a new worktree on `branch` and opens it; false after a failure toast. */
+  /**
+   * Starts the thread in a new worktree on `branch`, or in an existing checkout, and opens it;
+   * false after a failure toast.
+   */
   const launch = async (input: {
     readonly project: EnvironmentProject;
     readonly modelSelection: ModelSelection;
     readonly title: string;
     readonly text: string;
-    readonly baseBranch: string;
-    readonly branch: string;
-  }): Promise<boolean> => {
-    const { project, modelSelection, title, text, baseBranch, branch } = input;
+    readonly worktree:
+      | { readonly kind: "new"; readonly baseBranch: string; readonly branch: string }
+      | {
+          readonly kind: "existing";
+          readonly branch: string;
+          readonly worktreePath: string | null;
+        };
+  }): Promise<ScopedThreadRef | false> => {
+    const { project, modelSelection, title, text, worktree } = input;
+    const workspace =
+      worktree.kind === "existing"
+        ? { thread: { branch: worktree.branch, worktreePath: worktree.worktreePath } }
+        : {
+            thread: { branch: null, worktreePath: null },
+            prepareWorktree: {
+              projectCwd: project.workspaceRoot,
+              baseBranch: worktree.baseBranch,
+              branch: worktree.branch,
+              // The server fetches the base's upstream, or origin, and uses it locally without one.
+              startFromOrigin: true,
+            },
+          };
     const threadId = newThreadId();
     const createdAt = new Date().toISOString();
     const started = await startThreadTurn({
@@ -158,28 +194,21 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
             modelSelection,
             runtimeMode: DEFAULT_RUNTIME_MODE,
             interactionMode: DEFAULT_INTERACTION_MODE,
-            branch: null,
-            worktreePath: null,
+            ...workspace.thread,
             createdAt,
           },
-          prepareWorktree: {
-            projectCwd: project.workspaceRoot,
-            baseBranch,
-            branch,
-            // The server fetches the base's upstream, or origin, and uses it locally without one.
-            startFromOrigin: true,
-          },
+          ...(workspace.prepareWorktree === undefined
+            ? {}
+            : { prepareWorktree: workspace.prepareWorktree }),
           runSetupScript: true,
         },
         createdAt,
       },
     });
     if (started._tag === "Failure") return reportFailure(started, "Could not start the agent");
-    await navigate({
-      to: "/$environmentId/$threadId",
-      params: buildThreadRouteParams(scopeThreadRef(environmentId, threadId)),
-    });
-    return true;
+    const threadRef = scopeThreadRef(environmentId, threadId);
+    await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(threadRef) });
+    return threadRef;
   };
 
   /** The branch a worktree in `project` starts from, read from its refs; false after a failure toast. */
@@ -232,14 +261,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       if (base === false) return false;
 
       const branch = issueBranchName(issue);
-      return await launch({
+      const launched = await launch({
         project,
         modelSelection,
         title: `#${issue.number} ${issue.title}`,
         text: buildIssuePrompt(detail.value, branch),
-        baseBranch: base,
-        branch,
+        worktree: { kind: "new", baseBranch: base, branch },
       });
+      return launched !== false;
     } catch (error) {
       return fail("Could not dispatch the issue", errorMessage(error));
     }
@@ -269,10 +298,9 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `${issue.identifier} ${issue.title}`,
         text: buildLinearIssuePrompt(issue, detail.value, branch),
-        baseBranch: base,
-        branch,
+        worktree: { kind: "new", baseBranch: base, branch },
       });
-      if (!launched) return false;
+      if (launched === false) return false;
       const moved = await startLinearIssue({ environmentId, input: { id: issue.id } });
       if (moved._tag === "Failure") {
         reportFailure(moved, `Could not move ${issue.identifier} in Linear`, "warning");
@@ -290,5 +318,78 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     }
   };
 
-  return { projectFor, modelFor, dispatch, dispatchLinear };
+  /** Why this connection cannot dispatch a review, or null when it can. */
+  const reviewBlockedReason = () =>
+    readEnvironmentScope(environmentId, AuthSourceControlWriteScope) &&
+    readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)
+      ? null
+      : "This connection cannot check out pull requests or start threads.";
+
+  /**
+   * Starts a read-only review agent on a pull request: checks out its head in a worktree of
+   * `project`, then starts a thread there with cockpit's review prompt and links the PR to it.
+   */
+  const dispatchReview = async (
+    pr: ReviewRequestSummary,
+    project: EnvironmentProject,
+    picked: ModelSelection | null = null,
+  ): Promise<boolean> => {
+    const blocked = reviewBlockedReason();
+    if (blocked !== null) return fail("Cannot start the review", blocked);
+    const modelSelection = modelFor(project, picked);
+    if (modelSelection === null) return fail("Cannot start the review", "No model is available.");
+    try {
+      const prepared = await preparePullRequestThread({
+        environmentId,
+        input: { cwd: project.workspaceRoot, reference: pr.url, mode: "worktree" },
+      });
+      if (prepared._tag === "Failure") {
+        return fail(
+          "Could not check out the pull request",
+          checkoutFailureDescription(
+            isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
+          ),
+        );
+      }
+      const { branch, worktreePath, isOnPullRequestHead } = prepared.value;
+      // Reviewing code that is not the PR's head would review the wrong change.
+      if (!isOnPullRequestHead) {
+        toastManager.add(
+          stackedThreadToast(
+            offHeadPullRequestCheckoutToast(sourceControlClients.get("github").changeRequest),
+          ),
+        );
+        return false;
+      }
+      const threadRef = await launch({
+        project,
+        modelSelection,
+        title: `Review #${pr.number} ${pr.title}`,
+        text: buildReviewPrompt(pr),
+        worktree: { kind: "existing", branch, worktreePath },
+      });
+      if (threadRef === false) return false;
+      await linking.changeLink(threadRef, pr.url, true).catch((error: unknown) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "The review started, but the pull request is not linked to it",
+            description: errorMessage(error),
+          }),
+        );
+      });
+      return true;
+    } catch (error) {
+      return fail("Could not start the review", errorMessage(error));
+    }
+  };
+
+  return {
+    projectFor,
+    modelFor,
+    dispatch,
+    dispatchLinear,
+    dispatchReview,
+    reviewBlockedReason,
+  };
 }

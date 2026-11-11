@@ -215,7 +215,10 @@ function isAuthoredByViewer(entry: ScopedEntry, viewers: PullRequestViewers): bo
   return viewer !== null && normalize(entry.author?.login) === viewer;
 }
 
-export function matchesPullRequestQuery(entry: PullRequestListEntry, query: string): boolean {
+export function matchesPullRequestQuery(
+  entry: Pick<PullRequestListEntry, "number" | "title" | "repository" | "headBranch" | "author">,
+  query: string,
+): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.length === 0) return true;
   return `#${entry.number} ${entry.title} ${entry.repository} ${entry.headBranch} ${entry.author?.login ?? ""}`
@@ -295,6 +298,15 @@ export function groupPullRequestsByInvolvement<Entry extends ScopedEntry>(
   return (["authored", "reviewRequested", "others"] as const)
     .filter((key) => buckets[key].length > 0)
     .map((key) => ({ key, label: GROUP_LABELS[key], entries: buckets[key] }));
+}
+
+/** A pull request across servers and projects, ignoring case. */
+export function reviewRequestKey(pr: {
+  readonly host: string;
+  readonly repository: string;
+  readonly number: number;
+}) {
+  return `${pr.host.toLowerCase()}:${pr.repository.toLowerCase()}#${pr.number}`;
 }
 
 export function pullRequestEntryKey(entry: ScopedEntry): string {

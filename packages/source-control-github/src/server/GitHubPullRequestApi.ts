@@ -459,6 +459,14 @@ export class GitHubPullRequestApi extends Context.Service<
       readonly filters?: PullRequestListFilters | undefined;
     }) => Effect.Effect<GitHubPullRequestSearchBatch, GitHubPullRequestApiError>;
 
+    /** Open pull requests in any repository asking the signed-in account, or one of its teams, to review. */
+    readonly searchReviewRequests: (input: {
+      readonly host: string;
+    }) => Effect.Effect<
+      GitHubPullRequestSearchBatch,
+      GitHubRequestPolicy.GitHubApiError | GitHubPullRequestReadError
+    >;
+
     readonly listPullRequestStats: (input: {
       readonly cwd: string;
       readonly host: string;
@@ -839,6 +847,9 @@ function matchesUnsortedListing(
 }
 
 const SEARCH_REPOSITORY = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+
+// `review-requested:@me` also matches requests made to the viewer's teams.
+const REVIEW_REQUEST_SEARCH = "is:pr is:open archived:false review-requested:@me sort:updated-desc";
 
 /** Unquoted repo: values must not inject qualifiers. */
 function searchQuery(input: {
@@ -1978,6 +1989,28 @@ export const make = Effect.gen(function* () {
             return {
               items: items.slice(0, input.limit),
               truncated: page.rawCount > input.limit || page.hasNextPage,
+            };
+          }),
+        );
+    }),
+
+    searchReviewRequests: Effect.fn("GitHubPullRequestApi.searchReviewRequests")(function* (input) {
+      return yield* client
+        .PullRequestSearch({
+          q: REVIEW_REQUEST_SEARCH,
+          first: PULL_REQUEST_SEARCH_MAX_ROWS,
+          stacks: false,
+          stats: false,
+        })
+        .pipe(
+          graphql({ cwd: "", host: input.host, operation: "searchReviewRequests" }),
+          Effect.map(({ search }) => {
+            const page = toPullRequestRows(search);
+            return {
+              items: page.rows.flatMap(({ item, repository }) =>
+                repository === null ? [] : [{ ...item, repository }],
+              ),
+              truncated: page.hasNextPage,
             };
           }),
         );
