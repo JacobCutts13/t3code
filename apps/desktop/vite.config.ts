@@ -22,10 +22,11 @@ const launchElectronAfterPack =
         const started = Symbol.for("t3code.desktop.liveSupervisorStarted");
         if (Reflect.get(globalThis, started) === true) return;
         Reflect.set(globalThis, started, true);
+        // Cleared on exit so a supervisor that gave up (say, Vite was down) is relaunched by the next build.
         NodeChildProcess.spawn(process.execPath, ["scripts/dev-electron.mjs"], {
           cwd,
           stdio: "inherit",
-        });
+        }).once("close", () => Reflect.set(globalThis, started, false));
       }
     : "node scripts/dev-electron.mjs";
 const publicConfigDefine = {

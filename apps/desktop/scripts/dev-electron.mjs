@@ -105,6 +105,9 @@ async function hashLiveArtifact(file) {
 }
 
 function publishLiveChanges(changed) {
+  const unchanged =
+    changed.length === reportedChanges.size && changed.every((file) => reportedChanges.has(file));
+  if (unchanged && NodeFS.existsSync(liveStateFile)) return;
   for (const file of changed) {
     if (!reportedChanges.has(file)) {
       console.log(`[live] ${file} rebuilt — restart pending (use Restart in the app's sidebar)`);
@@ -303,7 +306,7 @@ async function shutdown(exitCode) {
   }
 
   await stopApp();
-  if (liveMode) NodeFS.rmSync(liveStateFile, { force: true });
+  if (liveTracker) NodeFS.rmSync(liveStateFile, { force: true });
   killChildTree("TERM");
   await new Promise((resolve) => {
     setTimeout(resolve, childTreeGracePeriodMs);

@@ -1,10 +1,11 @@
-import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/models";
+import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { RotateCwIcon } from "lucide-react";
 import { useState } from "react";
 
-import { useThreadShells } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useLiveRestartState } from "../../state/liveRestart";
+import { environmentThreadShells } from "../../state/threads";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -17,20 +18,43 @@ import {
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 
-/** `vp run live` holds rebuilt code until a restart, so a pull never kills running agents. */
+// Every status a restart cuts short, including runs queued or waiting on an answer.
+const ACTIVE_STATUSES = new Set(["preparing", "queued", "starting", "running", "waiting"]);
+
+// Mounted only while the dialog is open, so the footer never subscribes to the thread list.
+function InterruptedThreads({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const interrupted = useAtomValue(
+    environmentThreadShells.environmentThreadsAtom(environmentId),
+  ).filter((thread) => ACTIVE_STATUSES.has(thread.status));
+  if (interrupted.length === 0) {
+    return <AlertDialogDescription>No threads are running.</AlertDialogDescription>;
+  }
+  return (
+    <>
+      <AlertDialogDescription>
+        {interrupted.length === 1
+          ? "This running thread"
+          : `These ${interrupted.length} running threads`}{" "}
+        will be interrupted. T3 tries to resume them after the restart.
+      </AlertDialogDescription>
+      <ul className="max-h-48 list-disc overflow-y-auto pl-4 text-sm">
+        {interrupted.map((thread) => (
+          <li key={thread.id} className="truncate">
+            {thread.title}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function SidebarLiveRestartPill() {
   const state = useLiveRestartState();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const threads = useThreadShells(confirmOpen);
 
   if (state === null || state.changed.length === 0) return null;
-
-  const interrupted = threads.filter(
-    (thread) =>
-      thread.environmentId === primaryEnvironmentId && threadRuntimeIsActive(thread.runtime),
-  );
 
   const restart = async () => {
     setRestarting(true);
@@ -60,21 +84,10 @@ export function SidebarLiveRestartPill() {
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Restart T3 to apply pulled code?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {interrupted.length === 0
-                ? "No threads are running."
-                : `${interrupted.length === 1 ? "This running thread" : `These ${interrupted.length} running threads`} will be interrupted. T3 tries to resume them after the restart.`}
-            </AlertDialogDescription>
+            {confirmOpen && primaryEnvironmentId !== null ? (
+              <InterruptedThreads environmentId={primaryEnvironmentId} />
+            ) : null}
           </AlertDialogHeader>
-          {interrupted.length > 0 ? (
-            <ul className="max-h-48 list-disc overflow-y-auto px-10 pb-4 text-sm">
-              {interrupted.map((thread) => (
-                <li key={thread.id} className="truncate">
-                  {thread.title}
-                </li>
-              ))}
-            </ul>
-          ) : null}
           <AlertDialogFooter>
             <AlertDialogClose disabled={restarting} render={<Button variant="outline" />}>
               Later

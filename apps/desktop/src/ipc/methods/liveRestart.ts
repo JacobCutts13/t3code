@@ -18,13 +18,11 @@ const decodeStateFile = Schema.decodeUnknownOption(
 
 // scripts/dev-electron.mjs writes this file in `vp run live`; it is the only one who knows what Electron loaded.
 function readStateFile(stateFile: string): DesktopLiveRestartState {
+  let contents = "";
   try {
-    return Option.getOrElse(decodeStateFile(NodeFS.readFileSync(stateFile, "utf8")), () => ({
-      changed: [],
-    }));
-  } catch {
-    return { changed: [] };
-  }
+    contents = NodeFS.readFileSync(stateFile, "utf8");
+  } catch {}
+  return Option.getOrElse(decodeStateFile(contents), () => ({ changed: [] }));
 }
 
 export const installLiveRestart = Effect.fn("desktop.ipc.installLiveRestart")(function* () {
