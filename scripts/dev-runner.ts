@@ -63,6 +63,15 @@ export const DEFAULT_T3_HOME = Effect.map(Effect.service(Path.Path), (path) =>
   path.join(NodeOS.homedir(), ".t3"),
 );
 
+const DESKTOP_DEV_ARGS = [
+  "run",
+  "--filter=@t3tools/desktop",
+  "--filter=@t3tools/web",
+  "--filter=t3",
+  "--parallel",
+  "dev",
+] as const;
+
 const MODE_ARGS = {
   dev: [
     "run",
@@ -75,14 +84,9 @@ const MODE_ARGS = {
   "dev:server": ["run", "--filter=t3", "dev"],
   "dev:web": ["run", "--filter=@t3tools/web", "dev"],
   // The server is bundled and watched, not run: Electron starts it from dist/bin.mjs and restarts when it changes.
-  "dev:desktop": [
-    "run",
-    "--filter=@t3tools/desktop",
-    "--filter=@t3tools/web",
-    "--filter=t3",
-    "--parallel",
-    "dev",
-  ],
+  "dev:desktop": DESKTOP_DEV_ARGS,
+  // Desktop dev that never restarts on its own: rebuilds wait for an in-app restart, so agents keep running.
+  live: DESKTOP_DEV_ARGS,
 } as const satisfies Record<string, ReadonlyArray<string>>;
 
 // `--built`: the web package rebuilds into apps/web/dist and the backend serves
@@ -103,6 +107,9 @@ type PortAvailabilityCheck<R = never> = (
 ) => Effect.Effect<boolean, never, R>;
 
 const DEV_RUNNER_MODES = Object.keys(MODE_ARGS) as Array<DevMode>;
+const DevModeSchema = Schema.Literals(DEV_RUNNER_MODES);
+
+const isDesktopDevMode = (mode: DevMode) => mode === "dev:desktop" || mode === "live";
 
 export function isBrowserAllowedPort(port: number): boolean {
   return !FETCH_BAD_PORTS.has(port);
@@ -153,7 +160,7 @@ export class DevRunnerProcessError extends Schema.TaggedError<DevRunnerProcessEr
   "DevRunnerProcessError",
   {
     operation: Schema.Literals(["spawn", "wait-for-exit"]),
-    mode: Schema.Literals(["dev", "dev:server", "dev:web", "dev:desktop"]),
+    mode: DevModeSchema,
     executable: Schema.Literal("vp"),
     argumentCount: Schema.Number,
     shell: Schema.Boolean,
@@ -168,7 +175,7 @@ export class DevRunnerProcessError extends Schema.TaggedError<DevRunnerProcessEr
 export class DevRunnerProcessExitError extends Schema.TaggedError<DevRunnerProcessExitError>()(
   "DevRunnerProcessExitError",
   {
-    mode: Schema.Literals(["dev", "dev:server", "dev:web", "dev:desktop"]),
+    mode: DevModeSchema,
     executable: Schema.Literal("vp"),
     argumentCount: Schema.Number,
     shell: Schema.Boolean,
@@ -195,7 +202,7 @@ export class DevRunnerHostNotProxiableError extends Schema.TaggedError<DevRunner
 export class DevRunnerBuiltNeedsShareError extends Schema.TaggedError<DevRunnerBuiltNeedsShareError>()(
   "DevRunnerBuiltNeedsShareError",
   {
-    mode: Schema.Literals(["dev", "dev:server", "dev:web", "dev:desktop"]),
+    mode: DevModeSchema,
   },
 ) {
   override get message(): string {
@@ -324,7 +331,7 @@ export const createDevRunnerEnv = Effect.fn("dev-runner.createDevRunnerEnv")(fun
   const webPort = BASE_WEB_PORT + webOffset;
   const configuredBaseDir = t3Home?.trim() || undefined;
   const resolvedBaseDir = yield* resolveBaseDir(configuredBaseDir);
-  const isDesktopMode = mode === "dev:desktop";
+  const isDesktopMode = isDesktopDevMode(mode);
 
   const output: NodeJS.ProcessEnv = {
     ...baseEnv,
@@ -411,6 +418,12 @@ export const createDevRunnerEnv = Effect.fn("dev-runner.createDevRunnerEnv")(fun
   if (mode === "dev:server" || mode === "dev:web") {
     output.T3CODE_MODE = "web";
     delete output.T3CODE_DESKTOP_WS_URL;
+  }
+
+  // Set only here: agents inside a live app inherit it and must not make their own dev runs live.
+  delete output.T3CODE_DESKTOP_LIVE;
+  if (mode === "live") {
+    output.T3CODE_DESKTOP_LIVE = "1";
   }
 
   if (isDesktopMode) {
@@ -784,7 +797,7 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
   if (input.share) {
     if (input.mode === "dev:server") {
       yield* Effect.logInfo("[dev-runner] --share has no effect for dev:server (no web server).");
-    } else if (input.mode === "dev:desktop") {
+    } else if (isDesktopDevMode(input.mode)) {
       yield* Effect.logWarning(
         "[dev-runner] --share is not supported for dev:desktop (the renderer is pinned to loopback). Use `dev`, which runs the whole browser stack.",
       );

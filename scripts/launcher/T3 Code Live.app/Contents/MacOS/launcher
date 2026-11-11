@@ -15,7 +15,7 @@ if pgrep -f "$APP_PATTERN" >/dev/null; then
 fi
 
 # Started but the window is not up yet.
-if pgrep -f 'scripts/dev-runner.ts dev:desktop' >/dev/null; then
+if pgrep -f 'scripts/dev-runner.ts live' >/dev/null; then
   notify "Already starting. Log: ~/.t3/live.log"
   exit 0
 fi

@@ -93,6 +93,29 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
+    it.effect("marks only live runs as live, even when the marker is inherited", () =>
+      Effect.gen(function* () {
+        const input = {
+          baseEnv: { T3CODE_DESKTOP_LIVE: "1" },
+          serverOffset: 0,
+          webOffset: 0,
+          t3Home: undefined,
+          browser: undefined,
+          autoBootstrapProjectFromCwd: undefined,
+          logWebSocketEvents: undefined,
+          host: undefined,
+          port: undefined,
+          devUrl: undefined,
+        } as const;
+        const live = yield* createDevRunnerEnv({ ...input, mode: "live" });
+        const desktop = yield* createDevRunnerEnv({ ...input, mode: "dev:desktop" });
+
+        assert.equal(live.T3CODE_DESKTOP_LIVE, "1");
+        assert.equal(live.T3CODE_SERVER_BUNDLE_WATCH, "1");
+        assert.equal(desktop.T3CODE_DESKTOP_LIVE, undefined);
+      }),
+    );
+
     it.effect("turns product analytics off unless the developer opts in", () =>
       Effect.gen(function* () {
         const input = {
