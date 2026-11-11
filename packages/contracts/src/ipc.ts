@@ -318,6 +318,17 @@ export const DesktopLiveRestartStateSchema = Schema.Struct({
 });
 export type DesktopLiveRestartState = typeof DesktopLiveRestartStateSchema.Type;
 
+/** macOS only: this Mac's `pmset disablesleep`, last read from `pmset -g`. */
+export const DesktopKeepAwakeStateSchema = Schema.Struct({
+  on: Schema.Boolean,
+  pending: Schema.Boolean,
+});
+export type DesktopKeepAwakeState = typeof DesktopKeepAwakeStateSchema.Type;
+
+/** `busy`: another change is already waiting on the password dialog. */
+export const DesktopKeepAwakeSetResultSchema = Schema.Literals(["ok", "cancelled", "busy"]);
+export type DesktopKeepAwakeSetResult = typeof DesktopKeepAwakeSetResultSchema.Type;
+
 export const DesktopUpdateStateSchema = Schema.Struct({
   enabled: Schema.Boolean,
   status: DesktopUpdateStatusSchema,
@@ -1153,6 +1164,10 @@ export interface DesktopBridge {
   getLiveRestartState?: () => Promise<DesktopLiveRestartState | null>;
   onLiveRestartState?: (listener: (state: DesktopLiveRestartState) => void) => () => void;
   restartForLiveCode?: () => Promise<void>;
+  /** Null off macOS. Optional: a preload from before this feature lacks it. */
+  getKeepAwakeState?: () => Promise<DesktopKeepAwakeState | null>;
+  onKeepAwakeState?: (listener: (state: DesktopKeepAwakeState) => void) => () => void;
+  setKeepAwake?: (on: boolean) => Promise<DesktopKeepAwakeSetResult>;
   cliCommand: {
     getState: () => Promise<DesktopCliCommandState>;
     install: () => Promise<DesktopCliCommandState>;

@@ -119,6 +119,14 @@ protection takes effect at once. The server's protection from the kernel's
 out-of-memory killer takes effect after `t3 service restart`. `t3 service status` reports whether
 the protection is in place, and `t3 service protect --undo` removes it.
 
+## Keep your Mac awake
+
+In the macOS desktop app, the coffee cup at the bottom of the sidebar, or
+**Keep this Mac awake** in the command palette, stops the Mac from sleeping,
+even with the lid closed. macOS asks for your administrator password to change
+it. It stays on after T3 Code quits, so turn it off the same way when you are
+done.
+
 ## Troubleshooting
 
 Start with `t3 service status` on the host. It prints the log path and, on Linux,

@@ -60,6 +60,7 @@ import {
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
+  CoffeeIcon,
   CornerLeftUpIcon,
   FileSearchIcon,
   FolderGit2Icon,
@@ -80,6 +81,8 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
+import { setKeepAwake } from "./sidebar/SidebarKeepAwakeToggle";
+import { useKeepAwakeState } from "../state/keepAwake";
 import { CreateProjectFromRepos } from "./CreateProjectFromRepos";
 import { openCreateProjectFromRepos } from "./createProjectFromReposStore";
 import {
@@ -697,6 +700,7 @@ function OpenCommandPaletteDialog(props: {
   const canTriage =
     useAtomValue(serverEnvironment.prepareTriage.permissionAtom(triageEnvironmentId)) &&
     supportsTriage(triageEnvironmentId);
+  const keepAwake = useKeepAwakeState();
   const currentProject = resolveCommandPaletteProject(
     projectByKey,
     currentProjectEnvironmentId,
@@ -1339,6 +1343,21 @@ function OpenCommandPaletteDialog(props: {
       description: "An agent investigates a T3 Code problem and helps file an issue",
       icon: <BugIcon className={ITEM_ICON_CLASS} />,
       run: () => startTriage(triageEnvironmentId),
+    });
+  }
+
+  if (keepAwake !== null && !keepAwake.pending) {
+    const turnOn = !keepAwake.on;
+    actionItems.push({
+      kind: "action",
+      value: "action:keep-awake",
+      searchTerms: ["keep awake", "sleep", "caffeinate", "pmset", "lid", "insomnia"],
+      title: turnOn ? "Keep this Mac awake" : "Let this Mac sleep",
+      description: turnOn
+        ? "Stops sleep, even with the lid closed, until you turn it off"
+        : "Keep awake is on; turn it off",
+      icon: <CoffeeIcon className={ITEM_ICON_CLASS} />,
+      run: () => setKeepAwake(turnOn),
     });
   }
 
