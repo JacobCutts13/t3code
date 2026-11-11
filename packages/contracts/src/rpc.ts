@@ -216,7 +216,14 @@ import {
   PullRequestUnavailableError,
   PullRequestUpdateInput,
 } from "./pullRequest.ts";
-import { IssueDetail, IssueGetInput, IssueListInput, IssueListResult } from "./issue.ts";
+import {
+  IssueDetail,
+  IssueGetInput,
+  IssueListInput,
+  IssueListResult,
+  ReviewRequestListInput,
+  ReviewRequestListResult,
+} from "./issue.ts";
 import {
   LinearIssueDetail,
   LinearIssueInput,
@@ -574,6 +581,7 @@ export const WS_METHODS = {
 
   issuesList: "issues.list",
   issuesGet: "issues.get",
+  pullRequestsReviewRequests: "pullRequests.reviewRequests",
 
   linearViewer: "linear.viewer",
   linearIssuesList: "linear.issuesList",
@@ -1065,6 +1073,12 @@ const WsIssuesListRpc = Rpc.make(WS_METHODS.issuesList, {
 const WsIssuesGetRpc = Rpc.make(WS_METHODS.issuesGet, {
   payload: IssueGetInput,
   success: IssueDetail,
+  error: IssueRpcError,
+});
+
+const WsPullRequestsReviewRequestsRpc = Rpc.make(WS_METHODS.pullRequestsReviewRequests, {
+  payload: ReviewRequestListInput,
+  success: ReviewRequestListResult,
   error: IssueRpcError,
 });
 
@@ -2196,6 +2210,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsCloudInstallRelayClientRpc,
   WsIssuesListRpc,
   WsIssuesGetRpc,
+  WsPullRequestsReviewRequestsRpc,
   WsLinearViewerRpc,
   WsLinearIssuesListRpc,
   WsLinearIssuesGetRpc,

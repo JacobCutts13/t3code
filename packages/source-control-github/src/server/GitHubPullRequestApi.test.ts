@@ -1531,6 +1531,36 @@ layer("GitHubPullRequestApi.layer", (it) => {
     }),
   );
 
+  it.effect("searches every repository for open review requests, newest first", () =>
+    Effect.gen(function* () {
+      mockedExecute.mockReturnValue(
+        Effect.succeed(
+          searchPage(
+            [
+              searchItem(7, "acme/web", "2026-07-03T00:00:00Z"),
+              searchItem(9, "team/api", "2026-07-02T00:00:00Z"),
+              {},
+            ],
+            true,
+          ),
+        ),
+      );
+      const cli = yield* GitHubPullRequestApi.GitHubPullRequestApi;
+
+      const batch = yield* cli.searchReviewRequests({ host: "github.com" });
+
+      assert.strictEqual(
+        searchQueryOfCall(0),
+        "is:pr is:open archived:false review-requested:@me sort:updated-desc",
+      );
+      assert.deepStrictEqual(
+        batch.items.map((item) => `${item.repository}#${item.number}`),
+        ["acme/web#7", "team/api#9"],
+      );
+      assert.isTrue(batch.truncated);
+    }),
+  );
+
   it.effect("keeps a searched-for qualifier inside the phrase", () =>
     Effect.gen(function* () {
       mockedExecute.mockReturnValue(Effect.succeed(searchPage([])));

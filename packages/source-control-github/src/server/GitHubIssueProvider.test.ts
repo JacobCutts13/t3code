@@ -4,6 +4,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 
 import * as GitHubIssueProvider from "./GitHubIssueProvider.ts";
+import * as GitHubPullRequestApi from "./GitHubPullRequestApi.ts";
 import * as GitHubRest from "./GitHubRest.ts";
 
 const issue = (number: number, extra: Record<string, unknown> = {}) => ({
@@ -41,7 +42,9 @@ const provider = (answers: Record<string, unknown>) => {
   });
   return {
     asked,
-    make: GitHubIssueProvider.make.pipe(Effect.provide(rest)),
+    make: GitHubIssueProvider.make.pipe(
+      Effect.provide(Layer.merge(rest, Layer.mock(GitHubPullRequestApi.GitHubPullRequestApi)({}))),
+    ),
   };
 };
 

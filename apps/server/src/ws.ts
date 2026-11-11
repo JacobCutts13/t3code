@@ -2790,6 +2790,7 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.issuesList]: (input) => issues.list(input),
         [WS_METHODS.issuesGet]: (input) => issues.get(input),
+        [WS_METHODS.pullRequestsReviewRequests]: (input) => issues.reviewRequests(input),
         [WS_METHODS.linearViewer]: () => linear.viewer,
         [WS_METHODS.linearIssuesList]: (input) => linear.list(input),
         [WS_METHODS.linearIssuesGet]: (input) => linear.get(input.id),

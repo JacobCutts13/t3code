@@ -9,6 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+import * as GitHubPullRequestApi from "./GitHubPullRequestApi.ts";
 import * as GitHubRequestPolicy from "./GitHubRequestPolicy.ts";
 import * as GitHubRest from "./GitHubRest.ts";
 import { fromGitHubApiError } from "./GitHubSourceControlProvider.ts";
@@ -129,6 +130,7 @@ const byNewestUpdate = (left: IssueSummary, right: IssueSummary) =>
 /** Reads issues as the account GitHub knows the server by. */
 export const make = Effect.gen(function* () {
   const api = yield* GitHubRest.GitHubRest;
+  const pullRequests = yield* GitHubPullRequestApi.GitHubPullRequestApi;
 
   const read = (host: string, operation: string, path: string) =>
     api.rest({ host, operation, path }).pipe(Effect.mapError(fromGitHub(operation)));
@@ -239,7 +241,40 @@ export const make = Effect.gen(function* () {
     } satisfies IssueDetail;
   });
 
-  return { list, get } satisfies IssueProviderApi;
+  const reviewRequests: IssueProviderApi["reviewRequests"] = Effect.fn(
+    "GitHubIssueProvider.reviewRequests",
+  )(function* (input) {
+    const batch = yield* pullRequests.searchReviewRequests({ host: input.host }).pipe(
+      Effect.mapError(
+        (cause) =>
+          new PullRequestOperationError({
+            operation: "reviewRequests",
+            detail:
+              cause._tag === "GitHubPullRequestReadError"
+                ? "GitHub sent review requests in a shape this server cannot read."
+                : fromGitHubApiError(cause, "No pull requests found.").detail,
+            cause,
+          }),
+      ),
+    );
+    return {
+      entries: batch.items.map((item) => ({
+        host: input.host,
+        repository: item.repository,
+        number: item.number,
+        title: item.title,
+        url: item.url,
+        author: item.author?.login ?? null,
+        isDraft: item.isDraft,
+        headBranch: item.headBranch,
+        labels: item.labels,
+        updatedAt: item.updatedAt,
+      })),
+      truncated: batch.truncated,
+    };
+  });
+
+  return { list, get, reviewRequests } satisfies IssueProviderApi;
 });
 
 /** `/issues` answers for the signed-in account only, one relationship at a time. */
