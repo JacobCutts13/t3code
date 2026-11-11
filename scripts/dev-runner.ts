@@ -107,6 +107,7 @@ type PortAvailabilityCheck<R = never> = (
 ) => Effect.Effect<boolean, never, R>;
 
 const DEV_RUNNER_MODES = Object.keys(MODE_ARGS) as Array<DevMode>;
+const DevModeSchema = Schema.Literals(DEV_RUNNER_MODES);
 
 const isDesktopDevMode = (mode: DevMode) => mode === "dev:desktop" || mode === "live";
 
@@ -159,7 +160,7 @@ export class DevRunnerProcessError extends Schema.TaggedError<DevRunnerProcessEr
   "DevRunnerProcessError",
   {
     operation: Schema.Literals(["spawn", "wait-for-exit"]),
-    mode: Schema.Literals(["dev", "dev:server", "dev:web", "dev:desktop", "live"]),
+    mode: DevModeSchema,
     executable: Schema.Literal("vp"),
     argumentCount: Schema.Number,
     shell: Schema.Boolean,
@@ -174,7 +175,7 @@ export class DevRunnerProcessError extends Schema.TaggedError<DevRunnerProcessEr
 export class DevRunnerProcessExitError extends Schema.TaggedError<DevRunnerProcessExitError>()(
   "DevRunnerProcessExitError",
   {
-    mode: Schema.Literals(["dev", "dev:server", "dev:web", "dev:desktop", "live"]),
+    mode: DevModeSchema,
     executable: Schema.Literal("vp"),
     argumentCount: Schema.Number,
     shell: Schema.Boolean,
@@ -201,7 +202,7 @@ export class DevRunnerHostNotProxiableError extends Schema.TaggedError<DevRunner
 export class DevRunnerBuiltNeedsShareError extends Schema.TaggedError<DevRunnerBuiltNeedsShareError>()(
   "DevRunnerBuiltNeedsShareError",
   {
-    mode: Schema.Literals(["dev", "dev:server", "dev:web", "dev:desktop", "live"]),
+    mode: DevModeSchema,
   },
 ) {
   override get message(): string {

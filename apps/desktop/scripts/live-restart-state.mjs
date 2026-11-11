@@ -1,4 +1,3 @@
-// Which built files differ from what the running app was started with.
 export function makeLiveRestartTracker({ files, hashFile }) {
   let baseline = new Map();
   const current = new Map();
