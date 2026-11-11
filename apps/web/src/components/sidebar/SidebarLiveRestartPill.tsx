@@ -18,6 +18,7 @@ import {
 import { Button } from "../ui/button";
 import { SidebarMenuItem } from "../ui/sidebar";
 import { Spinner } from "../ui/spinner";
+import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 // Mounted only while the dialog is open, so the footer never subscribes to the thread list.
@@ -58,8 +59,15 @@ export function SidebarLiveRestartPill() {
     setRestarting(true);
     try {
       await window.desktopBridge?.restartForLiveCode?.();
-    } catch {
+    } catch (error) {
       setRestarting(false);
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Could not restart T3",
+          description: error instanceof Error ? error.message : "Restart failed.",
+        }),
+      );
     }
   };
 
