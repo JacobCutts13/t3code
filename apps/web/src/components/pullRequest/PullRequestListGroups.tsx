@@ -36,7 +36,7 @@ function firstPaintGroups<Group extends { entries: ReadonlyArray<unknown> }>(
   });
 }
 
-function PullRequestGroupHeader({
+export function PullRequestGroupHeader({
   group,
   count,
 }: {

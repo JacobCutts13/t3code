@@ -18,6 +18,7 @@ import {
   type EnvironmentPullRequestEntry,
   type PullRequestPartitionsSnapshot,
 } from "./pullRequestList.logic";
+import { reviewRequestKey } from "./pullRequestReviewDispatch.logic";
 
 export const pullRequestListEntryId = (target: Parameters<typeof pullRequestSurfaceId>[0]) =>
   pullRequestSurfaceId({ ...target, repository: target.repository.toLowerCase() });
@@ -37,6 +38,7 @@ export function pullRequestGroups({
   authored,
   reviewing,
   partitionsWanted,
+  listedAbove,
 }: {
   known: ReadonlyArray<EnvironmentPullRequestEntry>;
   providers: PullRequestListResult["providers"];
@@ -51,12 +53,16 @@ export function pullRequestGroups({
   authored: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
   reviewing: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
   partitionsWanted: boolean;
+  /** Pull requests the review-request section already lists, by `reviewRequestKey`. */
+  listedAbove: ReadonlySet<string>;
 }) {
+  const notListedAbove = (entry: EnvironmentPullRequestEntry) =>
+    !listedAbove.has(reviewRequestKey(entry));
   const searchingHosts = new Set(
     providers.flatMap((provider) => (provider.searchesOnHost ? [provider.host] : [])),
   );
 
-  const entries = (() => {
+  const allEntries = (() => {
     const involvementEntries = filterPullRequestsByInvolvement(known, viewers, involvement);
     // Host text searches cover fields absent from rows, so do not narrow their matches locally.
     // Filter text locally while results are pending or when the host has no text search.
@@ -74,8 +80,10 @@ export function pullRequestGroups({
     );
   })();
 
+  const entries = listedAbove.size === 0 ? allEntries : allEntries.filter(notListedAbove);
+
   const listedPullRequestTabStatuses: Record<string, PullRequestTabStatusSeed> = Object.fromEntries(
-    entries.map((entry) => [
+    allEntries.map((entry) => [
       pullRequestSurfaceId(entry),
       {
         state: entry.state,
@@ -84,7 +92,7 @@ export function pullRequestGroups({
     ]),
   );
 
-  const groups = (() => {
+  const allGroups = (() => {
     if (involvement !== "all") return [{ key: "others" as const, label: "", entries }];
     if (baselineEmpty) {
       return groupPullRequestsByInvolvement(entries, viewers);
@@ -102,6 +110,14 @@ export function pullRequestGroups({
     }
     return partitionPullRequestsWithPriority(entries, narrowedAuthored, narrowedReviewing);
   })();
+
+  const groups =
+    listedAbove.size === 0
+      ? allGroups
+      : allGroups.flatMap((group) => {
+          const shown = group.entries.filter(notListedAbove);
+          return shown.length === 0 ? [] : [{ ...group, entries: shown }];
+        });
 
   const entriesByStatsKey: ReadonlyMap<string, EnvironmentPullRequestEntry> = new Map(
     groups.flatMap((group) =>
