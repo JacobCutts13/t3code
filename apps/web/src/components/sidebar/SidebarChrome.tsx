@@ -299,6 +299,8 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
       )}
       <SidebarThreadUndoNotice />
       <SidebarUpdatePill />
+      {/* After the update pill: it is always present on desktop and owns the ml-auto push. */}
+      <SidebarLiveRestartPill />
     </SidebarMenu>
   );
 });
@@ -306,7 +308,6 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
 export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
   return (
     <SidebarFooter>
-      <SidebarLiveRestartPill />
       <SidebarProviderUpdatePill />
       <SidebarUpdateArchitectureWarning />
       <SidebarUtilityMenu />

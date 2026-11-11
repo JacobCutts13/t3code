@@ -16,7 +16,9 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { SidebarMenuItem } from "../ui/sidebar";
 import { Spinner } from "../ui/spinner";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 // Mounted only while the dialog is open, so the footer never subscribes to the thread list.
 function InterruptedThreads({ environmentId }: { readonly environmentId: EnvironmentId }) {
@@ -61,16 +63,24 @@ export function SidebarLiveRestartPill() {
     }
   };
 
+  const label = "New code pulled · Restart";
   return (
-    <>
-      <button
-        type="button"
-        className="flex min-h-7 w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-sidebar-control-surface px-2 py-1.5 text-left text-2xs leading-4 font-medium text-sidebar-foreground outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        onClick={() => setConfirmOpen(true)}
-      >
-        <RotateCwIcon className="size-3.5 shrink-0" />
-        <span className="min-w-0 wrap-break-word">New code pulled · Restart</span>
-      </button>
+    <SidebarMenuItem className="shrink-0">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              aria-label={label}
+              className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-info/15 text-info outline-hidden ring-ring transition-colors hover:bg-info/25 focus-visible:ring-2 focus-visible:ring-inset"
+              onClick={() => setConfirmOpen(true)}
+            >
+              <RotateCwIcon className="size-4" />
+            </button>
+          }
+        />
+        <TooltipPopup side="top">{label}</TooltipPopup>
+      </Tooltip>
       <AlertDialog
         open={confirmOpen}
         onOpenChange={(open) => {
@@ -101,6 +111,6 @@ export function SidebarLiveRestartPill() {
           </AlertDialogFooter>
         </AlertDialogPopup>
       </AlertDialog>
-    </>
+    </SidebarMenuItem>
   );
 }
