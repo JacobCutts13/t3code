@@ -57,9 +57,20 @@ const hostPlatform = NodeOS.platform();
 // `vp run live`: rebuilds never restart the app (that would kill every agent); it offers a restart instead.
 const liveMode = process.env.T3CODE_DESKTOP_LIVE === "1";
 const liveStateFile = NodePath.join(NodeOS.tmpdir(), `t3code-live-restart-${process.pid}.json`);
-const liveArtifacts = watchedDirectories.flatMap(({ directory, files }) =>
-  [...files].map((file) => NodePath.join(directory, file)),
-);
+// Every standalone desktop entry Electron loads; hashed chunks change their importer, so they're covered.
+const liveArtifacts = [
+  ...watchedDirectories.flatMap(({ directory, files }) =>
+    [...files].map((file) => NodePath.join(directory, file)),
+  ),
+  ...[
+    "boot.cjs",
+    "compileCache.cjs",
+    "serverCompileCache.cjs",
+    "mac-permission-preload.cjs",
+    "preview-pick-preload.cjs",
+    "preview-pip-preload.cjs",
+  ].map((file) => NodePath.join("dist-electron", file)),
+];
 
 NodeChildProcess.execFileSync(
   process.execPath,

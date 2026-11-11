@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { LIVE_SHELL_STATUSES, type EnvironmentId } from "@t3tools/contracts";
 import { RotateCwIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -18,14 +18,11 @@ import {
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 
-// Every status a restart cuts short, including runs queued or waiting on an answer.
-const ACTIVE_STATUSES = new Set(["preparing", "queued", "starting", "running", "waiting"]);
-
 // Mounted only while the dialog is open, so the footer never subscribes to the thread list.
 function InterruptedThreads({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const interrupted = useAtomValue(
     environmentThreadShells.environmentThreadsAtom(environmentId),
-  ).filter((thread) => ACTIVE_STATUSES.has(thread.status));
+  ).filter((thread) => LIVE_SHELL_STATUSES.has(thread.status));
   if (interrupted.length === 0) {
     return <AlertDialogDescription>No threads are running.</AlertDialogDescription>;
   }

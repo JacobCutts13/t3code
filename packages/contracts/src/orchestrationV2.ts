@@ -2182,7 +2182,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
 });
 export type OrchestrationV2ThreadShell = typeof OrchestrationV2ThreadShell.Type;
 
-const LIVE_SHELL_STATUSES: ReadonlySet<OrchestrationV2ShellThreadStatus> = new Set([
+export const LIVE_SHELL_STATUSES: ReadonlySet<OrchestrationV2ShellThreadStatus> = new Set([
   "queued",
   "preparing",
   "starting",

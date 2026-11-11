@@ -47,7 +47,7 @@ describe("live restart tracker", () => {
     const slowHash = new Promise((resolve) => {
       releaseSlowHash = resolve;
     });
-    const hashes = { "main.cjs": ["a"], "bin.mjs": ["b", slowHash, "b"] };
+    const hashes = { "main.cjs": ["a", "a"], "bin.mjs": ["b", slowHash, "b"] };
     const tracker = makeLiveRestartTracker({
       files,
       hashFile: async (file) => hashes[file].shift(),
@@ -60,5 +60,7 @@ describe("live restart tracker", () => {
 
     assert.deepEqual(await older, ["bin.mjs"]);
     assert.deepEqual(await newer, []);
+    // Unserialized, the slow older hash would land last and leave bin.mjs stuck as changed.
+    assert.deepEqual(await tracker.refresh("main.cjs"), []);
   });
 });

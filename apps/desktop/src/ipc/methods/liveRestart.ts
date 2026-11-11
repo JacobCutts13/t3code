@@ -16,13 +16,17 @@ const decodeStateFile = Schema.decodeUnknownOption(
   Schema.fromJsonString(DesktopLiveRestartStateSchema),
 );
 
+const NOTHING_PENDING: DesktopLiveRestartState = { changed: [] };
+
 // scripts/dev-electron.mjs writes this file in `vp run live`; it is the only one who knows what Electron loaded.
-function readStateFile(stateFile: string): DesktopLiveRestartState {
-  let contents = "";
+// None means the file exists but can't be read or decoded: the writer broke, so the caller logs it.
+function readStateFile(stateFile: string): Option.Option<DesktopLiveRestartState> {
+  if (!NodeFS.existsSync(stateFile)) return Option.some(NOTHING_PENDING);
   try {
-    contents = NodeFS.readFileSync(stateFile, "utf8");
-  } catch {}
-  return Option.getOrElse(decodeStateFile(contents), () => ({ changed: [] }));
+    return decodeStateFile(NodeFS.readFileSync(stateFile, "utf8"));
+  } catch {
+    return Option.none();
+  }
 }
 
 export const installLiveRestart = Effect.fn("desktop.ipc.installLiveRestart")(function* () {
@@ -30,7 +34,12 @@ export const installLiveRestart = Effect.fn("desktop.ipc.installLiveRestart")(fu
   const electronWindow = yield* ElectronWindow.ElectronWindow;
   const runFork = Effect.runForkWith(yield* Effect.context());
   const stateFile = Option.getOrUndefined(yield* trimmedString("T3CODE_DESKTOP_LIVE_STATE_FILE"));
-  let state = stateFile === undefined ? null : readStateFile(stateFile);
+  const read = (file: string) =>
+    Option.getOrElse(readStateFile(file), () => {
+      runFork(Effect.logWarning("live restart state file is unreadable", { stateFile: file }));
+      return NOTHING_PENDING;
+    });
+  let state = stateFile === undefined ? null : read(stateFile);
 
   yield* ipc.handle(
     DesktopIpc.makeIpcMethod({
@@ -55,7 +64,7 @@ export const installLiveRestart = Effect.fn("desktop.ipc.installLiveRestart")(fu
 
   if (stateFile === undefined) return;
   NodeFS.watchFile(stateFile, { interval: 500 }, () => {
-    const next = readStateFile(stateFile);
+    const next = read(stateFile);
     state = next;
     runFork(electronWindow.sendAll(IpcChannels.LIVE_RESTART_STATE_CHANNEL, next));
   });
