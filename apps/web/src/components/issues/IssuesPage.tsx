@@ -631,48 +631,53 @@ function IssuesView(props: { readonly environmentId: EnvironmentId }) {
             </Empty>
           ) : (
             <div>
-              <div className="flex items-center justify-end gap-2 border-b px-6 py-2">
-                <Select
-                  value={selectedProject?.id ?? null}
-                  disabled={dispatchingKey === selectedKey}
-                  onValueChange={(value) => {
-                    if (typeof value !== "string") return;
-                    setPickedProjects((current) => ({ ...current, [pickKey(selected)]: value }));
-                  }}
-                >
-                  <SelectTrigger size="sm" aria-label="Project">
-                    <SelectValue>
-                      {(value: string | null) =>
-                        projects.find((project) => project.id === value)?.title ??
-                        "Choose a project"
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectPopup>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.title}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-                {selectedProject === undefined ? null : (
+              <div className="flex items-center gap-2 border-b px-6 py-2">
+                <div className="min-w-0 flex-1">
+                  <Select
+                    value={selectedProject?.id ?? null}
+                    disabled={dispatchingKey === selectedKey}
+                    onValueChange={(value) => {
+                      if (typeof value !== "string") return;
+                      setPickedProjects((current) => ({ ...current, [pickKey(selected)]: value }));
+                    }}
+                  >
+                    <SelectTrigger size="sm" className="min-w-0" aria-label="Project">
+                      <SelectValue>
+                        {(value: string | null) =>
+                          projects.find((project) => project.id === value)?.title ??
+                          "Choose a project"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectPopup>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.title}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                </div>
+                <div className="shrink-0">
                   <IssueModelPicker
                     environmentId={environmentId}
-                    projectId={selectedProject.id}
-                    value={modelFor(selectedProject, picked)}
+                    projectId={selectedProject?.id ?? null}
+                    value={
+                      selectedProject === undefined ? picked : modelFor(selectedProject, picked)
+                    }
                     disabled={dispatchingKey === selectedKey}
                     onChange={setPicked}
                   />
-                )}
+                </div>
                 <Button
                   type="button"
+                  size="icon"
+                  aria-label="Dispatch agent"
                   disabled={dispatchingKey === selectedKey || selectedProject === undefined}
                   title={blockedReason(selected, selectedProject) ?? "Start an agent on this issue"}
                   onClick={() => void dispatchEntry(selected)}
                 >
                   <PlayIcon />
-                  Dispatch agent
                 </Button>
               </div>
               {selected.source === "github" ? (

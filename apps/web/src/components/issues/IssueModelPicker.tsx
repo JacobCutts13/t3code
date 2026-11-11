@@ -18,7 +18,7 @@ import type { TraitsSelectionInput } from "../chat/TraitsPicker";
 /** The composer's model picker with its effort column, listing what the project's environment offers. */
 export function IssueModelPicker(props: {
   readonly environmentId: EnvironmentId;
-  readonly projectId: ProjectId;
+  readonly projectId: ProjectId | null;
   readonly value: ModelSelection | null;
   readonly disabled?: boolean;
   readonly onChange: (selection: ModelSelection) => void;
