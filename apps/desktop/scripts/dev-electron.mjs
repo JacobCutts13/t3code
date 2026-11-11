@@ -1,4 +1,5 @@
 import * as NodeChildProcess from "node:child_process";
+import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -8,6 +9,7 @@ import {
   resolveDevProtocolClient,
   resolveElectronLaunchCommand,
 } from "./electron-launcher.mjs";
+import { makeLiveRestartTracker } from "./live-restart-state.mjs";
 import { waitForResources } from "./wait-for-resources.mjs";
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
@@ -52,6 +54,12 @@ const childTreeGracePeriodMs = 1_200;
 const remoteDebuggingPort = process.env.T3CODE_DESKTOP_REMOTE_DEBUGGING_PORT?.trim();
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone dev script has no Effect runtime.
 const hostPlatform = NodeOS.platform();
+// `vp run live`: rebuilds never restart the app (that would kill every agent); it offers a restart instead.
+const liveMode = process.env.T3CODE_DESKTOP_LIVE === "1";
+const liveStateFile = NodePath.join(NodeOS.tmpdir(), `t3code-live-restart-${process.pid}.json`);
+const liveArtifacts = watchedDirectories.flatMap(({ directory, files }) =>
+  [...files].map((file) => NodePath.join(directory, file)),
+);
 
 NodeChildProcess.execFileSync(
   process.execPath,
@@ -68,6 +76,8 @@ await waitForResources({
 
 const childEnv = { ...process.env };
 delete childEnv.ELECTRON_RUN_AS_NODE;
+if (liveMode) childEnv.T3CODE_DESKTOP_LIVE_STATE_FILE = liveStateFile;
+else delete childEnv.T3CODE_DESKTOP_LIVE_STATE_FILE;
 const devProtocolClient = resolveDevProtocolClient();
 if (devProtocolClient) {
   childEnv.T3CODE_DESKTOP_APP_USER_MODEL_ID = devProtocolClient.appBundleId;
@@ -80,6 +90,31 @@ let currentApp = null;
 let restartQueue = Promise.resolve();
 const expectedExits = new WeakSet();
 const watchers = [];
+const liveTracker = liveMode
+  ? makeLiveRestartTracker({ files: liveArtifacts, hashFile: hashLiveArtifact })
+  : null;
+let reportedChanges = new Set();
+
+async function hashLiveArtifact(file) {
+  try {
+    const contents = await NodeFS.promises.readFile(NodePath.join(desktopDir, file));
+    return NodeCrypto.createHash("sha256").update(contents).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+function publishLiveChanges(changed) {
+  for (const file of changed) {
+    if (!reportedChanges.has(file)) {
+      console.log(`[live] ${file} rebuilt — restart pending (use Restart in the app's sidebar)`);
+    }
+  }
+  reportedChanges = new Set(changed);
+  const temporaryFile = `${liveStateFile}.tmp`;
+  NodeFS.writeFileSync(temporaryFile, JSON.stringify({ changed }));
+  NodeFS.renameSync(temporaryFile, liveStateFile);
+}
 
 function killChildTreeByPid(pid, signal) {
   if (hostPlatform === "win32" || typeof pid !== "number") {
@@ -104,9 +139,16 @@ function cleanupStaleDevApps() {
   );
 }
 
-function startApp() {
+async function startApp() {
   if (shuttingDown || currentApp !== null) {
     return;
+  }
+
+  if (liveTracker) {
+    publishLiveChanges(await liveTracker.resetBaseline());
+    if (shuttingDown || currentApp !== null) {
+      return;
+    }
   }
 
   const electronArgs = remoteDebuggingPort
@@ -201,13 +243,25 @@ function scheduleRestart() {
       .then(async () => {
         await stopApp();
         if (!shuttingDown) {
-          startApp();
+          await startApp();
         }
       });
   }, restartDebounceMs);
 }
 
 function startWatchers() {
+  if (liveTracker) {
+    // Stat-based: the directory a rebuild cleans and recreates would orphan an fs.watch handle.
+    for (const file of liveArtifacts) {
+      const absolutePath = NodePath.join(desktopDir, file);
+      NodeFS.watchFile(absolutePath, { interval: 500 }, () => {
+        void liveTracker.refresh(file).then(publishLiveChanges);
+      });
+      watchers.push({ close: () => NodeFS.unwatchFile(absolutePath) });
+    }
+    return;
+  }
+
   for (const { directory, files } of watchedDirectories) {
     const watcher = NodeFS.watch(
       NodePath.join(desktopDir, directory),
@@ -249,6 +303,7 @@ async function shutdown(exitCode) {
   }
 
   await stopApp();
+  if (liveMode) NodeFS.rmSync(liveStateFile, { force: true });
   killChildTree("TERM");
   await new Promise((resolve) => {
     setTimeout(resolve, childTreeGracePeriodMs);
@@ -260,7 +315,7 @@ async function shutdown(exitCode) {
 
 startWatchers();
 cleanupStaleDevApps();
-startApp();
+void startApp();
 
 process.once("SIGINT", () => {
   void shutdown(130);

@@ -312,6 +312,12 @@ export const DesktopUpdateReleaseNoteSchema = Schema.Struct({
   footer: Schema.optionalKey(Schema.String),
 });
 
+/** Only `vp run live` has this: built files that differ from what the app is running. */
+export const DesktopLiveRestartStateSchema = Schema.Struct({
+  changed: Schema.Array(Schema.String),
+});
+export type DesktopLiveRestartState = typeof DesktopLiveRestartStateSchema.Type;
+
 export const DesktopUpdateStateSchema = Schema.Struct({
   enabled: Schema.Boolean,
   status: DesktopUpdateStatusSchema,
@@ -1143,6 +1149,10 @@ export interface DesktopBridge {
   /** With a version, installs only that downloaded build. */
   installUpdate: (expectedVersion?: string) => Promise<DesktopUpdateActionResult>;
   onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
+  /** Null outside `vp run live`. Optional: a preload from before this feature lacks it. */
+  getLiveRestartState?: () => Promise<DesktopLiveRestartState | null>;
+  onLiveRestartState?: (listener: (state: DesktopLiveRestartState) => void) => () => void;
+  restartForLiveCode?: () => Promise<void>;
   cliCommand: {
     getState: () => Promise<DesktopCliCommandState>;
     install: () => Promise<DesktopCliCommandState>;

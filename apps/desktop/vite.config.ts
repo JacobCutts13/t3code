@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Build config runs outside any Effect runtime; it only spawns the live supervisor.
+import * as NodeChildProcess from "node:child_process";
+
 import "vite-plus/test/config";
 import { defaultInclude, defineConfig } from "vite-plus";
 
@@ -10,6 +13,21 @@ const repoEnv = loadRepoEnv();
 const isMainProcessExternal = (id: string) =>
   id === "electron" || id.startsWith("electron/") || isDesktopRuntimeExternalDependency(id);
 const shouldLaunchElectronAfterPack = process.env.T3CODE_DESKTOP_DEV === "1";
+// A string `onSuccess` is killed and rerun on every rebuild, taking Electron and every agent with it.
+// `vp run live` starts one supervisor on the first build and keeps it; it offers restarts instead.
+const launchElectronAfterPack =
+  process.env.T3CODE_DESKTOP_LIVE === "1"
+    ? ({ cwd }: { readonly cwd: string }) => {
+        // A process global survives the config re-evaluation that a config change triggers.
+        const started = Symbol.for("t3code.desktop.liveSupervisorStarted");
+        if (Reflect.get(globalThis, started) === true) return;
+        Reflect.set(globalThis, started, true);
+        NodeChildProcess.spawn(process.execPath, ["scripts/dev-electron.mjs"], {
+          cwd,
+          stdio: "inherit",
+        });
+      }
+    : "node scripts/dev-electron.mjs";
 const publicConfigDefine = {
   __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: JSON.stringify(
     repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
@@ -72,7 +90,7 @@ export default defineConfig({
         neverBundle: isMainProcessExternal,
         onlyBundle: false,
       },
-      ...(shouldLaunchElectronAfterPack ? { onSuccess: "node scripts/dev-electron.mjs" } : {}),
+      ...(shouldLaunchElectronAfterPack ? { onSuccess: launchElectronAfterPack } : {}),
     },
     {
       format: "cjs",

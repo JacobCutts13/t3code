@@ -11,7 +11,7 @@
     "dev:web": "node scripts/dev-runner.ts dev:web",
     "dev:marketing": "vp run --filter @t3tools/marketing dev",
     "dev:desktop": "node scripts/dev-runner.ts dev:desktop",
-    "live": "node scripts/dev-runner.ts dev:desktop --home-dir ~/.t3",
+    "live": "node scripts/dev-runner.ts live --home-dir ~/.t3",
     "migrate-dev-db": "node apps/server/scripts/migrate-dev-db.ts",
     "start": "vp run --filter t3 start",
     "start:desktop": "vp run --filter @t3tools/desktop start",
