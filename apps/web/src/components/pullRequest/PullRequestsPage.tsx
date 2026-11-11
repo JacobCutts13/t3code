@@ -693,7 +693,7 @@ export function PullRequestsPage() {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const reviewRequestsShown =
     primaryEnvironmentId !== null &&
-    (scopedEnvironmentId === undefined || scopedEnvironmentId === primaryEnvironmentId) &&
+    (scopedEnvironmentId === null || scopedEnvironmentId === primaryEnvironmentId) &&
     (search.state === "open" || search.state === "all") &&
     search.involvement !== "authored" &&
     scopedProjectId === undefined &&
