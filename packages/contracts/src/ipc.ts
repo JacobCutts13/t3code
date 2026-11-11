@@ -325,10 +325,6 @@ export const DesktopKeepAwakeStateSchema = Schema.Struct({
 });
 export type DesktopKeepAwakeState = typeof DesktopKeepAwakeStateSchema.Type;
 
-/** `busy`: another change is already waiting on the password dialog. */
-export const DesktopKeepAwakeSetResultSchema = Schema.Literals(["ok", "cancelled", "busy"]);
-export type DesktopKeepAwakeSetResult = typeof DesktopKeepAwakeSetResultSchema.Type;
-
 export const DesktopUpdateStateSchema = Schema.Struct({
   enabled: Schema.Boolean,
   status: DesktopUpdateStatusSchema,
@@ -1167,7 +1163,8 @@ export interface DesktopBridge {
   /** Null off macOS. Optional: a preload from before this feature lacks it. */
   getKeepAwakeState?: () => Promise<DesktopKeepAwakeState | null>;
   onKeepAwakeState?: (listener: (state: DesktopKeepAwakeState) => void) => () => void;
-  setKeepAwake?: (on: boolean) => Promise<DesktopKeepAwakeSetResult>;
+  /** Resolves on cancel too; the pushed state is the outcome. */
+  setKeepAwake?: (on: boolean) => Promise<void>;
   cliCommand: {
     getState: () => Promise<DesktopCliCommandState>;
     install: () => Promise<DesktopCliCommandState>;

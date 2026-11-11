@@ -1,9 +1,4 @@
-import {
-  DesktopKeepAwakeSetResultSchema,
-  DesktopKeepAwakeStateSchema,
-  type DesktopKeepAwakeSetResult,
-  type DesktopKeepAwakeState,
-} from "@t3tools/contracts";
+import { DesktopKeepAwakeStateSchema, type DesktopKeepAwakeState } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -19,16 +14,11 @@ export class KeepAwakeError extends Schema.TaggedError<KeepAwakeError>()("KeepAw
   message: Schema.String,
 }) {}
 
-export interface KeepAwakeRunResult {
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly exitCode: number;
-}
-
-export type KeepAwakeRun = (
+/** Resolves with stdout; fails with stderr on a non-zero exit. */
+type KeepAwakeRun = (
   command: string,
   args: ReadonlyArray<string>,
-) => Effect.Effect<KeepAwakeRunResult, KeepAwakeError>;
+) => Effect.Effect<string, KeepAwakeError>;
 
 const PMSET = "/usr/bin/pmset";
 const OSASCRIPT = "/usr/bin/osascript";
@@ -49,7 +39,10 @@ export const setSleepDisabledArgs = (on: boolean): ReadonlyArray<string> => [
   ].join("\n"),
 ];
 
-/** Owns the verified `pmset` state and the single in-flight privileged write. */
+/**
+ * Owns the verified `pmset` state and the single in-flight privileged write. Electron's
+ * powerSaveBlocker cannot stop lid-close sleep; only `pmset disablesleep` can, and it needs root.
+ */
 export const makeKeepAwake = (
   run: KeepAwakeRun,
   publish: (state: DesktopKeepAwakeState) => Effect.Effect<void>,
@@ -57,11 +50,8 @@ export const makeKeepAwake = (
   let state: DesktopKeepAwakeState = { on: false, pending: false };
 
   const readOn = Effect.suspend(() => run(PMSET, ["-g"])).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
-        ? Effect.succeed(parseSleepDisabled(result.stdout))
-        : Effect.fail(new KeepAwakeError({ message: result.stderr.trim() })),
-    ),
+    Effect.timeout("10 seconds"),
+    Effect.map(parseSleepDisabled),
     Effect.tapError((cause) => Effect.logWarning("Could not read pmset state", { cause })),
     Effect.orElseSucceed(() => state.on),
   );
@@ -72,36 +62,27 @@ export const makeKeepAwake = (
     return changed ? publish(state) : Effect.void;
   };
 
-  const refresh = Effect.gen(function* () {
-    const on = yield* readOn;
-    yield* commit({ ...state, on });
-    return state;
+  let writes = 0;
+  // A write verifies its own result; a read that overlapped one may be stale, so it is dropped.
+  const refresh = Effect.suspend(() => {
+    if (state.pending) return Effect.succeed(state);
+    const startedAfter = writes;
+    return readOn.pipe(
+      Effect.flatMap((on) => (writes === startedAfter ? commit({ ...state, on }) : Effect.void)),
+      Effect.map(() => state),
+    );
   });
 
-  const set = (on: boolean): Effect.Effect<DesktopKeepAwakeSetResult, KeepAwakeError> =>
+  // A cancelled dialog and a busy rejection both resolve; the pushed state tells the UI what happened.
+  const set = (on: boolean): Effect.Effect<void, KeepAwakeError> =>
     Effect.suspend(() => {
-      if (state.pending) return Effect.succeed("busy" as const);
-      // Set before the first yield so a second request cannot slip past the check.
-      state = { ...state, pending: true };
-      return publish(state).pipe(
+      if (state.pending) return Effect.void;
+      writes += 1;
+      // commit assigns synchronously, so a second request cannot slip past the check above.
+      return commit({ ...state, pending: true }).pipe(
         Effect.andThen(run(OSASCRIPT, setSleepDisabledArgs(on))),
-        Effect.flatMap((result) =>
-          result.exitCode === 0
-            ? Effect.succeed<DesktopKeepAwakeSetResult>(
-                result.stdout.trim() === "cancelled" ? "cancelled" : "ok",
-              )
-            : Effect.fail(
-                new KeepAwakeError({
-                  message: result.stderr.trim() || `osascript exited with ${result.exitCode}`,
-                }),
-              ),
-        ),
-        Effect.ensuring(
-          Effect.gen(function* () {
-            const verified = yield* readOn;
-            yield* commit({ on: verified, pending: false });
-          }),
-        ),
+        Effect.asVoid,
+        Effect.ensuring(readOn.pipe(Effect.flatMap((on) => commit({ on, pending: false })))),
       );
     });
 
@@ -110,17 +91,6 @@ export const makeKeepAwake = (
 
 export const installKeepAwake = Effect.fn("desktop.ipc.installKeepAwake")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
-  if ((yield* HostProcess.Platform) !== "darwin") {
-    yield* ipc.handle(
-      DesktopIpc.makeIpcMethod({
-        channel: IpcChannels.KEEP_AWAKE_GET_STATE_CHANNEL,
-        payload: Schema.Void,
-        result: Schema.Null,
-        handler: () => Effect.succeed(null),
-      }),
-    );
-    return;
-  }
   const app = yield* ElectronApp.ElectronApp;
   const electronWindow = yield* ElectronWindow.ElectronWindow;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -138,29 +108,40 @@ export const installKeepAwake = Effect.fn("desktop.ipc.installKeepAwake")(functi
           ],
           { concurrency: "unbounded" },
         );
-        return { stdout, stderr, exitCode: Number(exitCode) };
+        if (exitCode === 0) return stdout;
+        return yield* new KeepAwakeError({
+          message: stderr.trim() || `${command} exited with ${exitCode}`,
+        });
       }),
-    ).pipe(Effect.mapError((cause) => new KeepAwakeError({ message: cause.message })));
-  const keepAwake = makeKeepAwake(run, (state) =>
-    electronWindow.sendAll(IpcChannels.KEEP_AWAKE_STATE_CHANNEL, state),
-  );
+    ).pipe(
+      Effect.catchTags({
+        PlatformError: (cause) => new KeepAwakeError({ message: cause.message }),
+      }),
+    );
+  const keepAwake =
+    (yield* HostProcess.Platform) === "darwin"
+      ? makeKeepAwake(run, (state) =>
+          electronWindow.sendAll(IpcChannels.KEEP_AWAKE_STATE_CHANNEL, state),
+        )
+      : null;
 
   yield* ipc.handle(
     DesktopIpc.makeIpcMethod({
       channel: IpcChannels.KEEP_AWAKE_GET_STATE_CHANNEL,
       payload: Schema.Void,
       result: Schema.NullOr(DesktopKeepAwakeStateSchema),
-      handler: () => keepAwake.refresh,
+      handler: () => keepAwake?.refresh ?? Effect.succeed(null),
     }),
   );
+  if (keepAwake === null) return;
   yield* ipc.handle(
     DesktopIpc.makeIpcMethod({
       channel: IpcChannels.KEEP_AWAKE_SET_CHANNEL,
       payload: Schema.Boolean,
-      result: DesktopKeepAwakeSetResultSchema,
+      result: Schema.Void,
       handler: keepAwake.set,
     }),
   );
-  // Another tool (cockpit, a terminal) may have changed it while T3 was in the background.
+  // Another process may have changed it while T3 was in the background.
   yield* app.on("browser-window-focus", () => runFork(keepAwake.refresh));
 });

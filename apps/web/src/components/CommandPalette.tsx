@@ -81,8 +81,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
-import { setKeepAwake } from "./sidebar/SidebarKeepAwakeToggle";
-import { useKeepAwakeState } from "../state/keepAwake";
+import { setKeepAwake, useKeepAwakeState } from "../state/keepAwake";
 import { CreateProjectFromRepos } from "./CreateProjectFromRepos";
 import { openCreateProjectFromRepos } from "./createProjectFromReposStore";
 import {
@@ -1354,8 +1353,8 @@ function OpenCommandPaletteDialog(props: {
       searchTerms: ["keep awake", "sleep", "caffeinate", "pmset", "lid", "insomnia"],
       title: turnOn ? "Keep this Mac awake" : "Let this Mac sleep",
       description: turnOn
-        ? "Stops sleep, even with the lid closed, until you turn it off"
-        : "Keep awake is on; turn it off",
+        ? "Stops sleep, even with the lid closed. Stays on after T3 quits"
+        : "Sleep settings return to normal",
       icon: <CoffeeIcon className={ITEM_ICON_CLASS} />,
       run: () => setKeepAwake(turnOn),
     });

@@ -12,15 +12,16 @@ import {
   makeKeepAwake,
   parseSleepDisabled,
   setSleepDisabledArgs,
-  type KeepAwakeRunResult,
 } from "./keepAwake.ts";
 
 const PMSET_ON = " AutoPowerOff\t\t1\n SleepDisabled\t\t1\n sleep                1\n";
 const PMSET_OFF = " AutoPowerOff\t\t1\n SleepDisabled        0\n";
-const ok = (stdout: string): KeepAwakeRunResult => ({ stdout, stderr: "", exitCode: 0 });
 
-// A fake Mac: pmset -g reports `sleepDisabled`; osascript answers with `write`.
-const setup = (write: (on: boolean) => Effect.Effect<KeepAwakeRunResult, KeepAwakeError>) => {
+// A fake Mac: `pmset -g` reports `sleepDisabled` (or `read` when given); osascript answers with `write`.
+const setup = (
+  write: (on: boolean) => Effect.Effect<string, KeepAwakeError>,
+  read?: Effect.Effect<string, KeepAwakeError>,
+) => {
   const machine = { sleepDisabled: false };
   const calls: Array<{ command: string; args: ReadonlyArray<string> }> = [];
   const published: Array<DesktopKeepAwakeState> = [];
@@ -28,13 +29,14 @@ const setup = (write: (on: boolean) => Effect.Effect<KeepAwakeRunResult, KeepAwa
     (command, args) => {
       calls.push({ command, args });
       if (command === "/usr/bin/pmset") {
-        return Effect.succeed(ok(machine.sleepDisabled ? PMSET_ON : PMSET_OFF));
+        return read ?? Effect.sync(() => (machine.sleepDisabled ? PMSET_ON : PMSET_OFF));
       }
       return write(args[1]!.includes("disablesleep 1"));
     },
     (state) => Effect.sync(() => published.push(state)),
   );
-  return { machine, calls, published, keepAwake };
+  const osascriptCalls = () => calls.filter((call) => call.command === "/usr/bin/osascript");
+  return { machine, calls, published, keepAwake, osascriptCalls };
 };
 
 describe("parseSleepDisabled", () => {
@@ -51,18 +53,20 @@ describe("makeKeepAwake", () => {
       const fake = setup((on) =>
         Effect.sync(() => {
           fake.machine.sleepDisabled = on;
-          return ok("\n");
+          return "\n";
         }),
       );
-      expect(yield* fake.keepAwake.set(true)).toBe("ok");
-      expect(fake.calls[0]).toEqual({
-        command: "/usr/bin/osascript",
-        args: [
-          "-e",
-          'try\ndo shell script "/usr/bin/pmset -a disablesleep 1" with administrator privileges\non error number -128\nreturn "cancelled"\nend try',
-        ],
-      });
-      expect(fake.calls[1]).toEqual({ command: "/usr/bin/pmset", args: ["-g"] });
+      yield* fake.keepAwake.set(true);
+      expect(fake.calls).toEqual([
+        {
+          command: "/usr/bin/osascript",
+          args: [
+            "-e",
+            'try\ndo shell script "/usr/bin/pmset -a disablesleep 1" with administrator privileges\non error number -128\nreturn "cancelled"\nend try',
+          ],
+        },
+        { command: "/usr/bin/pmset", args: ["-g"] },
+      ]);
       expect(setSleepDisabledArgs(false)[1]).toContain('"/usr/bin/pmset -a disablesleep 0"');
       expect(fake.published).toEqual([
         { on: false, pending: true },
@@ -73,19 +77,19 @@ describe("makeKeepAwake", () => {
 
   it.effect("treats a cancelled password dialog as a silent no-op", () =>
     Effect.gen(function* () {
-      const fake = setup(() => Effect.succeed(ok("cancelled\n")));
-      expect(yield* fake.keepAwake.set(true)).toBe("cancelled");
+      const fake = setup(() => Effect.succeed("cancelled\n"));
+      yield* fake.keepAwake.set(true);
       expect(fake.published.at(-1)).toEqual({ on: false, pending: false });
     }),
   );
 
-  it.effect("fails with stderr and still shows the re-read state, not the requested one", () =>
+  it.effect("fails with the error and still shows the re-read state, not the requested one", () =>
     Effect.gen(function* () {
       const fake = setup(() =>
-        Effect.sync(() => {
+        Effect.suspend(() => {
           // pmset changed the setting but osascript still reported an error.
           fake.machine.sleepDisabled = true;
-          return { stdout: "", stderr: "execution error: boom (1)\n", exitCode: 1 };
+          return Effect.fail(new KeepAwakeError({ message: "execution error: boom (1)" }));
         }),
       );
       const error = yield* Effect.flip(fake.keepAwake.set(true));
@@ -94,33 +98,51 @@ describe("makeKeepAwake", () => {
     }),
   );
 
-  it.effect("clears pending when the subprocess cannot even start", () =>
+  it.effect("ignores a second write while one is waiting on the dialog", () =>
     Effect.gen(function* () {
-      const fake = setup(() => Effect.fail(new KeepAwakeError({ message: "spawn ENOENT" })));
-      yield* Effect.flip(fake.keepAwake.set(false));
-      expect(fake.published.at(-1)).toEqual({ on: false, pending: false });
-    }),
-  );
-
-  it.effect("rejects a second write while one is waiting on the dialog", () =>
-    Effect.gen(function* () {
-      const answer = yield* Deferred.make<KeepAwakeRunResult>();
+      const answer = yield* Deferred.make<string>();
       const fake = setup(() => Deferred.await(answer));
       const first = yield* Effect.forkChild(fake.keepAwake.set(true));
       yield* Effect.yieldNow;
-      expect(yield* fake.keepAwake.set(false)).toBe("busy");
-      expect(fake.calls.filter((call) => call.command === "/usr/bin/osascript")).toHaveLength(1);
+      yield* fake.keepAwake.set(false);
+      expect(fake.osascriptCalls()).toHaveLength(1);
       fake.machine.sleepDisabled = true;
-      yield* Deferred.succeed(answer, ok(""));
-      expect(yield* Fiber.join(first)).toBe("ok");
+      yield* Deferred.succeed(answer, "");
+      yield* Fiber.join(first);
       expect(fake.published.at(-1)).toEqual({ on: true, pending: false });
-      expect(yield* fake.keepAwake.set(false)).not.toBe("busy");
+      yield* fake.keepAwake.set(false);
+      expect(fake.osascriptCalls()).toHaveLength(2);
+    }),
+  );
+
+  it.effect("drops a refresh that read pmset before a write verified its result", () =>
+    Effect.gen(function* () {
+      const staleRead = yield* Deferred.make<string>();
+      const fake = setup(
+        (on) =>
+          Effect.sync(() => {
+            fake.machine.sleepDisabled = on;
+            return "";
+          }),
+        Effect.suspend(() =>
+          fake.calls.length === 1
+            ? Deferred.await(staleRead)
+            : Effect.succeed(fake.machine.sleepDisabled ? PMSET_ON : PMSET_OFF),
+        ),
+      );
+      const refresh = yield* Effect.forkChild(fake.keepAwake.refresh);
+      yield* Effect.yieldNow;
+      yield* fake.keepAwake.set(true);
+      expect(fake.published.at(-1)).toEqual({ on: true, pending: false });
+      yield* Deferred.succeed(staleRead, PMSET_OFF);
+      yield* Fiber.join(refresh);
+      expect(fake.published.at(-1)).toEqual({ on: true, pending: false });
     }),
   );
 
   it.effect("refresh publishes only when the system value changed", () =>
     Effect.gen(function* () {
-      const fake = setup(() => Effect.succeed(ok("")));
+      const fake = setup(() => Effect.succeed(""));
       expect(yield* fake.keepAwake.refresh).toEqual({ on: false, pending: false });
       expect(fake.published).toEqual([]);
       fake.machine.sleepDisabled = true;

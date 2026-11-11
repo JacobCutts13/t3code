@@ -300,8 +300,8 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
       )}
       <SidebarThreadUndoNotice />
       <SidebarUpdatePill />
-      {/* After the update pill: it is always present on desktop and owns the ml-auto push. */}
       <SidebarKeepAwakeToggle />
+      {/* After the update pill: it is always present on desktop and owns the ml-auto push. */}
       <SidebarLiveRestartPill />
     </SidebarMenu>
   );
