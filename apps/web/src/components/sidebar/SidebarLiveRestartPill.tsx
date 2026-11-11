@@ -30,9 +30,8 @@ function InterruptedThreads({ environmentId }: { readonly environmentId: Environ
     <>
       <AlertDialogDescription>
         {interrupted.length === 1
-          ? "This running thread"
-          : `These ${interrupted.length} running threads`}{" "}
-        will be interrupted. T3 tries to resume them after the restart.
+          ? "This running thread will be interrupted. T3 tries to resume it after the restart."
+          : `These ${interrupted.length} running threads will be interrupted. T3 tries to resume them after the restart.`}
       </AlertDialogDescription>
       <ul className="max-h-48 list-disc overflow-y-auto pl-4 text-sm">
         {interrupted.map((thread) => (
