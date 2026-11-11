@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
+import * as Struct from "effect/Struct";
 import * as HttpServerRespondable from "effect/http/HttpServerRespondable";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
@@ -364,6 +365,30 @@ export const PullRequestListEntry = Schema.Struct({
   checksState: Schema.optional(PullRequestChecksState),
 });
 export type PullRequestListEntry = typeof PullRequestListEntry.Type;
+
+/** An open pull request, in any repository, asking the viewer or one of their teams to review. */
+export const ReviewRequestSummary = PullRequestListEntry.mapFields(
+  Struct.pick([
+    "host",
+    "repository",
+    "number",
+    "title",
+    "url",
+    "author",
+    "isDraft",
+    "headBranch",
+    "updatedAt",
+  ]),
+);
+export type ReviewRequestSummary = typeof ReviewRequestSummary.Type;
+
+export const ReviewRequestListResult = Schema.Struct({
+  /** Newest update first. */
+  entries: Schema.Array(ReviewRequestSummary),
+  /** More requests exist than were listed. */
+  truncated: Schema.Boolean,
+});
+export type ReviewRequestListResult = typeof ReviewRequestListResult.Type;
 
 export const PullRequestListCursors = Schema.Record(
   TrimmedNonEmptyString,

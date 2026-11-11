@@ -215,15 +215,9 @@ import {
   PullRequestThreadResolutionInput,
   PullRequestUnavailableError,
   PullRequestUpdateInput,
-} from "./pullRequest.ts";
-import {
-  IssueDetail,
-  IssueGetInput,
-  IssueListInput,
-  IssueListResult,
-  ReviewRequestListInput,
   ReviewRequestListResult,
-} from "./issue.ts";
+} from "./pullRequest.ts";
+import { IssueDetail, IssueGetInput, IssueListInput, IssueListResult } from "./issue.ts";
 import {
   LinearIssueDetail,
   LinearIssueInput,
@@ -1077,7 +1071,7 @@ const WsIssuesGetRpc = Rpc.make(WS_METHODS.issuesGet, {
 });
 
 const WsPullRequestsReviewRequestsRpc = Rpc.make(WS_METHODS.pullRequestsReviewRequests, {
-  payload: ReviewRequestListInput,
+  payload: Schema.Struct({}),
   success: ReviewRequestListResult,
   error: IssueRpcError,
 });

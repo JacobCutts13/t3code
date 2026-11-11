@@ -47,6 +47,7 @@ import {
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
   reviewRequestKey,
+  matchesPullRequestQuery,
 } from "./pullRequestList.logic";
 import {
   pullRequestListPreferences,
@@ -76,7 +77,6 @@ import {
 } from "./usePullRequestListView";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
 import { PullRequestReviewRequests, useReviewRequests } from "./PullRequestReviewRequests";
-import { matchesReviewRequestQuery } from "./pullRequestReviewDispatch.logic";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
 import { type PullRequestRowTarget } from "./PullRequestRow";
@@ -701,7 +701,7 @@ export function PullRequestsPage() {
     !hasLocalFilters;
   const reviewRequests = useReviewRequests(reviewRequestsShown ? reviewEnvironmentId : null);
   const shownReviewRequests = reviewRequestsShown
-    ? reviewRequests.entries.filter((pr) => matchesReviewRequestQuery(pr, typedParsed.text))
+    ? reviewRequests.entries.filter((pr) => matchesPullRequestQuery(pr, typedParsed.text))
     : [];
   const listedAbove = new Set(shownReviewRequests.map(reviewRequestKey));
 

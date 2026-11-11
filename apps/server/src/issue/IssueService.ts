@@ -4,7 +4,6 @@ import {
   type IssueListInput,
   type IssueListResult,
   PullRequestOperationError,
-  type ReviewRequestListInput,
   type ReviewRequestListResult,
 } from "@t3tools/contracts";
 import type { IssueProviderApi } from "@t3tools/source-control-core/server/IssueProvider";
@@ -24,9 +23,10 @@ export class IssueService extends Context.Service<
       input: IssueListInput,
     ) => Effect.Effect<IssueListResult, PullRequestOperationError>;
     readonly get: (input: IssueGetInput) => Effect.Effect<IssueDetail, PullRequestOperationError>;
-    readonly reviewRequests: (
-      input: ReviewRequestListInput,
-    ) => Effect.Effect<ReviewRequestListResult, PullRequestOperationError>;
+    readonly reviewRequests: () => Effect.Effect<
+      ReviewRequestListResult,
+      PullRequestOperationError
+    >;
   }
 >()("t3/issue/IssueService") {}
 
@@ -56,9 +56,9 @@ const make = Effect.gen(function* () {
         host: input.host ?? DEFAULT_HOST,
       });
     }),
-    reviewRequests: Effect.fn("IssueService.reviewRequests")(function* (input) {
+    reviewRequests: Effect.fn("IssueService.reviewRequests")(function* () {
       return yield* (yield* provider("pullRequests.reviewRequests")).reviewRequests({
-        host: input.host ?? DEFAULT_HOST,
+        host: DEFAULT_HOST,
       });
     }),
   });

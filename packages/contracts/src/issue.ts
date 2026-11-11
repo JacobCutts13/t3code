@@ -74,31 +74,3 @@ export const IssueDetail = Schema.Struct({
   commentsTruncated: Schema.Boolean,
 });
 export type IssueDetail = typeof IssueDetail.Type;
-
-/** An open pull request asking the signed-in account, or one of its teams, for a review. */
-export const ReviewRequestSummary = Schema.Struct({
-  host: TrimmedNonEmptyString,
-  /** `owner/name`. */
-  repository: TrimmedNonEmptyString,
-  number: PositiveInt,
-  title: Schema.String,
-  url: TrimmedNonEmptyString,
-  author: Schema.NullOr(TrimmedNonEmptyString),
-  isDraft: Schema.Boolean,
-  headBranch: TrimmedNonEmptyString,
-  updatedAt: IsoDateTime,
-});
-export type ReviewRequestSummary = typeof ReviewRequestSummary.Type;
-
-export const ReviewRequestListInput = Schema.Struct({
-  host: Schema.optional(TrimmedNonEmptyString),
-});
-export type ReviewRequestListInput = typeof ReviewRequestListInput.Type;
-
-export const ReviewRequestListResult = Schema.Struct({
-  /** Newest update first. */
-  entries: Schema.Array(ReviewRequestSummary),
-  /** More requests exist than were listed. */
-  truncated: Schema.Boolean,
-});
-export type ReviewRequestListResult = typeof ReviewRequestListResult.Type;

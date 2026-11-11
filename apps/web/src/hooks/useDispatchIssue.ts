@@ -150,10 +150,27 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     readonly title: string;
     readonly text: string;
     readonly worktree:
-      | { readonly baseBranch: string; readonly branch: string }
-      | { readonly branch: string; readonly worktreePath: string | null };
+      | { readonly kind: "new"; readonly baseBranch: string; readonly branch: string }
+      | {
+          readonly kind: "existing";
+          readonly branch: string;
+          readonly worktreePath: string | null;
+        };
   }): Promise<ScopedThreadRef | false> => {
     const { project, modelSelection, title, text, worktree } = input;
+    const workspace =
+      worktree.kind === "existing"
+        ? { thread: { branch: worktree.branch, worktreePath: worktree.worktreePath } }
+        : {
+            thread: { branch: null, worktreePath: null },
+            prepareWorktree: {
+              projectCwd: project.workspaceRoot,
+              baseBranch: worktree.baseBranch,
+              branch: worktree.branch,
+              // The server fetches the base's upstream, or origin, and uses it locally without one.
+              startFromOrigin: true,
+            },
+          };
     const threadId = newThreadId();
     const createdAt = new Date().toISOString();
     const started = await startThreadTurn({
@@ -177,22 +194,12 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
             modelSelection,
             runtimeMode: DEFAULT_RUNTIME_MODE,
             interactionMode: DEFAULT_INTERACTION_MODE,
-            ...("worktreePath" in worktree
-              ? { branch: worktree.branch, worktreePath: worktree.worktreePath }
-              : { branch: null, worktreePath: null }),
+            ...workspace.thread,
             createdAt,
           },
-          ...("worktreePath" in worktree
+          ...(workspace.prepareWorktree === undefined
             ? {}
-            : {
-                prepareWorktree: {
-                  projectCwd: project.workspaceRoot,
-                  baseBranch: worktree.baseBranch,
-                  branch: worktree.branch,
-                  // The server fetches the base's upstream, or origin, and uses it locally without one.
-                  startFromOrigin: true,
-                },
-              }),
+            : { prepareWorktree: workspace.prepareWorktree }),
           runSetupScript: true,
         },
         createdAt,
@@ -259,7 +266,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `#${issue.number} ${issue.title}`,
         text: buildIssuePrompt(detail.value, branch),
-        worktree: { baseBranch: base, branch },
+        worktree: { kind: "new", baseBranch: base, branch },
       });
       return launched !== false;
     } catch (error) {
@@ -291,7 +298,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `${issue.identifier} ${issue.title}`,
         text: buildLinearIssuePrompt(issue, detail.value, branch),
-        worktree: { baseBranch: base, branch },
+        worktree: { kind: "new", baseBranch: base, branch },
       });
       if (launched === false) return false;
       const moved = await startLinearIssue({ environmentId, input: { id: issue.id } });
@@ -359,7 +366,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         modelSelection,
         title: `Review #${pr.number} ${pr.title}`,
         text: buildReviewPrompt(pr),
-        worktree: { branch, worktreePath },
+        worktree: { kind: "existing", branch, worktreePath },
       });
       if (threadRef === false) return false;
       await linking.changeLink(threadRef, pr.url, true).catch((error: unknown) => {

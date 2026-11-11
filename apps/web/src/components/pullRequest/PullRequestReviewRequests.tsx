@@ -20,12 +20,18 @@ import { useEnvironmentQuery } from "~/state/query";
 import { buildThreadRouteParams } from "~/threadRoutes";
 
 import { IssueModelPicker } from "../issues/IssueModelPicker";
-import { RelativeTime } from "../RelativeTime";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Spinner } from "../ui/spinner";
 import { PullRequestGroupHeader } from "./PullRequestListGroups";
+import {
+  PULL_REQUEST_ROW_CLASS,
+  PULL_REQUEST_ROW_NUMBER_CLASS,
+  PullRequestRowAuthor,
+  PullRequestRowGlyph,
+  PullRequestRowLines,
+} from "./PullRequestListRow";
 import type { PullRequestRowTarget } from "./PullRequestRow";
 import { reviewRequestKey } from "./pullRequestList.logic";
 
@@ -123,27 +129,33 @@ export function PullRequestReviewRequests(props: {
           const threadId = linkedThreads.get(key);
           const ownProject = projectFor(pr);
           return (
-            <li key={key} className={cn("rounded-md", selected && "bg-accent")}>
-              <div className="flex items-start gap-2 px-3 py-2.5 hover:bg-accent/50">
+            <li key={key} className={cn("rounded-md", !selected && "hover:bg-accent/60")}>
+              <div className="flex items-center gap-2 pr-3">
                 <button
                   type="button"
                   aria-expanded={selected}
-                  className="flex min-w-0 flex-1 flex-col gap-1 text-start outline-none focus-visible:underline"
+                  className={cn(
+                    PULL_REQUEST_ROW_CLASS,
+                    "min-w-0 flex-1 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+                  )}
                   onClick={() => setSelectedKey(selected ? null : key)}
                 >
-                  <span className="truncate text-sm font-medium">{pr.title}</span>
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-xs">
-                    <span>
-                      {pr.repository}#{pr.number}
-                    </span>
-                    {pr.author ? <span>{pr.author}</span> : null}
-                    <RelativeTime timestamp={pr.updatedAt} />
-                    {pr.isDraft ? (
-                      <Badge variant="outline" size="sm">
-                        Draft
-                      </Badge>
-                    ) : null}
-                  </span>
+                  <PullRequestRowGlyph
+                    state="open"
+                    isDraft={pr.isDraft}
+                    className="mt-0.75 self-start"
+                  />
+                  <PullRequestRowLines
+                    number={<span className={PULL_REQUEST_ROW_NUMBER_CLASS}>#{pr.number}</span>}
+                    title={pr.title}
+                    meta={
+                      <>
+                        <PullRequestRowAuthor actor={pr.author} className="min-w-3.5 max-w-40" />
+                        <span className="truncate">{pr.repository}</span>
+                      </>
+                    }
+                    updatedAt={pr.updatedAt}
+                  />
                 </button>
                 {threadId === undefined ? null : (
                   <Badge
@@ -155,7 +167,7 @@ export function PullRequestReviewRequests(props: {
                         params={buildThreadRouteParams(scopeThreadRef(environmentId, threadId))}
                       />
                     }
-                    title="A thread is already reviewing this pull request"
+                    title="A thread is linked to this pull request"
                   >
                     Dispatched
                   </Badge>
@@ -245,7 +257,7 @@ export function PullRequestReviewRequests(props: {
       </ul>
       {props.truncated ? (
         <p className="px-3 pt-1 text-muted-foreground text-xs">
-          Showing the 100 most recently updated review requests.
+          Showing the most recently updated review requests.
         </p>
       ) : null}
     </div>

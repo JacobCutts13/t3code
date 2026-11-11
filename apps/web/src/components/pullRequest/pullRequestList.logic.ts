@@ -215,7 +215,10 @@ function isAuthoredByViewer(entry: ScopedEntry, viewers: PullRequestViewers): bo
   return viewer !== null && normalize(entry.author?.login) === viewer;
 }
 
-export function matchesPullRequestQuery(entry: PullRequestListEntry, query: string): boolean {
+export function matchesPullRequestQuery(
+  entry: Pick<PullRequestListEntry, "number" | "title" | "repository" | "headBranch" | "author">,
+  query: string,
+): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.length === 0) return true;
   return `#${entry.number} ${entry.title} ${entry.repository} ${entry.headBranch} ${entry.author?.login ?? ""}`

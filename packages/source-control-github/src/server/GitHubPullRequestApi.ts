@@ -852,7 +852,6 @@ const SEARCH_REPOSITORY = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const REVIEW_REQUEST_SEARCH = "is:pr is:open archived:false review-requested:@me sort:updated-desc";
 
 /** Unquoted repo: values must not inject qualifiers. */
-
 function searchQuery(input: {
   readonly repositories: ReadonlyArray<string>;
   readonly state: PullRequestListState;

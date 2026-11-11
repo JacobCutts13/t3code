@@ -1,5 +1,3 @@
-import type { ReviewRequestSummary } from "@t3tools/contracts";
-
 /** Cockpit's read-only review session: team review, print the comment, post only on "post". */
 export function buildReviewPrompt(pr: { readonly repository: string; readonly number: number }) {
   const { repository: repo, number } = pr;
@@ -24,15 +22,5 @@ export function buildReviewPrompt(pr: { readonly repository: string; readonly nu
     `Print the full comment body labelled "REVIEW COMMENT:" so I can read it — wait for me to type "post", then use the Write tool to write the body to /tmp/pr-review-comment.txt and submit with:\n` +
     `  gh pr review ${number} --repo ${repo} --comment --body-file /tmp/pr-review-comment.txt\n\n` +
     `IMPORTANT: Do NOT edit any source files. Do NOT commit or push anything. Read-only review only.`
-  );
-}
-
-export function matchesReviewRequestQuery(pr: ReviewRequestSummary, query: string): boolean {
-  const normalized = query.trim().toLowerCase();
-  return (
-    normalized.length === 0 ||
-    `#${pr.number} ${pr.title} ${pr.repository} ${pr.headBranch} ${pr.author ?? ""}`
-      .toLowerCase()
-      .includes(normalized)
   );
 }

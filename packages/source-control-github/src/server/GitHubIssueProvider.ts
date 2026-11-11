@@ -252,7 +252,7 @@ export const make = Effect.gen(function* () {
             detail:
               cause._tag === "GitHubPullRequestReadError"
                 ? "GitHub sent review requests in a shape this server cannot read."
-                : fromGitHubApiError(cause, "No pull requests found.").detail,
+                : fromGitHubApiError(cause, "GitHub could not search for review requests.").detail,
             cause,
           }),
       ),
@@ -264,7 +264,7 @@ export const make = Effect.gen(function* () {
         number: item.number,
         title: item.title,
         url: item.url,
-        author: item.author?.login ?? null,
+        author: item.author,
         isDraft: item.isDraft,
         headBranch: item.headBranch,
         updatedAt: item.updatedAt,
