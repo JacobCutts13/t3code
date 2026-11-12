@@ -306,18 +306,10 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     };
   },
   restartForLiveCode: () => ipcRenderer.invoke(IpcChannels.LIVE_RESTART_CHANNEL),
-  getKeepAwakeState: () => ipcRenderer.invoke(IpcChannels.KEEP_AWAKE_GET_STATE_CHANNEL),
-  onKeepAwakeState: (listener) => {
-    const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown) => {
-      if (typeof state !== "object" || state === null) return;
-      listener(state as Parameters<typeof listener>[0]);
-    };
-
-    ipcRenderer.on(IpcChannels.KEEP_AWAKE_STATE_CHANNEL, wrappedListener);
-    return () => {
-      ipcRenderer.removeListener(IpcChannels.KEEP_AWAKE_STATE_CHANNEL, wrappedListener);
-    };
-  },
+  getKeepAwake: () =>
+    clientPlatform === "darwin"
+      ? ipcRenderer.invoke(IpcChannels.KEEP_AWAKE_GET_CHANNEL)
+      : Promise.resolve(null),
   setKeepAwake: (on) => ipcRenderer.invoke(IpcChannels.KEEP_AWAKE_SET_CHANNEL, on),
   cliCommand: {
     getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),

@@ -1,23 +1,36 @@
-import { useAtomValue } from "@effect/atom-react";
-import type { DesktopKeepAwakeState } from "@t3tools/contracts";
-import * as AsyncResult from "effect/reactivity/AsyncResult";
+import { useSyncExternalStore } from "react";
 
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
-import { desktopBridgeStateAtom } from "./desktopBridgeState";
 
-const keepAwakeStateAtom = desktopBridgeStateAtom<DesktopKeepAwakeState>(
-  "desktop:keep-awake-state",
-  (bridge) => ({ getState: bridge.getKeepAwakeState, subscribe: bridge.onKeepAwakeState }),
-);
+// null until the desktop app answers, and forever off macOS desktop.
+let on: boolean | null = null;
+let busy = false;
+const listeners = new Set<() => void>();
 
-/** This Mac's keep-awake state; null off macOS desktop. */
-export function useKeepAwakeState(): DesktopKeepAwakeState | null {
-  return AsyncResult.getOrElse(useAtomValue(keepAwakeStateAtom), () => null);
+const update = (next: boolean | null) => {
+  on = next;
+  for (const listener of listeners) listener();
+};
+
+function subscribe(listener: () => void) {
+  if (listeners.size === 0) {
+    window.desktopBridge?.getKeepAwake?.().then(update, () => update(null));
+  }
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-export async function setKeepAwake(on: boolean): Promise<void> {
+/** Whether `pmset disablesleep` is on; null off macOS desktop. */
+export function useKeepAwake(): boolean | null {
+  return useSyncExternalStore(subscribe, () => on);
+}
+
+export async function setKeepAwake(next: boolean): Promise<void> {
+  const set = window.desktopBridge?.setKeepAwake;
+  if (!set || busy) return;
+  busy = true;
   try {
-    await window.desktopBridge?.setKeepAwake?.(on);
+    update(await set(next));
   } catch (error) {
     toastManager.add(
       stackedThreadToast({
@@ -26,5 +39,7 @@ export async function setKeepAwake(on: boolean): Promise<void> {
         description: error instanceof Error ? error.message : "pmset failed.",
       }),
     );
+  } finally {
+    busy = false;
   }
 }

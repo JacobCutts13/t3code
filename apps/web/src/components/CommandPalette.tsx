@@ -81,7 +81,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
-import { setKeepAwake, useKeepAwakeState } from "../state/keepAwake";
+import { setKeepAwake, useKeepAwake } from "../state/keepAwake";
 import { CreateProjectFromRepos } from "./CreateProjectFromRepos";
 import { openCreateProjectFromRepos } from "./createProjectFromReposStore";
 import {
@@ -699,7 +699,7 @@ function OpenCommandPaletteDialog(props: {
   const canTriage =
     useAtomValue(serverEnvironment.prepareTriage.permissionAtom(triageEnvironmentId)) &&
     supportsTriage(triageEnvironmentId);
-  const keepAwake = useKeepAwakeState();
+  const keepAwake = useKeepAwake();
   const currentProject = resolveCommandPaletteProject(
     projectByKey,
     currentProjectEnvironmentId,
@@ -1345,16 +1345,13 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
-  if (keepAwake !== null && !keepAwake.pending) {
-    const turnOn = !keepAwake.on;
+  if (keepAwake !== null) {
+    const turnOn = !keepAwake;
     actionItems.push({
       kind: "action",
       value: "action:keep-awake",
-      searchTerms: ["keep awake", "sleep", "caffeinate", "pmset", "lid", "insomnia"],
+      searchTerms: ["keep awake", "sleep", "caffeinate"],
       title: turnOn ? "Keep this Mac awake" : "Let this Mac sleep",
-      description: turnOn
-        ? "Stops sleep, even with the lid closed. Stays on after T3 quits"
-        : "Sleep settings return to normal",
       icon: <CoffeeIcon className={ITEM_ICON_CLASS} />,
       run: () => setKeepAwake(turnOn),
     });

@@ -121,11 +121,10 @@ the protection is in place, and `t3 service protect --undo` removes it.
 
 ## Keep your Mac awake
 
-In the macOS desktop app, the coffee cup at the bottom of the sidebar, or
-**Keep this Mac awake** in the command palette, stops the Mac from sleeping,
-even with the lid closed. macOS asks for your administrator password to change
-it. It stays on after T3 Code quits, so turn it off the same way when you are
-done.
+In the macOS desktop app, the coffee cup at the bottom of the sidebar (or
+**Keep this Mac awake** in the command palette) stops the Mac sleeping, even
+with the lid closed. It asks for your password, and stays on after T3 Code
+quits until you turn it off.
 
 ## Troubleshooting
 
