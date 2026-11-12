@@ -1180,6 +1180,7 @@ export function PullRequestsPage() {
         entries={shownReviewRequests}
         truncated={reviewRequests.truncated}
         error={reviewRequests.error}
+        selected={selected}
         onOpen={selectEntry}
       />
     ) : null;

@@ -8,7 +8,7 @@ import type {
 } from "@t3tools/contracts";
 import { visibleThreadPullRequests } from "@t3tools/client-runtime/thread-pull-requests";
 import * as Schema from "effect/Schema";
-import { ExternalLinkIcon, EyeIcon } from "lucide-react";
+import { ChevronDownIcon, MessageSquareIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useDispatchIssue } from "~/hooks/useDispatchIssue";
@@ -20,8 +20,8 @@ import { useEnvironmentQuery } from "~/state/query";
 import { buildThreadRouteParams } from "~/threadRoutes";
 
 import { IssueModelPicker } from "../issues/IssueModelPicker";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Group, GroupSeparator } from "../ui/group";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Spinner } from "../ui/spinner";
 import { PullRequestGroupHeader } from "./PullRequestListGroups";
@@ -56,6 +56,12 @@ export function PullRequestReviewRequests(props: {
   readonly entries: ReadonlyArray<ReviewRequestSummary>;
   readonly truncated: boolean;
   readonly error: string | null;
+  /** The pull request open in the detail panel, highlighted like the main list's selection. */
+  readonly selected: {
+    readonly repository: string;
+    readonly host: string | undefined;
+    readonly number: number;
+  } | null;
   readonly onOpen: (target: PullRequestRowTarget) => void;
 }) {
   const { environmentId } = props;
@@ -95,7 +101,12 @@ export function PullRequestReviewRequests(props: {
 
   const review = async (pr: ReviewRequestSummary, key: string) => {
     const project = projectOf(pr);
-    if (project === undefined || dispatchingKeys.has(key)) return;
+    // Without a project there is nowhere to check out the PR, so ask for one instead.
+    if (project === undefined) {
+      setSelectedKey(key);
+      return;
+    }
+    if (dispatchingKeys.has(key)) return;
     setDispatchingKeys((current) => new Set(current).add(key));
     // Reports its own failures and never rejects.
     await dispatchReview(pr, project, picked);
@@ -103,6 +114,22 @@ export function PullRequestReviewRequests(props: {
       const next = new Set(current);
       next.delete(key);
       return next;
+    });
+  };
+
+  /** The PR's detail panel when its repository is a project, else the PR on GitHub. */
+  const openPullRequest = (pr: ReviewRequestSummary) => {
+    const ownProject = projectFor(pr);
+    if (ownProject === undefined) {
+      window.open(pr.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    props.onOpen({
+      environmentId,
+      projectId: ownProject.id,
+      host: pr.host,
+      repository: pr.repository,
+      number: pr.number,
     });
   };
 
@@ -117,138 +144,145 @@ export function PullRequestReviewRequests(props: {
           GitHub: {props.error}
         </p>
       )}
-      <ul>
+      {/* Rows share one grid so the time, thread link and Review columns line up on every row. */}
+      <ul className="grid grid-cols-[minmax(0,1fr)_auto_auto]">
         {entries.map((pr) => {
           const key = reviewRequestKey(pr);
           const project = projectOf(pr);
-          const selected = key === selectedKey;
+          const configuring = key === selectedKey;
           const dispatching = dispatchingKeys.has(key);
-          const blocked =
-            connectionBlocked ??
-            (project === undefined ? `Add ${pr.repository} as a project, or choose one` : null);
           const threadId = linkedThreads.get(key);
-          const ownProject = projectFor(pr);
+          const open =
+            props.selected !== null &&
+            props.selected.number === pr.number &&
+            props.selected.repository.toLowerCase() === pr.repository.toLowerCase() &&
+            (props.selected.host ?? pr.host).toLowerCase() === pr.host.toLowerCase();
           return (
-            <li key={key} className={cn("rounded-md", !selected && "hover:bg-accent/60")}>
-              <div className="flex items-center gap-2 pr-3">
-                <button
-                  type="button"
-                  aria-expanded={selected}
-                  className={cn(
-                    PULL_REQUEST_ROW_CLASS,
-                    "min-w-0 flex-1 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
-                  )}
-                  onClick={() => setSelectedKey(selected ? null : key)}
-                >
-                  <PullRequestRowGlyph
-                    state="open"
-                    isDraft={pr.isDraft}
-                    className="mt-0.75 self-start"
-                  />
-                  <PullRequestRowLines
-                    number={<span className={PULL_REQUEST_ROW_NUMBER_CLASS}>#{pr.number}</span>}
-                    title={pr.title}
-                    meta={
-                      <>
-                        <PullRequestRowAuthor actor={pr.author} className="min-w-3.5 max-w-40" />
-                        <span className="truncate">{pr.repository}</span>
-                      </>
-                    }
-                    updatedAt={pr.updatedAt}
-                  />
-                </button>
+            <li
+              key={key}
+              className={cn(
+                "col-span-3 grid grid-cols-subgrid items-center rounded-md",
+                open ? "bg-accent" : "hover:bg-accent/60",
+              )}
+            >
+              <button
+                type="button"
+                aria-current={open ? "true" : undefined}
+                className={cn(
+                  PULL_REQUEST_ROW_CLASS,
+                  "min-w-0 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+                )}
+                onClick={() => openPullRequest(pr)}
+              >
+                <PullRequestRowGlyph
+                  state="open"
+                  isDraft={pr.isDraft}
+                  className="mt-0.75 self-start"
+                />
+                <PullRequestRowLines
+                  number={<span className={PULL_REQUEST_ROW_NUMBER_CLASS}>#{pr.number}</span>}
+                  title={pr.title}
+                  meta={
+                    <>
+                      <PullRequestRowAuthor actor={pr.author} className="min-w-3.5 max-w-40" />
+                      <span className="truncate">{pr.repository}</span>
+                    </>
+                  }
+                  updatedAt={pr.updatedAt}
+                />
+              </button>
+              <div className="flex justify-end pl-2">
                 {threadId === undefined ? null : (
-                  <Badge
-                    variant="info"
-                    size="sm"
+                  <Button
+                    size="compact"
+                    variant="ghost"
+                    aria-label={`Open the review thread for #${pr.number}`}
+                    title={`Open the review thread for #${pr.number}`}
                     render={
                       <Link
                         to="/$environmentId/$threadId"
                         params={buildThreadRouteParams(scopeThreadRef(environmentId, threadId))}
                       />
                     }
-                    title="A thread is linked to this pull request"
                   >
-                    Dispatched
-                  </Badge>
+                    <MessageSquareIcon />
+                  </Button>
                 )}
-                <Button
-                  type="button"
-                  size="compact"
-                  variant="outline"
-                  disabled={dispatching || blocked !== null}
-                  title={blocked ?? "Start a read-only review agent on this pull request"}
-                  onClick={() => void review(pr, key)}
-                >
-                  {dispatching ? <Spinner /> : <EyeIcon />}
-                  Review
-                </Button>
               </div>
-              {selected ? (
-                <div className="flex items-center gap-2 px-3 pb-2.5">
-                  <div className="min-w-0 flex-1">
-                    <Select
-                      value={project?.id ?? null}
-                      disabled={dispatching}
-                      onValueChange={(value) => {
-                        if (typeof value !== "string") return;
-                        setPickedProjects((current) => ({ ...current, [pickKey(pr)]: value }));
-                      }}
-                    >
-                      <SelectTrigger size="sm" className="min-w-0" aria-label="Project">
-                        <SelectValue>
-                          {(value: string | null) =>
-                            projects.find((candidate) => candidate.id === value)?.title ??
-                            "Choose a project"
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectPopup>
-                        {projects.map((candidate) => (
-                          <SelectItem key={candidate.id} value={candidate.id}>
-                            {candidate.title}
-                          </SelectItem>
-                        ))}
-                      </SelectPopup>
-                    </Select>
-                  </div>
-                  <div className="shrink-0">
-                    <IssueModelPicker
-                      environmentId={environmentId}
-                      projectId={project?.id ?? null}
-                      value={project === undefined ? picked : modelFor(project, picked)}
-                      disabled={dispatching}
-                      onChange={setPicked}
-                    />
-                  </div>
-                  {ownProject === undefined ? (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Open on GitHub"
-                      title="Open on GitHub"
-                      render={<a href={pr.url} target="_blank" rel="noreferrer" />}
-                    >
-                      <ExternalLinkIcon />
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="compact"
-                      variant="ghost"
-                      onClick={() =>
-                        props.onOpen({
-                          environmentId,
-                          projectId: ownProject.id,
-                          host: pr.host,
-                          repository: pr.repository,
-                          number: pr.number,
-                        })
-                      }
-                    >
-                      Open
-                    </Button>
-                  )}
+              <div className="pr-3 pl-2">
+                <Group aria-label={`Review #${pr.number}`}>
+                  <Button
+                    type="button"
+                    size="compact"
+                    variant="outline"
+                    disabled={dispatching || connectionBlocked !== null}
+                    title={
+                      connectionBlocked ??
+                      (project === undefined
+                        ? `Choose a project to check out ${pr.repository}`
+                        : `Start a read-only review agent in ${project.title}`)
+                    }
+                    onClick={() => void review(pr, key)}
+                  >
+                    {dispatching ? <Spinner /> : null}
+                    Review
+                  </Button>
+                  <GroupSeparator />
+                  <Button
+                    type="button"
+                    size="compact"
+                    variant="outline"
+                    aria-label="Choose the project and model for this review"
+                    aria-expanded={configuring}
+                    disabled={dispatching}
+                    onClick={() => setSelectedKey(configuring ? null : key)}
+                  >
+                    <ChevronDownIcon />
+                  </Button>
+                </Group>
+              </div>
+              {configuring ? (
+                <div className="col-span-3 flex items-center justify-end gap-2 px-3 pb-2.5">
+                  <Select
+                    value={project?.id ?? null}
+                    disabled={dispatching}
+                    onValueChange={(value) => {
+                      if (typeof value !== "string") return;
+                      setPickedProjects((current) => ({ ...current, [pickKey(pr)]: value }));
+                    }}
+                  >
+                    <SelectTrigger size="sm" className="w-auto max-w-60" aria-label="Project">
+                      <SelectValue>
+                        {(value: string | null) =>
+                          projects.find((candidate) => candidate.id === value)?.title ??
+                          "Choose a project"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectPopup>
+                      {projects.map((candidate) => (
+                        <SelectItem key={candidate.id} value={candidate.id}>
+                          {candidate.title}
+                        </SelectItem>
+                      ))}
+                    </SelectPopup>
+                  </Select>
+                  <IssueModelPicker
+                    environmentId={environmentId}
+                    projectId={project?.id ?? null}
+                    value={project === undefined ? picked : modelFor(project, picked)}
+                    disabled={dispatching}
+                    onChange={setPicked}
+                  />
+                  <Button
+                    type="button"
+                    size="compact"
+                    disabled={dispatching || project === undefined || connectionBlocked !== null}
+                    onClick={() => void review(pr, key)}
+                  >
+                    {dispatching ? <Spinner /> : null}
+                    Start review
+                  </Button>
                 </div>
               ) : null}
             </li>
