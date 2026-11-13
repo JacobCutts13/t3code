@@ -76,7 +76,12 @@ import {
   type PullRequestsSearch,
 } from "./usePullRequestListView";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
-import { PullRequestReviewRequests, useReviewRequests } from "./PullRequestReviewRequests";
+import {
+  PullRequestReviewDispatchBar,
+  PullRequestReviewRequests,
+  useReviewDispatchState,
+  useReviewRequests,
+} from "./PullRequestReviewRequests";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
 import { type PullRequestRowTarget } from "./PullRequestRow";
@@ -700,6 +705,7 @@ export function PullRequestsPage() {
     (search.host === undefined || search.host.toLowerCase() === "github.com") &&
     !hasLocalFilters;
   const reviewRequests = useReviewRequests(reviewRequestsShown ? reviewEnvironmentId : null);
+  const reviewDispatchState = useReviewDispatchState();
   const shownReviewRequests = reviewRequestsShown
     ? reviewRequests.entries.filter((pr) => matchesPullRequestQuery(pr, typedParsed.text))
     : [];
@@ -1169,6 +1175,16 @@ export function PullRequestsPage() {
       {panelToggleControls}
     </div>
   );
+  // The panel's pull request when it asks for the viewer's review, to offer the dispatch bar.
+  const panelReviewRequest =
+    renderedPullRequestSurface === null
+      ? undefined
+      : reviewRequests.entries.find(
+          (pr) =>
+            pr.number === renderedPullRequestSurface.number &&
+            pr.repository.toLowerCase() === renderedPullRequestSurface.repository.toLowerCase() &&
+            pr.host.toLowerCase() === (renderedPullRequestSurface.host ?? pr.host).toLowerCase(),
+        );
   const carriedToNothing =
     shownCount === 0 &&
     typedQuery.length === 0 &&
@@ -1177,6 +1193,7 @@ export function PullRequestsPage() {
     reviewEnvironmentId !== null && reviewRequestsShown ? (
       <PullRequestReviewRequests
         environmentId={reviewEnvironmentId}
+        state={reviewDispatchState}
         entries={shownReviewRequests}
         truncated={reviewRequests.truncated}
         error={reviewRequests.error}
@@ -1554,6 +1571,13 @@ export function PullRequestsPage() {
             deviceAvailable={false}
             pullRequestStatusSeeds={listedPullRequestTabStatuses}
           >
+            {reviewEnvironmentId === panelEnvironmentId && panelReviewRequest !== undefined ? (
+              <PullRequestReviewDispatchBar
+                environmentId={panelEnvironmentId}
+                state={reviewDispatchState}
+                pr={panelReviewRequest}
+              />
+            ) : null}
             <PullRequestDetailPanel
               getShortcutContext={getShortcutContext}
               shortcutsEnabled={activePullRequestSurface?.id === renderedPullRequestSurface.id}
