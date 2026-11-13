@@ -1,7 +1,8 @@
 import { CoffeeIcon } from "lucide-react";
 
 import { setKeepAwake, useKeepAwake } from "../../state/keepAwake";
-import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
+import { SidebarMenuItem } from "../ui/sidebar";
+import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export function SidebarKeepAwakeToggle() {
@@ -12,15 +13,14 @@ export function SidebarKeepAwakeToggle() {
       <Tooltip>
         <TooltipTrigger
           render={
-            <SidebarMenuButton
+            <Toggle
               aria-label="Keep this Mac awake"
-              aria-pressed={on}
-              isActive={on}
-              onClick={() => void setKeepAwake(!on)}
-              size="icon"
+              pressed={on}
+              onPressedChange={(next) => void setKeepAwake(next)}
+              variant="ghost"
             >
-              <CoffeeIcon />
-            </SidebarMenuButton>
+              <CoffeeIcon className="size-4" />
+            </Toggle>
           }
         />
         <TooltipPopup side="top">
