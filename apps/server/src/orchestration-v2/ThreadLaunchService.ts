@@ -442,8 +442,12 @@ const make = Effect.gen(function* () {
     // Repos the project adds to every new worktree thread; reused worktrees already have theirs.
     const nestedRepos =
       input.workspaceStrategy.type === "worktree"
-        ? resolveProjectSettings(yield* serverSettings.getSettings, input.projectId).settings
-            .nestedRepos
+        ? yield* serverSettings.getSettings.pipe(
+            Effect.map(
+              (settings) => resolveProjectSettings(settings, input.projectId).settings.nestedRepos,
+            ),
+            Effect.orElseSucceed(() => []),
+          )
         : [];
     const createdNested: NestedRepoWorktrees.CreatedNestedWorktree[] = [];
     // Stop background renames before forgetting worktrees; completed renames record them again.
