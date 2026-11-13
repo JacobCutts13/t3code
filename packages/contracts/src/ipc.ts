@@ -1170,6 +1170,10 @@ export interface DesktopBridge {
   getLiveRestartState?: () => Promise<DesktopLiveRestartState | null>;
   onLiveRestartState?: (listener: (state: DesktopLiveRestartState) => void) => () => void;
   restartForLiveCode?: () => Promise<void>;
+  /** `pmset disablesleep`; null off macOS. Optional: an older preload lacks it. */
+  getKeepAwake?: () => Promise<boolean | null>;
+  /** Resolves with the re-read value, unchanged when the password dialog is cancelled. */
+  setKeepAwake?: (on: boolean) => Promise<boolean>;
   cliCommand: {
     getState: () => Promise<DesktopCliCommandState>;
     install: () => Promise<DesktopCliCommandState>;
