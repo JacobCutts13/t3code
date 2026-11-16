@@ -213,6 +213,7 @@ describe("ranking what a search found", () => {
       authored: undefined,
       reviewing: undefined,
       partitionsWanted: false,
+      listedAbove: new Set(),
     });
 
     expect(entries.map((entry) => entry.number)).toEqual([1, 2, 3]);
@@ -400,6 +401,7 @@ describe("partitioning with the hosts' own priority reads", () => {
     }) =>
       pullRequestGroups({
         known: [mine, requested, other],
+        baseline: undefined,
         providers: [],
         viewers: VIEWERS,
         localFilters: {},
