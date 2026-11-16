@@ -9,6 +9,7 @@ import {
   resolveDevProtocolClient,
   resolveElectronLaunchCommand,
 } from "./electron-launcher.mjs";
+import { acquireLauncherLock } from "./launcher-lock.mjs";
 import { makeLiveRestartTracker } from "./live-restart-state.mjs";
 import { waitForResources } from "./wait-for-resources.mjs";
 
@@ -328,6 +329,28 @@ async function shutdown(exitCode) {
 
   process.exit(exitCode);
 }
+
+const launcherLock = acquireLauncherLock({
+  file: NodePath.join(
+    NodeOS.tmpdir(),
+    `t3code-live-launcher-${NodeCrypto.createHash("sha1").update(desktopDir).digest("hex").slice(0, 12)}.json`,
+  ),
+  pid: process.pid,
+  claim: liveMode,
+  isLauncher: (pid) => {
+    const result = NodeChildProcess.spawnSync("ps", ["-o", "command=", "-p", String(pid)], {
+      encoding: "utf8",
+    });
+    return result.status === 0 && result.stdout.includes("dev-electron.mjs");
+  },
+});
+if (!launcherLock.acquired) {
+  console.error(
+    `[launcher] a live launcher (pid ${launcherLock.holder}) already runs this checkout; not starting another, which would kill its app.`,
+  );
+  process.exit(1);
+}
+process.once("exit", launcherLock.release);
 
 startWatchers();
 cleanupStaleDevApps();
