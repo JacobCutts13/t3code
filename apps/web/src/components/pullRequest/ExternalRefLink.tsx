@@ -4,10 +4,15 @@ import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { cn } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
 
+import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
 
-const open = (url: string) => void readLocalApi()?.shell.openExternal(url);
+export function openExternalUrl(url: string): void {
+  void readLocalApi()
+    ?.shell.openExternal(url)
+    .catch(() => toastManager.add({ type: "error", title: "Could not open the link" }));
+}
 
 /**
  * A pull request's or issue's `#123 ↗` reference that opens it on its host, with a copy/open
@@ -34,7 +39,7 @@ export function ExternalRefLink({
   const onClick = (event: ReactMouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    open(url);
+    openExternalUrl(url);
   };
   const handlers = {
     onClick,
@@ -91,24 +96,23 @@ export function ExternalRefLink({
 
 /** The repository or tracker scope beside an {@link ExternalRefLink}, opening its page when known. */
 export function ExternalRefScope({ scope, url }: { scope: string; url: string | null }) {
+  if (url === null) {
+    return <span className="min-w-0 truncate font-medium text-muted-foreground">{scope}</span>;
+  }
   return (
     <Tooltip>
       <TooltipTrigger
         render={
-          url ? (
-            <button
-              type="button"
-              onClick={() => open(url)}
-              className="min-w-0 cursor-pointer truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-            >
-              {scope}
-            </button>
-          ) : (
-            <span className="min-w-0 truncate font-medium text-muted-foreground">{scope}</span>
-          )
+          <button
+            type="button"
+            onClick={() => openExternalUrl(url)}
+            className="min-w-0 cursor-pointer truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            {scope}
+          </button>
         }
       />
-      <TooltipPopup side="top">{url ? `Open ${scope} repository` : scope}</TooltipPopup>
+      <TooltipPopup side="top">Open {scope} repository</TooltipPopup>
     </Tooltip>
   );
 }

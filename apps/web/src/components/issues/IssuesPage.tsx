@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import {
   type EnvironmentId,
   type IssueComment,
@@ -32,6 +33,7 @@ import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 
 import ChatMarkdown from "../ChatMarkdown";
 import { ExternalRefLink, ExternalRefScope } from "../pullRequest/ExternalRefLink";
+import { openOnHostLabel } from "../pullRequest/pullRequestLinkContextMenu";
 import { RelativeTime } from "../RelativeTime";
 import { IssueModelPicker } from "./IssueModelPicker";
 import {
@@ -68,6 +70,8 @@ const SOURCES: ReadonlyArray<{ readonly value: IssueSource; readonly label: stri
   { value: "github", label: "GitHub" },
   { value: "linear", label: "Linear" },
 ];
+
+const OPEN_ON_GITHUB = openOnHostLabel(sourceControlClients.get("github"));
 
 const PRIORITY_LABELS = ["", "Urgent", "High", "Medium", "Low"] as const;
 
@@ -174,7 +178,7 @@ function GitHubIssueMeta(props: { readonly issue: IssueSummary }) {
           inRow
           url={issue.url}
           label={`#${issue.number}`}
-          openLabel="Open on GitHub"
+          openLabel={OPEN_ON_GITHUB}
           ariaLabel={`Open ${issue.repository}#${issue.number} on GitHub`}
         />
       </span>
@@ -327,7 +331,7 @@ function IssueDetailPane(props: {
           <ExternalRefLink
             url={issue.url}
             label={`#${issue.number}`}
-            openLabel="Open on GitHub"
+            openLabel={OPEN_ON_GITHUB}
             ariaLabel={`Open ${issue.repository}#${issue.number} on GitHub`}
             className="font-medium text-foreground"
           />
