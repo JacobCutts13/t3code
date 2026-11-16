@@ -41,6 +41,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
+import { SidebarKeepAwakeToggle } from "./SidebarKeepAwakeToggle";
 import { SidebarLiveRestartPill } from "./SidebarLiveRestartPill";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
@@ -299,6 +300,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
       )}
       <SidebarThreadUndoNotice />
       <SidebarUpdatePill />
+      <SidebarKeepAwakeToggle />
       {/* After the update pill: it is always present on desktop and owns the ml-auto push. */}
       <SidebarLiveRestartPill />
     </SidebarMenu>
