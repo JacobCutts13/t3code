@@ -5353,6 +5353,66 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
     }),
   );
 
+  it.effect(
+    "gives each review its own worktree on the PR head, leaving the author's checkout",
+    () =>
+      Effect.gen(function* () {
+        const repoDir = yield* makeTempDir("t3code-git-manager-");
+        yield* initRepo(repoDir);
+        const remoteDir = yield* createBareRemote();
+        yield* runGit(repoDir, ["remote", "add", "origin", remoteDir]);
+        yield* runGit(repoDir, ["push", "-u", "origin", "main"]);
+        yield* runGit(repoDir, ["checkout", "-b", "feature/pr-reviewed"]);
+        NodeFS.writeFileSync(NodePath.join(repoDir, "reviewed.txt"), "reviewed\n");
+        yield* runGit(repoDir, ["add", "reviewed.txt"]);
+        yield* runGit(repoDir, ["commit", "-m", "PR under review"]);
+        yield* runGit(repoDir, ["push", "-u", "origin", "feature/pr-reviewed"]);
+        const head = (yield* runGit(repoDir, ["rev-parse", "HEAD"])).stdout.trim();
+        NodeFS.writeFileSync(NodePath.join(repoDir, "in-progress.txt"), "mine\n");
+
+        const { manager } = yield* makeManager({
+          providerScenario: {
+            pullRequest: {
+              number: 86,
+              title: "Reviewed PR",
+              url: "https://github.com/pingdotgg/codething-mvp/pull/86",
+              baseRefName: "main",
+              headRefName: "feature/pr-reviewed",
+              state: "open",
+              headSha: head,
+              isCrossRepository: false,
+              headRepositoryNameWithOwner: "pingdotgg/codething-mvp",
+              headRepositoryOwnerLogin: "pingdotgg",
+            },
+            repositoryCloneUrls: {
+              "pingdotgg/codething-mvp": { url: remoteDir, sshUrl: remoteDir },
+            },
+          },
+        });
+
+        const review = () =>
+          preparePullRequestThread(manager, { cwd: repoDir, reference: "86", mode: "review" });
+        const first = yield* review();
+        const second = yield* review();
+
+        expect(first.worktreePath).not.toBeNull();
+        expect(second.worktreePath).not.toBe(first.worktreePath);
+        expect(second.branch).not.toBe(first.branch);
+        for (const result of [first, second]) {
+          expect(result.isOnPullRequestHead).toBe(true);
+          expect((yield* runGit(result.worktreePath!, ["rev-parse", "HEAD"])).stdout.trim()).toBe(
+            head,
+          );
+        }
+        expect((yield* runGit(repoDir, ["branch", "--show-current"])).stdout.trim()).toBe(
+          "feature/pr-reviewed",
+        );
+        expect(NodeFS.readFileSync(NodePath.join(repoDir, "in-progress.txt"), "utf8")).toBe(
+          "mine\n",
+        );
+      }),
+  );
+
   it.effect("resets a clean reused PR worktree onto a force-pushed pull request head", () =>
     Effect.gen(function* () {
       const repoDir = yield* makeTempDir("t3code-git-manager-");

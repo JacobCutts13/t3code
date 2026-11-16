@@ -2940,6 +2940,32 @@ export const make = Effect.gen(function* () {
       const localPullRequestBranch =
         resolvePullRequestWorktreeLocalBranchName(pullRequestWithRemoteInfo);
 
+      if (input.mode === "review") {
+        const reviewId = (yield* randomUUIDv4(input.cwd)).slice(0, 8);
+        const reviewBranch = `t3code/review/pr-${pullRequest.number}-${reviewId}`;
+        yield* materializePullRequestHeadBranch(input.cwd, pullRequestWithRemoteInfo, reviewBranch);
+        const worktree = yield* gitCore.createWorktree(
+          { cwd: input.cwd, refName: reviewBranch, path: null },
+          {
+            ...(yield* readWorktreeCreationSettings),
+            submodules: yield* projectSettingsFor(input).pipe(
+              Effect.map(({ settings }) => settings.worktreeSubmodules),
+              Effect.orElseSucceed(() => null),
+            ),
+          },
+        );
+        yield* maybeRunSetupScript(worktree.worktree.path);
+        return {
+          pullRequest,
+          branch: worktree.worktree.refName,
+          worktreePath: worktree.worktree.path,
+          isOnPullRequestHead: yield* moveToPullRequestHead(
+            worktree.worktree.path,
+            pullRequestSummary.headSha,
+          ),
+        };
+      }
+
       // Git refuses to move checked-out branches; advance reused checkouts from inside their worktree.
       const reuseExistingWorktree = Effect.fn("reuseExistingWorktree")(function* (
         worktreePath: string,

@@ -210,7 +210,7 @@ export function pullRequestEntryViewer(
   return normalize(viewers[pullRequestViewerKey(entry)] ?? viewers[entry.host]);
 }
 
-function isAuthoredByViewer(entry: ScopedEntry, viewers: PullRequestViewers): boolean {
+export function isAuthoredByViewer(entry: ScopedEntry, viewers: PullRequestViewers): boolean {
   const viewer = pullRequestEntryViewer(entry, viewers);
   return viewer !== null && normalize(entry.author?.login) === viewer;
 }

@@ -117,7 +117,7 @@ export function PullRequestReviewRequests(props: {
   readonly onOpen: (target: PullRequestRowTarget) => void;
 }) {
   const { environmentId, state } = props;
-  const { projectOf, blockedReason, review } = useReviewDispatch(environmentId, state);
+  const { projectOf } = useReviewDispatch(environmentId, state);
   // The thread each pull request is linked to; a review dispatch links its PR to the new thread.
   const linkedThreads = new Map<string, ThreadId>();
   for (const thread of useThreadShells()) {
@@ -161,8 +161,6 @@ export function PullRequestReviewRequests(props: {
       <ul className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center">
         {entries.map((pr) => {
           const key = reviewRequestKey(pr);
-          const dispatching = state.dispatchingKeys.has(key);
-          const blocked = blockedReason(pr);
           const threadId = linkedThreads.get(key);
           const open =
             props.selected !== null &&
@@ -221,17 +219,7 @@ export function PullRequestReviewRequests(props: {
                 )}
               </div>
               <div className="pr-3 pl-2">
-                <Button
-                  type="button"
-                  size="compact"
-                  variant="outline"
-                  disabled={dispatching || blocked !== null}
-                  title={blocked ?? "Start a read-only review agent on this pull request"}
-                  onClick={() => void review(pr)}
-                >
-                  {dispatching ? <Spinner /> : <PlayIcon />}
-                  Review
-                </Button>
+                <PullRequestReviewButton environmentId={environmentId} state={state} pr={pr} />
               </div>
             </li>
           );
@@ -243,6 +231,30 @@ export function PullRequestReviewRequests(props: {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** Starts a read-only review agent in its own worktree on the pull request's head. */
+export function PullRequestReviewButton(props: {
+  readonly environmentId: EnvironmentId;
+  readonly state: ReviewDispatchState;
+  readonly pr: ReviewRequestSummary;
+}) {
+  const { blockedReason, review } = useReviewDispatch(props.environmentId, props.state);
+  const dispatching = props.state.dispatchingKeys.has(reviewRequestKey(props.pr));
+  const blocked = blockedReason(props.pr);
+  return (
+    <Button
+      type="button"
+      size="compact"
+      variant="outline"
+      disabled={dispatching || blocked !== null}
+      title={blocked ?? "Start a read-only review agent on this pull request"}
+      onClick={() => void review(props.pr)}
+    >
+      {dispatching ? <Spinner /> : <PlayIcon />}
+      Review
+    </Button>
   );
 }
 

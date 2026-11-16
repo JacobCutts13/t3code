@@ -341,7 +341,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     try {
       const prepared = await preparePullRequestThread({
         environmentId,
-        input: { cwd: project.workspaceRoot, reference: pr.url, mode: "worktree" },
+        input: { cwd: project.workspaceRoot, reference: pr.url, mode: "review" },
       });
       if (prepared._tag === "Failure") {
         return fail(

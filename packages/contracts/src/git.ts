@@ -52,7 +52,8 @@ const GitPrStepStatus = Schema.Literals(["created", "opened_existing", "skipped_
 const VcsStatusChangeRequestState = Schema.Literals(["open", "closed", "merged"]);
 const GitPullRequestReference = TrimmedNonEmptyStringSchema;
 const GitPullRequestState = Schema.Literals(["open", "closed", "merged"]);
-const GitPreparePullRequestThreadMode = Schema.Literals(["local", "worktree"]);
+// "review" checks the head out on a new branch in a new worktree, so reviews never share one.
+const GitPreparePullRequestThreadMode = Schema.Literals(["local", "worktree", "review"]);
 export const GitRunStackedActionToastRunAction = Schema.Struct({
   kind: GitStackedAction,
 });

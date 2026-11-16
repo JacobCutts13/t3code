@@ -15,6 +15,7 @@ import {
   PullRequestSpeedModeProvider,
   type PullRequestSpeedActionResult,
 } from "./PullRequestSpeedActions";
+import { PullRequestReviewButton, type ReviewDispatchState } from "./PullRequestReviewRequests";
 
 const GROUP_ICONS: Record<string, LucideIcon> = {
   authored: PenLineIcon,
@@ -68,6 +69,7 @@ export function PullRequestListGroups({
   closingKeys,
   sweepingKeys,
   onCloseSweepStart,
+  review,
 }: {
   groups: ReadonlyArray<PullRequestGroup<EnvironmentPullRequestEntry>>;
   /** Only when rows come from more than one server, so each says which. */
@@ -88,6 +90,11 @@ export function PullRequestListGroups({
   closingKeys: ReadonlySet<string>;
   sweepingKeys: ReadonlySet<string>;
   onCloseSweepStart: (entry: EnvironmentPullRequestEntry, event: PointerEvent) => void;
+  /** Rows that get a Review button, and the review state they share. */
+  review?: {
+    readonly state: ReviewDispatchState;
+    readonly offered: (entry: EnvironmentPullRequestEntry) => boolean;
+  };
 }) {
   // Every row mounts tooltips and actions; painting a first screenful before the rest keeps
   // opening the page from blocking on the whole list.
@@ -133,6 +140,15 @@ export function PullRequestListGroups({
                   closing={closingKeys.has(entryKey)}
                   sweeping={sweepingKeys.has(entryKey)}
                   onCloseSweepStart={onCloseSweepStart}
+                  trailing={
+                    review?.offered(entry) ? (
+                      <PullRequestReviewButton
+                        environmentId={entry.environmentId}
+                        state={review.state}
+                        pr={entry}
+                      />
+                    ) : undefined
+                  }
                 />
               );
             })}

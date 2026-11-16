@@ -48,6 +48,7 @@ import {
   largestPullRequestReadCount,
   reviewRequestKey,
   matchesPullRequestQuery,
+  isAuthoredByViewer,
 } from "./pullRequestList.logic";
 import {
   pullRequestListPreferences,
@@ -1175,16 +1176,31 @@ export function PullRequestsPage() {
       {panelToggleControls}
     </div>
   );
-  // The panel's pull request when it asks for the viewer's review, to offer the dispatch bar.
-  const panelReviewRequest =
+  // The review prompt drives the GitHub CLI, so only the viewer's own GitHub pull requests qualify.
+  const reviewableOwnPullRequest = (entry: EnvironmentPullRequestEntry) =>
+    entry.provider === "github" && entry.state === "open" && isAuthoredByViewer(entry, viewers);
+  const panelListEntry =
     renderedPullRequestSurface === null
       ? undefined
-      : reviewRequests.entries.find(
-          (pr) =>
-            pr.number === renderedPullRequestSurface.number &&
-            pr.repository.toLowerCase() === renderedPullRequestSurface.repository.toLowerCase() &&
-            pr.host.toLowerCase() === (renderedPullRequestSurface.host ?? pr.host).toLowerCase(),
-        );
+      : listedPullRequestsBySurface.get(pullRequestListEntryId(renderedPullRequestSurface));
+  // The panel's pull request when it asks for the viewer's review, or is their own, to offer the
+  // dispatch bar.
+  const panelReviewTarget =
+    renderedPullRequestSurface === null
+      ? undefined
+      : reviewEnvironmentId === panelEnvironmentId
+        ? reviewRequests.entries.find(
+            (pr) =>
+              pr.number === renderedPullRequestSurface.number &&
+              pr.repository.toLowerCase() === renderedPullRequestSurface.repository.toLowerCase() &&
+              pr.host.toLowerCase() === (renderedPullRequestSurface.host ?? pr.host).toLowerCase(),
+          )
+        : undefined;
+  const panelReviewable =
+    panelReviewTarget ??
+    (panelListEntry !== undefined && reviewableOwnPullRequest(panelListEntry)
+      ? panelListEntry
+      : undefined);
   const carriedToNothing =
     shownCount === 0 &&
     typedQuery.length === 0 &&
@@ -1255,6 +1271,7 @@ export function PullRequestsPage() {
           closingKeys={closingKeys}
           sweepingKeys={closeSweepKeys}
           onCloseSweepStart={startCloseSweep}
+          review={{ state: reviewDispatchState, offered: reviewableOwnPullRequest }}
         />
       )}
 
@@ -1571,13 +1588,13 @@ export function PullRequestsPage() {
             deviceAvailable={false}
             pullRequestStatusSeeds={listedPullRequestTabStatuses}
           >
-            {reviewEnvironmentId === panelEnvironmentId && panelReviewRequest !== undefined ? (
+            {panelReviewable === undefined ? null : (
               <PullRequestReviewDispatchBar
                 environmentId={panelEnvironmentId}
                 state={reviewDispatchState}
-                pr={panelReviewRequest}
+                pr={panelReviewable}
               />
-            ) : null}
+            )}
             <PullRequestDetailPanel
               getShortcutContext={getShortcutContext}
               shortcutsEnabled={activePullRequestSurface?.id === renderedPullRequestSurface.id}
