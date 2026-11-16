@@ -2089,7 +2089,7 @@ export const make = Effect.gen(function* () {
           q: REVIEW_REQUEST_SEARCH,
           first: PULL_REQUEST_SEARCH_MAX_ROWS,
           stacks: false,
-          stats: false,
+          stats: true,
         })
         .pipe(
           graphql({ cwd: "", host: input.host, operation: "searchReviewRequests" }),

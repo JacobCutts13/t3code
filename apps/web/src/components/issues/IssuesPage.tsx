@@ -11,7 +11,7 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
-import { CircleDotIcon, ExternalLinkIcon, PlayIcon, RefreshCwIcon } from "lucide-react";
+import { CircleDotIcon, PlayIcon, RefreshCwIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import {
@@ -31,6 +31,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 
 import ChatMarkdown from "../ChatMarkdown";
+import { ExternalRefLink, ExternalRefScope } from "../pullRequest/ExternalRefLink";
 import { RelativeTime } from "../RelativeTime";
 import { IssueModelPicker } from "./IssueModelPicker";
 import {
@@ -167,8 +168,15 @@ function GitHubIssueMeta(props: { readonly issue: IssueSummary }) {
   const { issue } = props;
   return (
     <>
-      <span>
-        {issue.repository}#{issue.number}
+      <span className="inline-flex items-center gap-1">
+        {issue.repository}
+        <ExternalRefLink
+          inRow
+          url={issue.url}
+          label={`#${issue.number}`}
+          openLabel="Open on GitHub"
+          ariaLabel={`Open ${issue.repository}#${issue.number} on GitHub`}
+        />
       </span>
       <RelativeTime timestamp={issue.updatedAt} />
       {issue.labels.slice(0, 3).map((label) => (
@@ -198,7 +206,13 @@ function LinearIssueMeta(props: { readonly issue: LinearIssueSummary }) {
   const priority = PRIORITY_LABELS[issue.priority];
   return (
     <>
-      <span>{issue.identifier}</span>
+      <ExternalRefLink
+        inRow
+        url={issue.url}
+        label={issue.identifier}
+        openLabel="Open in Linear"
+        ariaLabel={`Open ${issue.identifier} in Linear`}
+      />
       <LinearStateLabel state={issue.state} />
       {priority ? <span>{priority}</span> : null}
       <span>{issue.project ?? issue.team.name}</span>
@@ -270,19 +284,20 @@ function LinearIssueDetailPane(props: {
   return (
     <article className="flex flex-col gap-4 p-6">
       <header className="flex flex-col gap-2">
+        <div className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs">
+          <ExternalRefScope scope={issue.project ?? issue.team.name} url={null} />
+          <ExternalRefLink
+            url={issue.url}
+            label={issue.identifier}
+            openLabel="Open in Linear"
+            ariaLabel={`Open ${issue.identifier} in Linear`}
+            className="font-medium text-foreground"
+          />
+        </div>
         <h2 className="text-lg font-semibold leading-tight">{issue.title}</h2>
         <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
-          <span>{issue.identifier}</span>
           <LinearStateLabel state={issue.state} />
           {issue.assignee ? <span>assigned to {issue.assignee}</span> : null}
-          <a
-            href={issue.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
-          >
-            Linear <ExternalLinkIcon className="size-3" />
-          </a>
         </div>
       </header>
       <IssueDetailBody environmentId={environmentId} error={detail.error} detail={detail.data} />
@@ -304,24 +319,29 @@ function IssueDetailPane(props: {
   return (
     <article className="flex flex-col gap-4 p-6">
       <header className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold leading-tight">{issue.title}</h2>
-        <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
-          <span>
-            {issue.repository}#{issue.number}
-          </span>
-          {issue.author ? <span>opened by {issue.author}</span> : null}
-          {issue.assignees.length > 0 ? (
-            <span>assigned to {issue.assignees.join(", ")}</span>
-          ) : null}
-          <a
-            href={issue.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
-          >
-            GitHub <ExternalLinkIcon className="size-3" />
-          </a>
+        <div className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs">
+          <ExternalRefScope
+            scope={issue.repository}
+            url={`https://${issue.host}/${issue.repository}`}
+            tooltip={`Open ${issue.repository} repository`}
+          />
+          <ExternalRefLink
+            url={issue.url}
+            label={`#${issue.number}`}
+            openLabel="Open on GitHub"
+            ariaLabel={`Open ${issue.repository}#${issue.number} on GitHub`}
+            className="font-medium text-foreground"
+          />
         </div>
+        <h2 className="text-lg font-semibold leading-tight">{issue.title}</h2>
+        {issue.author || issue.assignees.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+            {issue.author ? <span>opened by {issue.author}</span> : null}
+            {issue.assignees.length > 0 ? (
+              <span>assigned to {issue.assignees.join(", ")}</span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-1">
           {issue.labels.map((label) => (
             <Badge key={label.name} variant="outline">

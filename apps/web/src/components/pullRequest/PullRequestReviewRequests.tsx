@@ -13,6 +13,7 @@ import { useState } from "react";
 
 import { useDispatchIssue } from "~/hooks/useDispatchIssue";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
+import { readLocalApi } from "~/localApi";
 import { cn } from "~/lib/utils";
 import { useProjects, useThreadShells } from "~/state/entities";
 import { issueEnvironment } from "~/state/issues";
@@ -24,6 +25,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Spinner } from "../ui/spinner";
+import { ExternalRefLink } from "./ExternalRefLink";
+import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import { PullRequestGroupHeader } from "./PullRequestListGroups";
 import {
   PULL_REQUEST_ROW_CLASS,
@@ -34,6 +37,7 @@ import {
 } from "./PullRequestListRow";
 import type { PullRequestRowTarget } from "./PullRequestRow";
 import { reviewRequestKey } from "./pullRequestList.logic";
+import { PullRequestDiffStat } from "./pullRequestPresentation";
 
 // Per environment: the project each repository's review requests were last dispatched into.
 const PickedProjectsSchema = Schema.Record(Schema.String, Schema.String);
@@ -85,9 +89,12 @@ function useReviewDispatch(environmentId: EnvironmentId, state: ReviewDispatchSt
     const id = pickedProjects[pickKey(pr)];
     return projects.find((project) => project.id === id) ?? projectFor(pr);
   };
+  /** The project the pull request is read through: its own, else any, since GitHub reads any repository. */
+  const anchorOf = (pr: ReviewRequestSummary) => projectOf(pr) ?? projects[0];
+  /** Why the review cannot start; a missing project is picked in the dispatch bar. */
   const blockedReason = (pr: ReviewRequestSummary) =>
     reviewBlockedReason() ??
-    (projectOf(pr) === undefined ? `Add ${pr.repository} as a project to review it here` : null);
+    (projectOf(pr) === undefined ? "Choose a project to review this pull request in" : null);
   const review = async (pr: ReviewRequestSummary) => {
     const key = reviewRequestKey(pr);
     const project = projectOf(pr);
@@ -99,7 +106,16 @@ function useReviewDispatch(environmentId: EnvironmentId, state: ReviewDispatchSt
   };
   const chooseProject = (pr: ReviewRequestSummary, projectId: string) =>
     setPickedProjects((current) => ({ ...current, [pickKey(pr)]: projectId }));
-  return { projects, projectOf, modelFor, blockedReason, review, chooseProject };
+  return {
+    projects,
+    projectOf,
+    anchorOf,
+    modelFor,
+    reviewBlockedReason,
+    blockedReason,
+    review,
+    chooseProject,
+  };
 }
 
 export function PullRequestReviewRequests(props: {
@@ -117,7 +133,7 @@ export function PullRequestReviewRequests(props: {
   readonly onOpen: (target: PullRequestRowTarget) => void;
 }) {
   const { environmentId, state } = props;
-  const { projectOf } = useReviewDispatch(environmentId, state);
+  const { anchorOf } = useReviewDispatch(environmentId, state);
   // The thread each pull request is linked to; a review dispatch links its PR to the new thread.
   const linkedThreads = new Map<string, ThreadId>();
   for (const thread of useThreadShells()) {
@@ -130,16 +146,16 @@ export function PullRequestReviewRequests(props: {
   const { entries } = props;
   if (entries.length === 0 && props.error === null) return null;
 
-  /** The PR in the detail panel when a project checks out its repository, else on GitHub. */
+  /** The PR in the detail panel, read through any project; on GitHub only when there is none. */
   const openPullRequest = (pr: ReviewRequestSummary) => {
-    const project = projectOf(pr);
-    if (project === undefined) {
-      window.open(pr.url, "_blank", "noopener,noreferrer");
+    const anchor = anchorOf(pr);
+    if (anchor === undefined) {
+      void readLocalApi()?.shell.openExternal(pr.url);
       return;
     }
     props.onOpen({
       environmentId,
-      projectId: project.id,
+      projectId: anchor.id,
       host: pr.host,
       repository: pr.repository,
       number: pr.number,
@@ -157,11 +173,12 @@ export function PullRequestReviewRequests(props: {
           GitHub: {props.error}
         </p>
       )}
-      {/* Rows share one grid so the Dispatched and Review columns line up on every row. */}
-      <ul className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center">
+      {/* Rows mirror PullRequestRow so their stat, time and Review line up with the groups below. */}
+      <ul>
         {entries.map((pr) => {
           const key = reviewRequestKey(pr);
           const threadId = linkedThreads.get(key);
+          const anchor = anchorOf(pr);
           const open =
             props.selected !== null &&
             props.selected.number === pr.number &&
@@ -171,7 +188,7 @@ export function PullRequestReviewRequests(props: {
             <li
               key={key}
               className={cn(
-                "col-span-3 grid grid-cols-subgrid items-center rounded-md",
+                "flex items-center rounded-md",
                 open ? "bg-accent" : "hover:bg-accent/60",
               )}
             >
@@ -180,7 +197,7 @@ export function PullRequestReviewRequests(props: {
                 aria-current={open ? "true" : undefined}
                 className={cn(
                   PULL_REQUEST_ROW_CLASS,
-                  "min-w-0 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+                  "min-w-0 flex-1 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
                 )}
                 onClick={() => openPullRequest(pr)}
               >
@@ -190,8 +207,39 @@ export function PullRequestReviewRequests(props: {
                   className="mt-0.75 self-start"
                 />
                 <PullRequestRowLines
-                  number={<span className={PULL_REQUEST_ROW_NUMBER_CLASS}>#{pr.number}</span>}
+                  number={
+                    <ExternalRefLink
+                      inRow
+                      url={pr.url}
+                      label={`#${pr.number}`}
+                      openLabel="Open on GitHub"
+                      ariaLabel={`Open #${pr.number} on GitHub`}
+                      className={PULL_REQUEST_ROW_NUMBER_CLASS}
+                    />
+                  }
                   title={pr.title}
+                  status={
+                    anchor === undefined ? (
+                      <PullRequestDiffStat
+                        additions={pr.additions}
+                        deletions={pr.deletions}
+                        className="font-mono"
+                      />
+                    ) : (
+                      <PullRequestChangeBreakdownStat
+                        environmentId={environmentId}
+                        reference={{
+                          projectId: anchor.id,
+                          host: pr.host,
+                          repository: pr.repository,
+                          number: pr.number,
+                        }}
+                        additions={pr.additions}
+                        deletions={pr.deletions}
+                        className="font-mono"
+                      />
+                    )
+                  }
                   meta={
                     <>
                       <PullRequestRowAuthor actor={pr.author} className="min-w-3.5 max-w-40" />
@@ -201,7 +249,7 @@ export function PullRequestReviewRequests(props: {
                   updatedAt={pr.updatedAt}
                 />
               </button>
-              <div className="flex justify-end pl-2">
+              <div className="flex shrink-0 items-center gap-2 pl-2">
                 {threadId === undefined ? null : (
                   <Badge
                     variant="info"
@@ -217,9 +265,12 @@ export function PullRequestReviewRequests(props: {
                     Dispatched
                   </Badge>
                 )}
-              </div>
-              <div className="pr-3 pl-2">
-                <PullRequestReviewButton environmentId={environmentId} state={state} pr={pr} />
+                <PullRequestReviewButton
+                  environmentId={environmentId}
+                  state={state}
+                  pr={pr}
+                  onPickProject={() => openPullRequest(pr)}
+                />
               </div>
             </li>
           );
@@ -239,18 +290,29 @@ export function PullRequestReviewButton(props: {
   readonly environmentId: EnvironmentId;
   readonly state: ReviewDispatchState;
   readonly pr: ReviewRequestSummary;
+  /** Opens the pull request's dispatch bar, where a project is picked when none matches. */
+  readonly onPickProject?: () => void;
 }) {
-  const { blockedReason, review } = useReviewDispatch(props.environmentId, props.state);
+  const { projectOf, reviewBlockedReason, blockedReason, review } = useReviewDispatch(
+    props.environmentId,
+    props.state,
+  );
   const dispatching = props.state.dispatchingKeys.has(reviewRequestKey(props.pr));
-  const blocked = blockedReason(props.pr);
+  const pickProject = projectOf(props.pr) === undefined ? props.onPickProject : undefined;
+  const blocked = pickProject === undefined ? blockedReason(props.pr) : reviewBlockedReason();
   return (
     <Button
       type="button"
       size="compact"
       variant="outline"
       disabled={dispatching || blocked !== null}
-      title={blocked ?? "Start a read-only review agent on this pull request"}
-      onClick={() => void review(props.pr)}
+      title={
+        blocked ??
+        (pickProject === undefined
+          ? "Start a read-only review agent on this pull request"
+          : "Choose a project to review this pull request in")
+      }
+      onClick={() => (pickProject === undefined ? void review(props.pr) : pickProject())}
     >
       {dispatching ? <Spinner /> : <PlayIcon />}
       Review

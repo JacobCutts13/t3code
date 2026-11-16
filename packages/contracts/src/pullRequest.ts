@@ -399,6 +399,8 @@ export const ReviewRequestSummary = PullRequestListEntry.mapFields(
     "isDraft",
     "headBranch",
     "updatedAt",
+    "additions",
+    "deletions",
   ]),
 );
 export type ReviewRequestSummary = typeof ReviewRequestSummary.Type;
