@@ -323,7 +323,6 @@ function IssueDetailPane(props: {
           <ExternalRefScope
             scope={issue.repository}
             url={`https://${issue.host}/${issue.repository}`}
-            tooltip={`Open ${issue.repository} repository`}
           />
           <ExternalRefLink
             url={issue.url}

@@ -29,7 +29,9 @@ import { ExternalRefLink } from "./ExternalRefLink";
 import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import { PullRequestGroupHeader } from "./PullRequestListGroups";
 import {
-  PULL_REQUEST_ROW_CLASS,
+  PULL_REQUEST_PAGE_ROW_BUTTON_CLASS,
+  PULL_REQUEST_PAGE_ROW_FRAME_CLASS,
+  PULL_REQUEST_PAGE_ROW_TRAILING_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
   PullRequestRowAuthor,
   PullRequestRowGlyph,
@@ -37,7 +39,8 @@ import {
 } from "./PullRequestListRow";
 import type { PullRequestRowTarget } from "./PullRequestRow";
 import { reviewRequestKey } from "./pullRequestList.logic";
-import { PullRequestDiffStat } from "./pullRequestPresentation";
+
+const CHOOSE_PROJECT = "Choose a project to review this pull request in";
 
 // Per environment: the project each repository's review requests were last dispatched into.
 const PickedProjectsSchema = Schema.Record(Schema.String, Schema.String);
@@ -93,8 +96,7 @@ function useReviewDispatch(environmentId: EnvironmentId, state: ReviewDispatchSt
   const anchorOf = (pr: ReviewRequestSummary) => projectOf(pr) ?? projects[0];
   /** Why the review cannot start; a missing project is picked in the dispatch bar. */
   const blockedReason = (pr: ReviewRequestSummary) =>
-    reviewBlockedReason() ??
-    (projectOf(pr) === undefined ? "Choose a project to review this pull request in" : null);
+    reviewBlockedReason() ?? (projectOf(pr) === undefined ? CHOOSE_PROJECT : null);
   const review = async (pr: ReviewRequestSummary) => {
     const key = reviewRequestKey(pr);
     const project = projectOf(pr);
@@ -173,7 +175,6 @@ export function PullRequestReviewRequests(props: {
           GitHub: {props.error}
         </p>
       )}
-      {/* Rows mirror PullRequestRow so their stat, time and Review line up with the groups below. */}
       <ul>
         {entries.map((pr) => {
           const key = reviewRequestKey(pr);
@@ -188,17 +189,14 @@ export function PullRequestReviewRequests(props: {
             <li
               key={key}
               className={cn(
-                "flex items-center rounded-md",
+                PULL_REQUEST_PAGE_ROW_FRAME_CLASS,
                 open ? "bg-accent" : "hover:bg-accent/60",
               )}
             >
               <button
                 type="button"
                 aria-current={open ? "true" : undefined}
-                className={cn(
-                  PULL_REQUEST_ROW_CLASS,
-                  "min-w-0 flex-1 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
-                )}
+                className={PULL_REQUEST_PAGE_ROW_BUTTON_CLASS}
                 onClick={() => openPullRequest(pr)}
               >
                 <PullRequestRowGlyph
@@ -219,26 +217,22 @@ export function PullRequestReviewRequests(props: {
                   }
                   title={pr.title}
                   status={
-                    anchor === undefined ? (
-                      <PullRequestDiffStat
-                        additions={pr.additions}
-                        deletions={pr.deletions}
-                        className="font-mono"
-                      />
-                    ) : (
-                      <PullRequestChangeBreakdownStat
-                        environmentId={environmentId}
-                        reference={{
-                          projectId: anchor.id,
-                          host: pr.host,
-                          repository: pr.repository,
-                          number: pr.number,
-                        }}
-                        additions={pr.additions}
-                        deletions={pr.deletions}
-                        className="font-mono"
-                      />
-                    )
+                    <PullRequestChangeBreakdownStat
+                      environmentId={environmentId}
+                      reference={
+                        anchor === undefined
+                          ? null
+                          : {
+                              projectId: anchor.id,
+                              host: pr.host,
+                              repository: pr.repository,
+                              number: pr.number,
+                            }
+                      }
+                      additions={pr.additions}
+                      deletions={pr.deletions}
+                      className="font-mono"
+                    />
                   }
                   meta={
                     <>
@@ -249,7 +243,7 @@ export function PullRequestReviewRequests(props: {
                   updatedAt={pr.updatedAt}
                 />
               </button>
-              <div className="flex shrink-0 items-center gap-2 pl-2">
+              <div className={cn(PULL_REQUEST_PAGE_ROW_TRAILING_CLASS, "flex items-center gap-2")}>
                 {threadId === undefined ? null : (
                   <Badge
                     variant="info"
@@ -298,8 +292,9 @@ export function PullRequestReviewButton(props: {
     props.state,
   );
   const dispatching = props.state.dispatchingKeys.has(reviewRequestKey(props.pr));
+  // Without a project, Review opens the dispatch bar to pick one, when the caller offers it.
   const pickProject = projectOf(props.pr) === undefined ? props.onPickProject : undefined;
-  const blocked = pickProject === undefined ? blockedReason(props.pr) : reviewBlockedReason();
+  const blocked = pickProject ? reviewBlockedReason() : blockedReason(props.pr);
   return (
     <Button
       type="button"
@@ -308,11 +303,9 @@ export function PullRequestReviewButton(props: {
       disabled={dispatching || blocked !== null}
       title={
         blocked ??
-        (pickProject === undefined
-          ? "Start a read-only review agent on this pull request"
-          : "Choose a project to review this pull request in")
+        (pickProject ? CHOOSE_PROJECT : "Start a read-only review agent on this pull request")
       }
-      onClick={() => (pickProject === undefined ? void review(props.pr) : pickProject())}
+      onClick={pickProject ?? (() => void review(props.pr))}
     >
       {dispatching ? <Spinner /> : <PlayIcon />}
       Review

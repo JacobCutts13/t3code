@@ -32,7 +32,8 @@ export function PullRequestChangeBreakdownStat({
   eager = false,
 }: {
   environmentId: EnvironmentId;
-  reference: PullRequestRef;
+  /** Null when no project can read the pull request, which shows the totals without a split. */
+  reference: PullRequestRef | null;
   additions: number;
   deletions: number;
   className: string;
@@ -40,7 +41,9 @@ export function PullRequestChangeBreakdownStat({
 }) {
   const [requested, setRequested] = useState(eager);
   const query = useEnvironmentQuery(
-    requested ? pullRequestEnvironment.changeBreakdown({ environmentId, input: reference }) : null,
+    requested && reference !== null
+      ? pullRequestEnvironment.changeBreakdown({ environmentId, input: reference })
+      : null,
   );
   const breakdown = query.data;
   if (additions === 0 && deletions === 0) return null;

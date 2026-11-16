@@ -97,11 +97,7 @@ export function PullRequestDetailCrumbs({
         {ready ? (
           <>
             {onBack ? <BackButton onBack={onBack} focusable /> : null}
-            <ExternalRefScope
-              scope={detail.repository}
-              url={repositoryUrl}
-              tooltip={`Open ${detail.repository} repository`}
-            />
+            <ExternalRefScope scope={detail.repository} url={repositoryUrl} />
             <NumberLink
               detail={detail}
               toneClassName={toneClassName}

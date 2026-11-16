@@ -31,17 +31,15 @@ export function ExternalRefLink({
   focusable?: boolean;
   inRow?: boolean;
 }) {
+  const onClick = (event: ReactMouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    open(url);
+  };
   const handlers = {
-    onClick: (event: ReactMouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      open(url);
-    },
+    onClick,
     onAuxClick: (event: ReactMouseEvent) => {
-      if (event.button !== 1) return;
-      event.preventDefault();
-      event.stopPropagation();
-      open(url);
+      if (event.button === 1) onClick(event);
     },
     onContextMenu: (event: ReactMouseEvent) => {
       event.preventDefault();
@@ -63,21 +61,25 @@ export function ExternalRefLink({
       <ExternalLinkIcon aria-hidden className="size-2.5" />
     </>
   );
+  // Rows render in long lists, so they skip the tooltip; the icon and label carry the meaning.
+  if (inRow) {
+    return (
+      <span role="link" aria-label={ariaLabel} className={linkClassName} {...handlers}>
+        {content}
+      </span>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger
         render={
-          inRow ? (
-            <span role="link" aria-label={ariaLabel} className={linkClassName} {...handlers} />
-          ) : (
-            <button
-              type="button"
-              aria-label={ariaLabel}
-              {...(focusable ? {} : { tabIndex: -1 })}
-              className={linkClassName}
-              {...handlers}
-            />
-          )
+          <button
+            type="button"
+            aria-label={ariaLabel}
+            tabIndex={focusable ? undefined : -1}
+            className={linkClassName}
+            {...handlers}
+          />
         }
       >
         {content}
@@ -88,15 +90,7 @@ export function ExternalRefLink({
 }
 
 /** The repository or tracker scope beside an {@link ExternalRefLink}, opening its page when known. */
-export function ExternalRefScope({
-  scope,
-  url,
-  tooltip,
-}: {
-  scope: string;
-  url: string | null;
-  tooltip?: string;
-}) {
+export function ExternalRefScope({ scope, url }: { scope: string; url: string | null }) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -114,7 +108,7 @@ export function ExternalRefScope({
           )
         }
       />
-      <TooltipPopup side="top">{url ? (tooltip ?? `Open ${scope}`) : scope}</TooltipPopup>
+      <TooltipPopup side="top">{url ? `Open ${scope} repository` : scope}</TooltipPopup>
     </Tooltip>
   );
 }
