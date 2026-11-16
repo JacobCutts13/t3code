@@ -268,6 +268,8 @@ export const make = Effect.gen(function* () {
         isDraft: item.isDraft,
         headBranch: item.headBranch,
         updatedAt: item.updatedAt,
+        additions: item.additions,
+        deletions: item.deletions,
       })),
       truncated: batch.truncated,
     };

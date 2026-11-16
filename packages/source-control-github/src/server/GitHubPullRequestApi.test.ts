@@ -1572,7 +1572,7 @@ layer("GitHubPullRequestApi.layer", (it) => {
         Effect.succeed(
           searchPage(
             [
-              searchItem(7, "acme/web", "2026-07-03T00:00:00Z"),
+              { ...searchItem(7, "acme/web", "2026-07-03T00:00:00Z"), additions: 12, deletions: 3 },
               searchItem(9, "team/api", "2026-07-02T00:00:00Z"),
               {},
             ],
@@ -1588,9 +1588,12 @@ layer("GitHubPullRequestApi.layer", (it) => {
         searchQueryOfCall(0),
         "is:pr is:open archived:false review-requested:@me sort:updated-desc",
       );
+      assert.strictEqual(varsAt(0)["stats"], true);
       assert.deepStrictEqual(
-        batch.items.map((item) => `${item.repository}#${item.number}`),
-        ["acme/web#7", "team/api#9"],
+        batch.items.map(
+          (item) => `${item.repository}#${item.number} +${item.additions} -${item.deletions}`,
+        ),
+        ["acme/web#7 +12 -3", "team/api#9 +0 -0"],
       );
       assert.isTrue(batch.truncated);
     }),

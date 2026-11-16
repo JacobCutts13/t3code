@@ -15,9 +15,12 @@ import { getSourceControlPresentationForKind } from "~/sourceControlPresentation
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PullRequestChecksPopover } from "./PullRequestChecksPopover";
 import type { EnvironmentPullRequestEntry } from "./pullRequestList.logic";
-import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
+import { ExternalRefLink } from "./ExternalRefLink";
+import { openOnHostLabel } from "./pullRequestLinkContextMenu";
 import {
-  PULL_REQUEST_ROW_CLASS,
+  PULL_REQUEST_PAGE_ROW_BUTTON_CLASS,
+  PULL_REQUEST_PAGE_ROW_FRAME_CLASS,
+  PULL_REQUEST_PAGE_ROW_TRAILING_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
   PullRequestRowAuthor,
   PullRequestRowGlyph,
@@ -60,8 +63,6 @@ function PullRequestRowLabels({ labels }: { labels: EnvironmentPullRequestEntry[
     </span>
   );
 }
-
-const PAGE_ROW_CLASS = "px-3 py-2.5";
 
 export type PullRequestRowTarget = Pick<
   EnvironmentPullRequestEntry,
@@ -113,7 +114,8 @@ function PullRequestRowImpl({
       data-pull-request-stats-key={statsKey}
       data-pull-request-key={statsKey}
       className={cn(
-        "flex items-center rounded-md [content-visibility:auto] [contain-intrinsic-block-size:56.5px]",
+        PULL_REQUEST_PAGE_ROW_FRAME_CLASS,
+        "[content-visibility:auto] [contain-intrinsic-block-size:56.5px]",
         selected ? "bg-accent" : "hover:bg-accent/60",
       )}
     >
@@ -129,11 +131,7 @@ function PullRequestRowImpl({
         onBlur={(event) => {
           if (!event.currentTarget.matches(":hover")) onIntent?.(null);
         }}
-        className={cn(
-          PULL_REQUEST_ROW_CLASS,
-          PAGE_ROW_CLASS,
-          "min-w-0 flex-1 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
-        )}
+        className={PULL_REQUEST_PAGE_ROW_BUTTON_CLASS}
       >
         <PullRequestRowGlyph
           state={entry.state}
@@ -144,20 +142,14 @@ function PullRequestRowImpl({
         />
         <PullRequestRowLines
           number={
-            <span
+            <ExternalRefLink
+              inRow
+              url={entry.url}
+              label={`#${entry.number}`}
+              openLabel={openOnHostLabel(sourceControlClients.get(entry.provider))}
+              ariaLabel={`Open #${entry.number} on ${providerName}`}
               className={PULL_REQUEST_ROW_NUMBER_CLASS}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                void showPullRequestLinkContextMenu({
-                  url: entry.url,
-                  openLabel: openOnHostLabel(sourceControlClients.get(entry.provider)),
-                  position: { x: event.clientX, y: event.clientY },
-                });
-              }}
-            >
-              #{entry.number}
-            </span>
+            />
           }
           title={entry.title}
           signals={
@@ -251,7 +243,7 @@ function PullRequestRowImpl({
           updatedAt={entry.updatedAt}
         />
       </button>
-      {trailing ? <div className="shrink-0 pl-2">{trailing}</div> : null}
+      {trailing ? <div className={PULL_REQUEST_PAGE_ROW_TRAILING_CLASS}>{trailing}</div> : null}
       {hostActions.size > 0 ? (
         <PullRequestSpeedActions
           entry={entry}

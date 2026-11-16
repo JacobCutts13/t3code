@@ -388,8 +388,8 @@ export const PullRequestListEntry = Schema.Struct({
 export type PullRequestListEntry = typeof PullRequestListEntry.Type;
 
 /** An open pull request, in any repository, asking the viewer or one of their teams to review. */
-export const ReviewRequestSummary = PullRequestListEntry.mapFields(
-  Struct.pick([
+export const ReviewRequestSummary = PullRequestListEntry.mapFields((fields) => ({
+  ...Struct.pick(fields, [
     "host",
     "repository",
     "number",
@@ -400,7 +400,10 @@ export const ReviewRequestSummary = PullRequestListEntry.mapFields(
     "headBranch",
     "updatedAt",
   ]),
-);
+  // Optional so clients still read review requests from servers that predate the stat.
+  additions: Schema.optional(NonNegativeInt),
+  deletions: Schema.optional(NonNegativeInt),
+}));
 export type ReviewRequestSummary = typeof ReviewRequestSummary.Type;
 
 export const ReviewRequestListResult = Schema.Struct({

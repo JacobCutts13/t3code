@@ -1,12 +1,10 @@
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { ArrowLeftIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
-import { readLocalApi } from "~/localApi";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
+import { ExternalRefLink, ExternalRefScope } from "./ExternalRefLink";
 
 interface CrumbsPullRequest {
   readonly url: string;
@@ -15,16 +13,6 @@ interface CrumbsPullRequest {
   readonly repository: string;
   readonly title: string;
 }
-
-const openNumberContextMenu = (event: ReactMouseEvent, detail: CrumbsPullRequest): void => {
-  event.preventDefault();
-  event.stopPropagation();
-  void showPullRequestLinkContextMenu({
-    url: detail.url,
-    openLabel: openOnHostLabel(sourceControlClients.get(detail.provider)),
-    position: { x: event.clientX, y: event.clientY },
-  });
-};
 
 const ROW_CLASS_NAME =
   "col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-sm text-muted-foreground transition-[opacity,transform] ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-xs";
@@ -63,30 +51,14 @@ function NumberLink({
   focusable: boolean;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            {...(focusable ? {} : { tabIndex: -1 })}
-            onClick={() => void readLocalApi()?.shell.openExternal(detail.url)}
-            onAuxClick={(event) => {
-              if (event.button === 1) void readLocalApi()?.shell.openExternal(detail.url);
-            }}
-            onContextMenu={(event) => openNumberContextMenu(event, detail)}
-            className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
-              toneClassName,
-            )}
-            aria-label={`Open ${sourceControlClients.get(detail.provider).changeRequest.singular} #${detail.number} on host`}
-          >
-            #{detail.number}
-            <ExternalLinkIcon aria-hidden className="size-2.5" />
-          </button>
-        }
-      />
-      <TooltipPopup side="top">{openOnHostText}</TooltipPopup>
-    </Tooltip>
+    <ExternalRefLink
+      url={detail.url}
+      label={`#${detail.number}`}
+      openLabel={openOnHostText}
+      ariaLabel={`Open ${sourceControlClients.get(detail.provider).changeRequest.singular} #${detail.number} on host`}
+      className={cn("font-medium", toneClassName)}
+      focusable={focusable}
+    />
   );
 }
 
@@ -125,28 +97,7 @@ export function PullRequestDetailCrumbs({
         {ready ? (
           <>
             {onBack ? <BackButton onBack={onBack} focusable /> : null}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  repositoryUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => void readLocalApi()?.shell.openExternal(repositoryUrl)}
-                      className="min-w-0 cursor-pointer truncate text-left font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                    >
-                      {detail.repository}
-                    </button>
-                  ) : (
-                    <span className="min-w-0 truncate font-medium text-muted-foreground">
-                      {detail.repository}
-                    </span>
-                  )
-                }
-              />
-              <TooltipPopup side="top">
-                {repositoryUrl ? `Open ${detail.repository} repository` : detail.repository}
-              </TooltipPopup>
-            </Tooltip>
+            <ExternalRefScope scope={detail.repository} url={repositoryUrl} />
             <NumberLink
               detail={detail}
               toneClassName={toneClassName}

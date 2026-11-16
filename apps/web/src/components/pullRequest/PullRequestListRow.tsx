@@ -19,6 +19,14 @@ import {
 export const PULL_REQUEST_ROW_CLASS =
   "group/pr-row flex w-full items-center gap-2 rounded-md py-1 pr-1 text-left";
 
+/** The Pull requests page's rows: every list on the page shares these so their columns align. */
+export const PULL_REQUEST_PAGE_ROW_FRAME_CLASS = "flex items-center rounded-md";
+export const PULL_REQUEST_PAGE_ROW_BUTTON_CLASS = cn(
+  PULL_REQUEST_ROW_CLASS,
+  "min-w-0 flex-1 cursor-pointer px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+);
+export const PULL_REQUEST_PAGE_ROW_TRAILING_CLASS = "shrink-0 pl-2";
+
 export const PULL_REQUEST_ROW_NUMBER_CLASS =
   "shrink-0 font-mono text-xs tabular-nums text-muted-foreground";
 

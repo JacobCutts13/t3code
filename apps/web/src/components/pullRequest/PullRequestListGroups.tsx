@@ -146,6 +146,7 @@ export function PullRequestListGroups({
                         environmentId={entry.environmentId}
                         state={review.state}
                         pr={entry}
+                        onChooseProject={() => onSelect(entry)}
                       />
                     ) : undefined
                   }
