@@ -213,6 +213,7 @@ describe("ranking what a search found", () => {
       authored: undefined,
       reviewing: undefined,
       partitionsWanted: false,
+      listedAbove: new Set(),
     });
 
     expect(entries.map((entry) => entry.number)).toEqual([1, 2, 3]);
@@ -387,6 +388,46 @@ describe("partitioning with the hosts' own priority reads", () => {
     expect(groups.map((group) => group.key)).toEqual(["authored", "reviewRequested"]);
     expect(groups[0]!.entries.map((item) => item.number)).toEqual([1]);
     expect(groups[1]!.entries.map((item) => item.number)).toEqual([2, 3]);
+  });
+
+  it("leaves rows the review-request section lists out of every grouping path", () => {
+    const mine = authoredRow(1, "2026-07-01T00:00:00Z");
+    const requested = entry({ number: 2, viewerReviewRequested: true });
+    const other = entry({ number: 3 });
+    const groupsFor = (input: {
+      involvement: "all" | "reviewing";
+      baselineEmpty: boolean;
+      reviewing?: ReadonlyArray<EnvironmentPullRequestEntry>;
+    }) =>
+      pullRequestGroups({
+        known: [mine, requested, other],
+        baseline: undefined,
+        providers: [],
+        viewers: VIEWERS,
+        localFilters: {},
+        hasLocalFilters: false,
+        text: "",
+        answeredLocally: false,
+        held: undefined,
+        authored: [mine],
+        partitionsWanted: input.reviewing !== undefined,
+        listedAbove: new Set(["github.com:pingdotgg/t3code#2"]),
+        involvement: input.involvement,
+        baselineEmpty: input.baselineEmpty,
+        reviewing: input.reviewing,
+      }).groups.map((group) => [group.key, group.entries.map((item) => item.number)]);
+
+    expect(groupsFor({ involvement: "all", baselineEmpty: true })).toEqual([
+      ["authored", [1]],
+      ["others", [3]],
+    ]);
+    expect(groupsFor({ involvement: "all", baselineEmpty: false, reviewing: [requested] })).toEqual(
+      [
+        ["authored", [1]],
+        ["others", [3]],
+      ],
+    );
+    expect(groupsFor({ involvement: "reviewing", baselineEmpty: false })).toEqual([["others", []]]);
   });
 });
 

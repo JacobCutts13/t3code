@@ -4,6 +4,8 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 
 import * as GitHubIssueProvider from "./GitHubIssueProvider.ts";
+import * as GitHubPullRequestApi from "./GitHubPullRequestApi.ts";
+import * as GitHubRequestPolicy from "./GitHubRequestPolicy.ts";
 import * as GitHubRest from "./GitHubRest.ts";
 
 const issue = (number: number, extra: Record<string, unknown> = {}) => ({
@@ -22,7 +24,10 @@ const issue = (number: number, extra: Record<string, unknown> = {}) => ({
 });
 
 /** Answers each path from `answers`, and records the paths asked. */
-const provider = (answers: Record<string, unknown>) => {
+const provider = (
+  answers: Record<string, unknown>,
+  pullRequests: Partial<GitHubPullRequestApi.GitHubPullRequestApi["Service"]> = {},
+) => {
   const asked: string[] = [];
   const rest = Layer.mock(GitHubRest.GitHubRest)({
     rest: (input) => {
@@ -41,7 +46,11 @@ const provider = (answers: Record<string, unknown>) => {
   });
   return {
     asked,
-    make: GitHubIssueProvider.make.pipe(Effect.provide(rest)),
+    make: GitHubIssueProvider.make.pipe(
+      Effect.provide(
+        Layer.merge(rest, Layer.mock(GitHubPullRequestApi.GitHubPullRequestApi)(pullRequests)),
+      ),
+    ),
   };
 };
 
@@ -229,4 +238,77 @@ it.effect(
       assert.strictEqual(capped.comments.length, 500);
       assert.isTrue(capped.commentsTruncated);
     }),
+);
+
+it.effect("lists review requests from the search, and explains a refused credential", () =>
+  Effect.gen(function* () {
+    const author = { login: "ada", name: null, avatarUrl: null };
+    const found = provider(
+      {},
+      {
+        searchReviewRequests: () =>
+          Effect.succeed({
+            items: [
+              {
+                number: 7,
+                title: "Bump undici",
+                url: "https://github.com/acme/api/pull/7",
+                author,
+                headBranch: "bump-undici",
+                baseBranch: "main",
+                state: "open",
+                isDraft: true,
+                mergeability: "mergeable",
+                reviewDecision: null,
+                additions: 0,
+                deletions: 0,
+                createdAt: "2026-01-01T00:00:00Z",
+                updatedAt: "2026-01-02T00:00:00Z",
+                reviewRequestLogins: [],
+                hasTeamReviewRequest: true,
+                labels: [],
+                checksState: null,
+                repository: "acme/api",
+              },
+            ],
+            truncated: true,
+          }),
+      },
+    );
+    const listed = yield* (yield* found.make).reviewRequests({ host: "github.com" });
+    assert.deepStrictEqual(listed, {
+      entries: [
+        {
+          host: "github.com",
+          repository: "acme/api",
+          number: 7,
+          title: "Bump undici",
+          url: "https://github.com/acme/api/pull/7",
+          author,
+          isDraft: true,
+          headBranch: "bump-undici",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+      truncated: true,
+    });
+
+    const refused = provider(
+      {},
+      {
+        searchReviewRequests: () =>
+          Effect.fail(
+            new GitHubRequestPolicy.GitHubApiAuthenticationError({
+              host: "github.com",
+              operation: "searchReviewRequests",
+            }),
+          ),
+      },
+    );
+    const failure = yield* Effect.flip(
+      (yield* refused.make).reviewRequests({ host: "github.com" }),
+    );
+    assert.strictEqual(failure.operation, "reviewRequests");
+    assert.include(failure.detail, "gh auth login");
+  }),
 );

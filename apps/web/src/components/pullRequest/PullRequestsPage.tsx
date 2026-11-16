@@ -48,6 +48,9 @@ import {
   settlePullRequestOverrides,
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
+  reviewRequestKey,
+  matchesPullRequestQuery,
+  isAuthoredByViewer,
 } from "./pullRequestList.logic";
 import {
   pullRequestListPreferences,
@@ -76,6 +79,12 @@ import {
   type PullRequestsSearch,
 } from "./usePullRequestListView";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
+import {
+  PullRequestReviewDispatchBar,
+  PullRequestReviewRequests,
+  useReviewDispatchState,
+  useReviewRequests,
+} from "./PullRequestReviewRequests";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
 import { type PullRequestRowTarget } from "./PullRequestRow";
@@ -114,6 +123,7 @@ import {
   type EnvironmentQueryTarget,
 } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { usePrimaryEnvironmentId } from "~/state/environments";
 import { cn } from "~/lib/utils";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
@@ -734,6 +744,23 @@ export function PullRequestsPage() {
     search.state,
   );
 
+  // Review requests come from one GitHub-wide search, so they show only while the page is not
+  // narrowed to something that search cannot honour.
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const reviewEnvironmentId = scopedEnvironmentId ?? primaryEnvironmentId;
+  const reviewRequestsShown =
+    (search.state === "open" || search.state === "all") &&
+    search.involvement !== "authored" &&
+    scopedProjectId === undefined &&
+    (search.host === undefined || search.host.toLowerCase() === "github.com") &&
+    !hasLocalFilters;
+  const reviewRequests = useReviewRequests(reviewRequestsShown ? reviewEnvironmentId : null);
+  const reviewDispatchState = useReviewDispatchState();
+  const shownReviewRequests = reviewRequestsShown
+    ? reviewRequests.entries.filter((pr) => matchesPullRequestQuery(pr, typedParsed.text))
+    : [];
+  const listedAbove = new Set(shownReviewRequests.map(reviewRequestKey));
+
   const heldEntries = ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []);
   const overlayInput = { state: search.state, filters };
   const shownEntries = usePendingListEntries(overlayInput, heldEntries);
@@ -783,6 +810,7 @@ export function PullRequestsPage() {
     authored: partitionsWanted && authoredQuery.data !== null ? shownAuthored : undefined,
     reviewing: partitionsWanted && reviewingQuery.data !== null ? shownReviewing : undefined,
     partitionsWanted,
+    listedAbove,
   });
 
   const visibleStatsKeys = useRef({ key: filterKey, values: new Set<string>() });
@@ -942,6 +970,7 @@ export function PullRequestsPage() {
       actedEnvironmentId?: EnvironmentId,
     ) => {
       refreshList(true, actedEnvironmentId);
+      if (reviewRequestsShown) reviewRequests.refresh();
       const visible = visibleStatsKeys.current;
       const batches = pullRequestStatsRefreshBatches({
         requestedScope: requestedStatsScope,
@@ -1230,6 +1259,31 @@ export function PullRequestsPage() {
       {panelToggleControls}
     </div>
   );
+  // The review prompt drives the GitHub CLI, so only the viewer's own GitHub pull requests qualify.
+  const reviewableOwnPullRequest = (entry: EnvironmentPullRequestEntry) =>
+    entry.provider === "github" && entry.state === "open" && isAuthoredByViewer(entry, viewers);
+  const panelListEntry =
+    renderedPullRequestSurface === null
+      ? undefined
+      : listedPullRequestsBySurface.get(pullRequestListEntryId(renderedPullRequestSurface));
+  // The panel's pull request when it asks for the viewer's review, or is their own, to offer the
+  // dispatch bar.
+  const panelReviewTarget =
+    renderedPullRequestSurface === null
+      ? undefined
+      : reviewEnvironmentId === panelEnvironmentId
+        ? reviewRequests.entries.find(
+            (pr) =>
+              pr.number === renderedPullRequestSurface.number &&
+              pr.repository.toLowerCase() === renderedPullRequestSurface.repository.toLowerCase() &&
+              pr.host.toLowerCase() === (renderedPullRequestSurface.host ?? pr.host).toLowerCase(),
+          )
+        : undefined;
+  const panelReviewable =
+    panelReviewTarget ??
+    (panelListEntry !== undefined && reviewableOwnPullRequest(panelListEntry)
+      ? panelListEntry
+      : undefined);
   const listError = listQuery.error
     ? `${environmentLabels.get(listQuery.error.environmentId) || "Environment"}: ${listQuery.error.message}`
     : null;
@@ -1237,8 +1291,21 @@ export function PullRequestsPage() {
     shownCount === 0 &&
     typedQuery.length === 0 &&
     (!querySettled || (showingCarried && listQuery.isPending));
+  const reviewSection =
+    reviewEnvironmentId !== null && reviewRequestsShown ? (
+      <PullRequestReviewRequests
+        environmentId={reviewEnvironmentId}
+        state={reviewDispatchState}
+        entries={shownReviewRequests}
+        truncated={reviewRequests.truncated}
+        error={reviewRequests.error}
+        selected={selected}
+        onOpen={selectEntry}
+      />
+    ) : null;
   const listBody = (
     <>
+      {reviewSection}
       {!capabilityKnown ? (
         <PullRequestListGhost rows={7} caption="Loading pull requests…" />
       ) : !pullRequestsSupported ? (
@@ -1256,7 +1323,7 @@ export function PullRequestsPage() {
         />
       ) : carriedToNothing ? (
         <PullRequestListGhost rows={7} />
-      ) : shownCount === 0 ? (
+      ) : shownCount === 0 && shownReviewRequests.length === 0 ? (
         <PullRequestListEmptyState
           hasProjects={!projectsKnown || projects.length > 0}
           refreshing={refreshing}
@@ -1290,6 +1357,7 @@ export function PullRequestsPage() {
           closingKeys={closingKeys}
           sweepingKeys={closeSweepKeys}
           onCloseSweepStart={startCloseSweep}
+          review={{ state: reviewDispatchState, offered: reviewableOwnPullRequest }}
         />
       )}
 
@@ -1596,6 +1664,13 @@ export function PullRequestsPage() {
             deviceAvailable={false}
             pullRequestStatusSeeds={listedPullRequestTabStatuses}
           >
+            {panelReviewable === undefined ? null : (
+              <PullRequestReviewDispatchBar
+                environmentId={panelEnvironmentId}
+                state={reviewDispatchState}
+                pr={panelReviewable}
+              />
+            )}
             <PullRequestDetailPanel
               getShortcutContext={getShortcutContext}
               shortcutsEnabled={activePullRequestSurface?.id === renderedPullRequestSurface.id}

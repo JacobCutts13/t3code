@@ -21,6 +21,11 @@ export function createIssueEnvironmentAtoms<R, E>(
       tag: WS_METHODS.issuesGet,
       staleTimeMs: ISSUE_STALE_TIME_MS,
     }),
+    reviewRequests: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:pull-requests:review-requests",
+      tag: WS_METHODS.pullRequestsReviewRequests,
+      staleTimeMs: ISSUE_STALE_TIME_MS,
+    }),
     linearViewer: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:linear:viewer",
       tag: WS_METHODS.linearViewer,

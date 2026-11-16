@@ -7,7 +7,7 @@ import {
   PullRequestSpeedActions,
   type PullRequestSpeedActionResult,
 } from "./PullRequestSpeedActions";
-import { memo, type RefCallback } from "react";
+import { memo, type ReactNode, type RefCallback } from "react";
 
 import { cn } from "~/lib/utils";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
@@ -84,6 +84,7 @@ function PullRequestRowImpl({
   closing = false,
   sweeping = false,
   onCloseSweepStart,
+  trailing,
 }: {
   entry: EnvironmentPullRequestEntry;
   selected: boolean;
@@ -102,6 +103,8 @@ function PullRequestRowImpl({
   closing?: boolean;
   sweeping?: boolean;
   onCloseSweepStart?: (entry: EnvironmentPullRequestEntry, event: PointerEvent) => void;
+  /** An action shown after the row, before its hover actions. */
+  trailing?: ReactNode;
 }) {
   const { Icon, providerName, terminology } = getSourceControlPresentationForKind(entry.provider);
   return (
@@ -248,6 +251,7 @@ function PullRequestRowImpl({
           updatedAt={entry.updatedAt}
         />
       </button>
+      {trailing ? <div className="shrink-0 pl-2">{trailing}</div> : null}
       {hostActions.size > 0 ? (
         <PullRequestSpeedActions
           entry={entry}

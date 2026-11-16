@@ -16,6 +16,7 @@ import {
   pullRequestEntryKey,
   pullRequestEntryViewer,
   rankPullRequestMatches,
+  reviewRequestKey,
   type EnvironmentPullRequestEntry,
   type PullRequestPartitionsSnapshot,
 } from "./pullRequestList.logic";
@@ -39,6 +40,7 @@ export function pullRequestGroups({
   authored,
   reviewing,
   partitionsWanted,
+  listedAbove,
 }: {
   known: ReadonlyArray<EnvironmentPullRequestEntry>;
   /** The text-free rows already loaded, or undefined when the typed filters cannot vet them. */
@@ -55,13 +57,24 @@ export function pullRequestGroups({
   authored: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
   reviewing: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
   partitionsWanted: boolean;
+  /** Pull requests the review-request section already lists, by `reviewRequestKey`. */
+  listedAbove: ReadonlySet<string>;
 }) {
+  // The section above owns these rows; dropping them from every input keeps them out of each group.
+  const unlisted = (rows: ReadonlyArray<EnvironmentPullRequestEntry>) =>
+    listedAbove.size === 0
+      ? rows
+      : rows.filter((entry) => !listedAbove.has(reviewRequestKey(entry)));
   const searchingHosts = new Set(
     providers.flatMap((provider) => (provider.searchesOnHost ? [provider.host] : [])),
   );
 
   const narrowRows = (rows: ReadonlyArray<EnvironmentPullRequestEntry>) => {
-    const involvementEntries = filterPullRequestsByInvolvement(rows, viewers, involvement);
+    const involvementEntries = filterPullRequestsByInvolvement(
+      unlisted(rows),
+      viewers,
+      involvement,
+    );
     return hasLocalFilters
       ? involvementEntries.filter((entry) =>
           matchesPullRequestFilters(entry, localFilters, pullRequestEntryViewer(entry, viewers)),
@@ -104,12 +117,15 @@ export function pullRequestGroups({
     if (baselineEmpty) {
       return groupPullRequestsByInvolvement(entries, viewers);
     }
-    const narrow = (rows: ReadonlyArray<EnvironmentPullRequestEntry> | undefined) =>
-      rows === undefined || !hasLocalFilters
-        ? rows
-        : rows.filter((entry) =>
+    const narrow = (rows: ReadonlyArray<EnvironmentPullRequestEntry> | undefined) => {
+      if (rows === undefined) return rows;
+      const shown = unlisted(rows);
+      return hasLocalFilters
+        ? shown.filter((entry) =>
             matchesPullRequestFilters(entry, localFilters, pullRequestEntryViewer(entry, viewers)),
-          );
+          )
+        : shown;
+    };
     const narrowedAuthored = narrow(partitionsWanted ? (authored ?? held?.authored) : undefined);
     const narrowedReviewing = narrow(partitionsWanted ? (reviewing ?? held?.reviewing) : undefined);
     if (narrowedAuthored === undefined || narrowedReviewing === undefined) {

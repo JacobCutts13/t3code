@@ -92,7 +92,7 @@ export function clientRpcRequiredScopes(
 ): readonly AuthEnvironmentScope[] {
   if (method === WS_METHODS.gitPreparePullRequestThread && input !== undefined) {
     const payload = decodePrepareThread(input);
-    if (payload.mode === "worktree" && payload.threadId !== undefined)
+    if (payload.mode !== "local" && payload.threadId !== undefined)
       return [AuthSourceControlWriteScope, AuthOrchestrationOperateScope];
   }
   if (method === WS_METHODS.gitRunStackedAction && input !== undefined) {
