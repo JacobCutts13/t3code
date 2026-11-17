@@ -167,7 +167,6 @@ it.effect("reads a collected reference again once it is invalidated", () =>
     cache.set("voice#key", "stale");
     cache.set("expo#token", "stale");
     cache.set("simlock#token", "stale");
-    cache.set("linear#key", "stale");
     assert.deepEqual((yield* read()).bitbucket, {
       email: "me@example.test",
       accessToken: "stale",
@@ -182,10 +181,8 @@ it.effect("reads a collected reference again once it is invalidated", () =>
         textGenerators: {},
         easDeviceHosts,
         simlockDeviceHosts,
-        linear: { apiKey: source("linear#key") },
       }),
     );
-    assert.isFalse(cache.has("linear#key"));
     assert.isFalse(cache.has("cliproxy#key"));
     assert.isFalse(cache.has("voice#key"));
     assert.isFalse(cache.has("expo#token"));

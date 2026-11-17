@@ -1,12 +1,5 @@
 import { deriveLocalBranchNameFromRemoteRef } from "@t3tools/shared/git";
-import type {
-  IssueComment,
-  IssueDetail,
-  LinearIssueDetail,
-  LinearIssueSummary,
-  ThreadId,
-  VcsRef,
-} from "@t3tools/contracts";
+import type { IssueDetail, IssueState, ThreadId, VcsRef } from "@t3tools/contracts";
 
 const SLUG_MAX = 40;
 
@@ -24,24 +17,12 @@ export function issueSlug(title: string): string {
   );
 }
 
-export function issueBranchName(issue: { readonly number: number; readonly title: string }) {
-  return `fix/${issue.number}-${issueSlug(issue.title)}`;
-}
-
-/** `eng-123-<slug>`: the identifier lowercased, then the title. */
-export function linearBranchName(issue: { readonly identifier: string; readonly title: string }) {
-  return `${issue.identifier.toLowerCase()}-${issueSlug(issue.title)}`;
-}
-
-/** What the dispatch prompt carries, whichever tracker the issue lives in. */
-interface PromptSource {
-  /** `#12` or `ENG-123`. */
-  readonly identifier: string;
-  readonly title: string;
-  readonly url: string;
-  readonly description: string;
-  readonly comments: ReadonlyArray<IssueComment>;
-  readonly commentsTruncated: boolean;
+/** `fix/12-<slug>` for a git host's `#12`, `eng-123-<slug>` for a tracker key like `ENG-123`. */
+export function issueBranchName(issue: { readonly displayKey: string; readonly title: string }) {
+  const slug = issueSlug(issue.title);
+  return issue.displayKey.startsWith("#")
+    ? `fix/${issue.displayKey.slice(1)}-${slug}`
+    : `${issue.displayKey.toLowerCase()}-${slug}`;
 }
 
 /**
@@ -50,63 +31,38 @@ interface PromptSource {
  * names no workspace paths.
  */
 export function buildIssuePrompt(detail: IssueDetail, branch: string): string {
-  return buildPrompt(
-    {
-      identifier: `#${detail.issue.number}`,
-      title: detail.issue.title,
-      url: detail.issue.url,
-      description: detail.body,
-      comments: detail.comments,
-      commentsTruncated: detail.commentsTruncated,
-    },
-    branch,
-  );
-}
-
-export function buildLinearIssuePrompt(
-  issue: LinearIssueSummary,
-  detail: LinearIssueDetail,
-  branch: string,
-): string {
-  return buildPrompt(
-    {
-      identifier: issue.identifier,
-      title: issue.title,
-      url: issue.url,
-      description: detail.description,
-      comments: detail.comments,
-      commentsTruncated: detail.commentsTruncated,
-    },
-    branch,
-  );
-}
-
-function buildPrompt(source: PromptSource, branch: string): string {
+  const older = detail.commentsCursor === null ? "" : "(Older comments are not shown here.)\n\n";
   const comments =
-    source.comments.length === 0
+    detail.comments.length === 0
       ? ""
-      : `\n\n## Comments\n\n${source.comments
+      : `\n\n## Comments\n\n${older}${detail.comments
           .map(
             (comment) =>
-              `### ${comment.author ?? "unknown"} - ${comment.createdAt}\n\n${comment.body}`,
+              `### ${comment.author?.login ?? "unknown"} - ${comment.createdAt}\n\n${comment.body}`,
           )
           .join("\n\n---\n\n")}`;
-  const truncated = source.commentsTruncated
-    ? "\n\n(The thread has more comments than are shown here.)"
-    : "";
-  const description = source.description.trim() === "" ? "(no description)" : source.description;
-  return `/complete-task # Source: ${source.identifier} - ${source.title}
+  const description = detail.body.trim() === "" ? "(no description)" : detail.body;
+  return `/complete-task # Source: ${detail.displayKey} - ${detail.title}
 
-Source: ${source.url}
-Identifier: ${source.identifier}
-Title: ${source.title}
+Source: ${detail.url}
+Identifier: ${detail.displayKey}
+Title: ${detail.title}
 Branch: ${branch}
 
 ---
 
 ## Description
 
-${description}${comments}${truncated}`;
+${description}${comments}`;
+}
+
+/**
+ * The state a dispatched issue moves to: the first started one in its workflow, while it is
+ * open and not started yet. Null where the tracker marks no state as started.
+ */
+export function issueStartState(detail: Pick<IssueDetail, "state" | "states">): IssueState | null {
+  if (detail.state.category !== "open" || detail.state.started === true) return null;
+  return detail.states.find((state) => state.started === true) ?? null;
 }
 
 /**

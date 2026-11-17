@@ -1,10 +1,4 @@
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  ChartNoAxesColumnIcon,
-  CircleDotIcon,
-  SettingsIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -19,7 +13,7 @@ import {
 } from "../../navigationHistory";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
-import { usePullRequestsSupported } from "../../state/environments";
+import { useIssuesSupported, usePullRequestsSupported } from "../../state/environments";
 import { T3Wordmark } from "../T3Wordmark";
 import {
   resolveEnvironmentIdentificationPillLabel,
@@ -39,6 +33,8 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import { readIssueListPreferences } from "../issue/issueListPreferences";
+import { IssueGlyph } from "../issue/issuePresentation";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarKeepAwakeToggle } from "./SidebarKeepAwakeToggle";
@@ -234,6 +230,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const pullRequestsSupported = usePullRequestsSupported();
+  const issuesSupported = useIssuesSupported();
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -248,7 +245,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   };
   const handleIssuesClick = () => {
     closeMobileSidebar();
-    void navigate({ to: "/issues" });
+    void navigate({ to: "/issues", search: readIssueListPreferences() });
   };
   const handleSettingsClick = () => {
     closeMobileSidebar();
@@ -290,7 +287,13 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               onClick={handlePullRequestsClick}
             />
           ) : null}
-          <SidebarUtilityItem icon={<CircleDotIcon />} label="Issues" onClick={handleIssuesClick} />
+          {issuesSupported ? (
+            <SidebarUtilityItem
+              icon={<IssueGlyph.issue />}
+              label="Issues"
+              onClick={handleIssuesClick}
+            />
+          ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label="Usage"

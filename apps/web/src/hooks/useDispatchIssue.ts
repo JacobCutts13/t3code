@@ -10,8 +10,7 @@ import {
   AuthOrchestrationOperateScope,
   AuthSourceControlWriteScope,
   type EnvironmentId,
-  type IssueSummary,
-  type LinearIssueSummary,
+  type IssueDetail,
   type ModelSelection,
   type ReviewRequestSummary,
   type ScopedThreadRef,
@@ -25,9 +24,8 @@ import { findProjectForRepository } from "~/components/pullRequest/pullRequestLi
 import { buildReviewPrompt } from "~/components/pullRequest/pullRequestReviewDispatch.logic";
 import {
   buildIssuePrompt,
-  buildLinearIssuePrompt,
   issueBranchName,
-  linearBranchName,
+  issueStartState,
   worktreeBase,
 } from "~/components/issues/issueDispatch.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
@@ -38,13 +36,12 @@ import {
 } from "~/providerInstances";
 import { useProjects } from "~/state/entities";
 import { useEnvironmentProviders } from "~/state/environments";
-import { issueEnvironment } from "~/state/issues";
+import { issueEnvironment, refreshIssueLists } from "~/state/issues";
 import { gitEnvironment } from "~/state/git";
 import { EMPTY_SERVER_PROVIDERS } from "~/state/server";
 import { readEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 import { vcsEnvironment } from "~/state/vcs";
 import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE } from "~/types";
@@ -79,29 +76,19 @@ function reportFailure(
 }
 
 /**
- * Starts an agent on a GitHub or Linear issue: a thread in a new worktree whose first message
- * runs `/complete-task`. That skill plans first and waits for approval before building.
+ * Starts an agent on an issue: a thread in a new worktree whose first message runs
+ * `/complete-task`. That skill plans first and waits for approval before building.
  */
 export function useDispatchIssue(environmentId: EnvironmentId) {
   const projects = useProjects();
   const settings = useEnvironmentSettings(environmentId);
   const providers = useEnvironmentProviders().get(environmentId) ?? EMPTY_SERVER_PROVIDERS;
-  const readIssue = useAtomQueryRunner(issueEnvironment.get, {
-    reportFailure: false,
-    reportDefect: false,
-  });
-  const readLinearIssue = useAtomQueryRunner(issueEnvironment.linearGet, {
-    reportFailure: false,
-    reportDefect: false,
-  });
   const readRefs = useAtomCommand(vcsEnvironment.readRefs, {
     label: "read the project's branches",
     reportFailure: false,
   });
-  const startLinearIssue = useAtomCommand(issueEnvironment.linearStart, {
-    label: "move the Linear issue to started",
-    reportFailure: false,
-  });
+  const setIssueState = useAtomCommand(issueEnvironment.setState, { reportFailure: false });
+  const linkIssue = useAtomCommand(threadEnvironment.linkIssue, { reportFailure: false });
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
   });
@@ -111,11 +98,11 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
   const linking = usePullRequestLinking(environmentId);
   const navigate = useNavigate();
 
-  /** The added project whose clone is the issue's repository, if any. */
-  const projectFor = (issue: Pick<IssueSummary, "repository" | "host">) =>
+  /** The added project whose clone is the pull request's repository, if any. */
+  const projectFor = (pr: Pick<ReviewRequestSummary, "repository" | "host">) =>
     findProjectForRepository(
       projects.filter((project) => project.environmentId === environmentId),
-      { repository: issue.repository, host: issue.host },
+      { repository: pr.repository, host: pr.host },
     );
 
   /**
@@ -231,91 +218,82 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
   };
 
   /**
-   * Starts an agent on a GitHub issue in `project`, the issue's repository's project unless the
-   * user picked another; a picked project branches from its own default branch.
+   * Starts an agent on an issue in `project`, a thread in a new worktree off the project's default
+   * branch, links the issue to it, then moves the issue to its first started state, if any.
    */
   const dispatch = async (
-    issue: IssueSummary,
+    detail: IssueDetail,
     project: EnvironmentProject,
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
     const modelSelection = modelFor(project, picked);
     if (modelSelection === null) return fail("Cannot dispatch", "No model is available.");
-    const isIssueRepository = projectFor(issue)?.id === project.id;
-
     try {
-      const [detail, refsBase] = await Promise.all([
-        readIssue({
-          environmentId,
-          input: { host: issue.host, repository: issue.repository, number: issue.number },
-        }),
-        isIssueRepository ? null : baseFromRefs(project),
-      ]);
-      if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
-      const defaultBranch = detail.value.defaultBranch;
-      const base =
-        refsBase ??
-        (defaultBranch === null
-          ? fail("Cannot dispatch", `GitHub did not report ${issue.repository}'s default branch.`)
-          : defaultBranch);
+      const base = await baseFromRefs(project);
       if (base === false) return false;
-
-      const branch = issueBranchName(issue);
-      const launched = await launch({
+      const branch = issueBranchName(detail);
+      const threadRef = await launch({
         project,
         modelSelection,
-        title: `#${issue.number} ${issue.title}`,
-        text: buildIssuePrompt(detail.value, branch),
+        title: `${detail.displayKey} ${detail.title}`,
+        text: buildIssuePrompt(detail, branch),
         worktree: { kind: "new", baseBranch: base, branch },
       });
-      return launched !== false;
+      if (threadRef === false) return false;
+      const [linked, moved] = await Promise.all([
+        linkIssue({
+          environmentId,
+          input: {
+            threadId: threadRef.threadId,
+            tracker: detail.tracker,
+            host: detail.host,
+            scope: detail.scope,
+            key: detail.key,
+            projectId: detail.projectId,
+            url: detail.url,
+            displayKey: detail.displayKey,
+            title: detail.title,
+            source: "manual",
+          },
+        }),
+        moveToStarted(detail),
+      ]);
+      if (linked._tag === "Failure") {
+        reportFailure(linked, "The agent started, but the issue is not linked to it", "warning");
+      }
+      if (moved) refreshIssueLists(environmentId);
+      return true;
     } catch (error) {
       return fail("Could not dispatch the issue", errorMessage(error));
     }
   };
 
-  /**
-   * Starts an agent on a Linear issue in `project`, a thread in a new worktree on
-   * `<identifier>-<slug>`, then moves the issue to its team's first started state.
-   */
-  const dispatchLinear = async (
-    issue: LinearIssueSummary,
-    project: EnvironmentProject,
-    picked: ModelSelection | null = null,
-  ): Promise<boolean> => {
-    const modelSelection = modelFor(project, picked);
-    if (modelSelection === null) return fail("Cannot dispatch", "No model is available.");
-    try {
-      const [detail, base] = await Promise.all([
-        readLinearIssue({ environmentId, input: { id: issue.id } }),
-        baseFromRefs(project),
-      ]);
-      if (detail._tag === "Failure") return reportFailure(detail, "Could not read the issue");
-      if (base === false) return false;
-      const branch = linearBranchName(issue);
-      const launched = await launch({
-        project,
-        modelSelection,
-        title: `${issue.identifier} ${issue.title}`,
-        text: buildLinearIssuePrompt(issue, detail.value, branch),
-        worktree: { kind: "new", baseBranch: base, branch },
-      });
-      if (launched === false) return false;
-      const moved = await startLinearIssue({ environmentId, input: { id: issue.id } });
-      if (moved._tag === "Failure") {
-        reportFailure(moved, `Could not move ${issue.identifier} in Linear`, "warning");
-      } else if (moved.value.moved) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "success",
-            title: `Moved ${issue.identifier} to ${moved.value.stateName}`,
-          }),
-        );
-      }
-      return true;
-    } catch (error) {
-      return fail("Could not dispatch the issue", errorMessage(error));
+  /** Moves a writable issue to its first started state; true when it moved. */
+  const moveToStarted = async (detail: IssueDetail): Promise<boolean> => {
+    const target = issueStartState(detail);
+    if (target === null || !detail.writable || !detail.viewerPermissions.setState) return false;
+    const moved = await setIssueState({
+      environmentId,
+      input: {
+        projectId: detail.projectId,
+        tracker: detail.tracker,
+        host: detail.host,
+        scope: detail.scope,
+        key: detail.key,
+        state: target.name,
+      },
+    });
+    if (moved._tag === "Failure") {
+      reportFailure(moved, `Could not move ${detail.displayKey} to ${target.name}`, "warning");
+      return false;
     }
+    toastManager.add(
+      stackedThreadToast({
+        type: "success",
+        title: `Moved ${detail.displayKey} to ${target.name}`,
+      }),
+    );
+    return true;
   };
 
   /** Why this connection cannot dispatch a review, or null when it can. */
@@ -388,7 +366,6 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     projectFor,
     modelFor,
     dispatch,
-    dispatchLinear,
     dispatchReview,
     reviewBlockedReason,
   };

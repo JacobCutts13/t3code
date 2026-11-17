@@ -1,7 +1,8 @@
 import {
+  type IssueComment,
   type IssueDetail,
-  type LinearIssueDetail,
-  type LinearIssueSummary,
+  IssueTrackerKind,
+  ProjectId,
   ThreadId,
   type VcsRef,
 } from "@t3tools/contracts";
@@ -9,35 +10,64 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   buildIssuePrompt,
-  buildLinearIssuePrompt,
   dispatchedThreadId,
   issueBranchName,
   issueSlug,
-  linearBranchName,
+  issueStartState,
   threadsByBranch,
   worktreeBase,
 } from "./issueDispatch.logic";
 
+const capabilities = {
+  create: true,
+  edit: true,
+  comment: true,
+  labels: true,
+  assignees: true,
+  reactions: true,
+  templates: true,
+  linkedPullRequests: true,
+  events: true,
+  search: true,
+};
+
 const detail = (overrides: Partial<IssueDetail> = {}): IssueDetail => ({
-  issue: {
-    host: "github.com",
-    repository: "acme/api",
-    number: 12,
-    title: "Crash when saving: a draft!",
-    state: "open",
-    url: "https://github.com/acme/api/issues/12",
-    author: "ada",
-    assignees: [],
-    labels: [],
-    commentCount: 0,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-02T00:00:00Z",
-  },
+  tracker: IssueTrackerKind.make("github"),
+  host: "github.com",
+  scope: "acme/api",
+  key: "12",
+  displayKey: "#12",
+  title: "Crash when saving: a draft!",
+  url: "https://github.com/acme/api/issues/12",
+  author: { login: "ada", name: null, avatarUrl: null },
+  state: { category: "open", name: "Open" },
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z",
+  closedAt: null,
+  assignees: [],
+  labels: [],
+  commentCount: 0,
+  projectId: ProjectId.make("p1"),
+  projectTitle: "api",
+  writable: true,
+  capabilities,
+  viewerPermissions: { setState: true, comment: true, edit: true, labels: true, assignees: true },
+  states: [],
+  viewer: "ada",
   body: "Steps to reproduce",
-  defaultBranch: "main",
   comments: [],
-  commentsTruncated: false,
+  commentsCursor: null,
+  events: [],
+  linkedPullRequests: [],
   ...overrides,
+});
+
+const comment = (login: string | null, body: string, createdAt: string): IssueComment => ({
+  id: `${login}-${createdAt}`,
+  author: login === null ? null : { login, name: null, avatarUrl: null },
+  body,
+  createdAt,
+  url: null,
 });
 
 describe("issueSlug", () => {
@@ -57,19 +87,20 @@ describe("issueSlug", () => {
 });
 
 describe("issueBranchName", () => {
-  it("is fix/<number>-<slug>", () => {
-    expect(issueBranchName({ number: 12, title: "Crash when saving" })).toBe(
-      "fix/12-crash-when-saving",
-    );
+  it.each([
+    { displayKey: "#12", expected: "fix/12-crash-when-saving" },
+    { displayKey: "ENG-123", expected: "eng-123-crash-when-saving" },
+  ])("names $displayKey's branch $expected", ({ displayKey, expected }) => {
+    expect(issueBranchName({ displayKey, title: "Crash when saving" })).toBe(expected);
   });
 });
 
 describe("buildIssuePrompt", () => {
-  it("renders the whole GitHub prompt exactly", () => {
+  it("renders the whole prompt exactly, saying older comments were left out", () => {
     const prompt = buildIssuePrompt(
       detail({
-        comments: [{ author: "grace", body: "On it", createdAt: "2026-01-03T00:00:00Z" }],
-        commentsTruncated: true,
+        comments: [comment("grace", "On it", "2026-01-03T00:00:00Z")],
+        commentsCursor: "older",
       }),
       "fix/12-crash",
     );
@@ -88,43 +119,27 @@ Steps to reproduce
 
 ## Comments
 
+(Older comments are not shown here.)
+
 ### grace - 2026-01-03T00:00:00Z
 
-On it
-
-(The thread has more comments than are shown here.)`);
+On it`);
   });
 
-  it("runs /complete-task with the issue's header, description and no comments section", () => {
+  it("leaves out the comments section when there are none", () => {
     const prompt = buildIssuePrompt(detail(), "fix/12-crash");
-    expect(prompt.startsWith("/complete-task # Source: #12 - Crash when saving: a draft!")).toBe(
-      true,
-    );
-    expect(prompt).toContain("Source: https://github.com/acme/api/issues/12");
-    expect(prompt).toContain("Branch: fix/12-crash");
     expect(prompt).toContain("## Description\n\nSteps to reproduce");
     expect(prompt).not.toContain("## Comments");
+    expect(prompt).not.toContain("Older comments");
   });
 
-  it("says when the thread has more comments than the prompt carries", () => {
-    const prompt = buildIssuePrompt(
-      detail({
-        comments: [{ author: "grace", body: "On it", createdAt: "2026-01-03T00:00:00Z" }],
-        commentsTruncated: true,
-      }),
-      "fix/12-crash",
-    );
-    expect(prompt).toContain("more comments than are shown");
-    expect(buildIssuePrompt(detail(), "fix/12-crash")).not.toContain("more comments");
-  });
-
-  it("appends comments oldest first and says so when there is no description", () => {
+  it("keeps comments oldest first and says so when there is no description", () => {
     const prompt = buildIssuePrompt(
       detail({
         body: "  ",
         comments: [
-          { author: "grace", body: "On it", createdAt: "2026-01-03T00:00:00Z" },
-          { author: null, body: "Thanks", createdAt: "2026-01-04T00:00:00Z" },
+          comment("grace", "On it", "2026-01-03T00:00:00Z"),
+          comment(null, "Thanks", "2026-01-04T00:00:00Z"),
         ],
       }),
       "fix/12-crash",
@@ -134,45 +149,22 @@ On it
   });
 });
 
-const linearIssue: LinearIssueSummary = {
-  id: "uuid-1",
-  identifier: "ENG-123",
-  title: "Fix login",
-  url: "https://linear.app/acme/issue/ENG-123/fix-login",
-  priority: 2,
-  state: { name: "Todo", type: "unstarted", color: "#e2e2e2" },
-  team: { id: "team-1", name: "Engineering" },
-  project: null,
-  assignee: null,
-  updatedAt: "2026-01-02T00:00:00Z",
-};
+describe("issueStartState", () => {
+  const todo = { category: "open", name: "Todo" } as const;
+  const inProgress = { category: "open", name: "In Progress", started: true } as const;
+  const done = { category: "closed", name: "Done", closeReason: "completed" } as const;
+  const states = [todo, inProgress, { ...inProgress, name: "In Review" }, done];
 
-const linearDetail: LinearIssueDetail = {
-  description: "",
-  comments: [],
-  commentsTruncated: false,
-};
-
-describe("Linear dispatch", () => {
-  it("branches as <identifier>-<slug>", () => {
-    expect(linearBranchName(linearIssue)).toBe("eng-123-fix-login");
+  it.each([
+    { name: "an unstarted issue to the first started state", state: todo, expected: inProgress },
+    { name: "a started issue nowhere", state: inProgress, expected: null },
+    { name: "a closed issue nowhere", state: done, expected: null },
+  ])("moves $name", ({ state, expected }) => {
+    expect(issueStartState({ state, states })).toEqual(expected);
   });
 
-  it("uses the GitHub template with the Linear identifier", () => {
-    expect(buildLinearIssuePrompt(linearIssue, linearDetail, "eng-123-fix-login")).toBe(
-      `/complete-task # Source: ENG-123 - Fix login
-
-Source: https://linear.app/acme/issue/ENG-123/fix-login
-Identifier: ENG-123
-Title: Fix login
-Branch: eng-123-fix-login
-
----
-
-## Description
-
-(no description)`,
-    );
+  it("moves nothing on a tracker that marks no state started", () => {
+    expect(issueStartState({ state: todo, states: [todo, done] })).toBeNull();
   });
 });
 

@@ -12,12 +12,13 @@ import { definition } from "../shared/definition.ts";
 
 import * as GitHubAppAccess from "./GitHubAppAccess.ts";
 import * as GitHubAppSignIn from "./GitHubAppSignIn.ts";
-import * as GitHubIssueProvider from "./GitHubIssueProvider.ts";
 import * as GitHubMediaFetch from "./gitHubMediaFetch.ts";
 import * as GitHubPullRequestApi from "./GitHubPullRequestApi.ts";
 import * as GitHubPullRequestProvider from "./GitHubPullRequestProvider.ts";
+import * as GitHubReviewRequestProvider from "./GitHubReviewRequestProvider.ts";
 import * as GitHubRest from "./GitHubRest.ts";
 import * as GitHubHttpClient from "./GitHubHttpClient.ts";
+import * as GitHubIssueTracker from "./GitHubIssueTracker.ts";
 import * as GitHubSourceControlProvider from "./GitHubSourceControlProvider.ts";
 
 // `GitHubRest.layerWithDependencies` carries the quota reserve every GitHub reader shares, so it
@@ -105,7 +106,8 @@ const makeInstance = Effect.gen(function* () {
       sourceControl: GitHubSourceControlProvider.make,
       discovery: GitHubSourceControlProvider.makeDiscovery,
       pullRequests: GitHubPullRequestProvider.make,
-      issues: GitHubIssueProvider.make,
+      issues: GitHubIssueTracker.make,
+      reviewRequests: GitHubReviewRequestProvider.make,
       fetchMedia: GitHubMediaFetch.make.pipe(
         Effect.provideService(HttpClient.HttpClient, mediaHttpClient),
       ),
