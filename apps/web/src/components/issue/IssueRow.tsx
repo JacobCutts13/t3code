@@ -4,6 +4,7 @@ import { memo } from "react";
 
 import { cn } from "~/lib/utils";
 
+import { ExternalRefLink } from "../pullRequest/ExternalRefLink";
 import {
   PULL_REQUEST_ROW_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
@@ -56,7 +57,16 @@ function IssueRowImpl({
       >
         <IssueStateGlyph state={entry.state} />
         <PullRequestRowLines
-          number={<span className={PULL_REQUEST_ROW_NUMBER_CLASS}>{entry.displayKey}</span>}
+          number={
+            <ExternalRefLink
+              inRow
+              url={entry.url}
+              label={entry.displayKey}
+              openLabel={`Open on ${tracker.providerName}`}
+              ariaLabel={`Open ${entry.displayKey} on ${tracker.providerName}`}
+              className={PULL_REQUEST_ROW_NUMBER_CLASS}
+            />
+          }
           title={entry.title}
           status={
             <>
