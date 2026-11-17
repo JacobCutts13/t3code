@@ -76,8 +76,8 @@ function reportFailure(
 }
 
 /**
- * Starts an agent on a GitHub or Linear issue: a thread in a new worktree whose first message
- * runs `/complete-task`. That skill plans first and waits for approval before building.
+ * Starts an agent on an issue: a thread in a new worktree whose first message runs
+ * `/complete-task`. That skill plans first and waits for approval before building.
  */
 export function useDispatchIssue(environmentId: EnvironmentId) {
   const projects = useProjects();
@@ -98,7 +98,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
   const linking = usePullRequestLinking(environmentId);
   const navigate = useNavigate();
 
-  /** The added project whose clone is the issue's repository, if any. */
+  /** The added project whose clone is the pull request's repository, if any. */
   const projectFor = (pr: Pick<ReviewRequestSummary, "repository" | "host">) =>
     findProjectForRepository(
       projects.filter((project) => project.environmentId === environmentId),
