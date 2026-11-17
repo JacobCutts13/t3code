@@ -79,6 +79,12 @@ export interface TrackerIssuePage {
   readonly nextCursor: string | null;
 }
 
+/** A page read across scopes, so each row names the scope it lives in. */
+export interface TrackerAccountIssuePage {
+  readonly items: ReadonlyArray<TrackerIssueSummary & { readonly scope: string }>;
+  readonly nextCursor: string | null;
+}
+
 export interface TrackerIssueDetail extends TrackerIssueSummary {
   readonly body: string;
   readonly viewer: string | null;
@@ -120,6 +126,15 @@ export interface IssueTrackerApi {
       readonly cursor?: string | undefined;
     },
   ) => Effect.Effect<TrackerIssuePage, IssueTrackerError>;
+
+  /**
+   * Issues involving the signed-in account in every scope it reaches, not one scope's. `all`
+   * involvement means any involvement of the viewer. Absent where the tracker cannot read across
+   * scopes.
+   */
+  readonly listAccountIssues?: (
+    input: Omit<Parameters<IssueTrackerApi["listIssues"]>[0], "scope">,
+  ) => Effect.Effect<TrackerAccountIssuePage, IssueTrackerError>;
 
   /** The issue with its first page of conversation, in one read where the tracker allows. */
   readonly getIssue: (input: IssueTarget) => Effect.Effect<TrackerIssueDetail, IssueTrackerError>;

@@ -16,6 +16,7 @@ import type {
 import { decodeJsonResult } from "@t3tools/shared/schemaJson";
 import type { TrackerIssueSummary } from "@t3tools/source-control-core/server/IssueTracker";
 
+import type * as AccountIssues from "./accountIssues.graphql.ts";
 import type * as Issues from "./issues.graphql.ts";
 import { toReactions } from "./gitHubPullRequestJson.ts";
 
@@ -295,6 +296,17 @@ export function toIssueSearch({ search }: Issues.IssueSearch.Result) {
   return {
     items: (search.nodes ?? []).flatMap((node) =>
       node !== null && node.__typename === "Issue" ? [toSummary(node)] : [],
+    ),
+    nextCursor: search.pageInfo.hasNextPage ? search.pageInfo.endCursor : null,
+  };
+}
+
+export function toAccountIssueSearch({ search }: AccountIssues.AccountIssueSearch.Result) {
+  return {
+    items: (search.nodes ?? []).flatMap((node) =>
+      node !== null && node.__typename === "Issue"
+        ? [{ ...toSummary(node), scope: node.repository.nameWithOwner }]
+        : [],
     ),
     nextCursor: search.pageInfo.hasNextPage ? search.pageInfo.endCursor : null,
   };

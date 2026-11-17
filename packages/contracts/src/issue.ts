@@ -279,6 +279,12 @@ export const IssueListInput = Schema.Struct({
   assignee: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(320))),
   /** Absent means `updated`. */
   sort: Schema.optional(IssueListSort),
+  /**
+   * Every repository or team the signed-in account reaches, not only the projects'. Involvement
+   * `all` then means involving the viewer. A tracker that cannot read across scopes lists its
+   * projects' scopes as usual.
+   */
+  everywhere: Schema.optional(Schema.Boolean),
 });
 export type IssueListInput = typeof IssueListInput.Type;
 

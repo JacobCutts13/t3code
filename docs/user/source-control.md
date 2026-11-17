@@ -364,6 +364,11 @@ DevOps or Forgejo, grouped per tracker account. Open it from the sidebar's utili
 (assigned, opened by you, mentioning you), and by tracker; the search box asks the tracker
 itself where it can search. Press **Load more** at the end of a group to read further back.
 
+Switch **My projects** to **All repositories** to list GitHub and Linear issues that involve you
+anywhere your account reaches, including repositories and teams without a project. There,
+**Involving me** replaces **Everyone**. An issue outside your projects opens read-only, and still
+needs one project on its host (or one bound to Linear) to be read through.
+
 To list a Linear team's issues beside a project's, connect Linear with an API key under
 Settings → Source control & issues, then choose the team for that project there.
 

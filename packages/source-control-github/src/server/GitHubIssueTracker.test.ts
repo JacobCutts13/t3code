@@ -407,6 +407,20 @@ describe("GitHubIssueTracker", () => {
       expect(seen[0]).toMatchObject({
         q: 'is:issue repo:acme/web is:open label:"needs \\"repro\\"" assignee:"theo" sort:created-desc',
       });
+
+      // Across repositories, "everyone" means anything involving the viewer.
+      yield* api
+        .listAccountIssues({
+          cwd: "/w",
+          host: "github.com",
+          state: "open",
+          involvement: "all",
+          viewer: "julius",
+          sort: "updated",
+          limit: 10,
+        })
+        .pipe(Effect.exit);
+      expect(seen[1]).toMatchObject({ q: "is:issue is:open involves:julius sort:updated-desc" });
     }),
   );
 

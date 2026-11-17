@@ -17,6 +17,8 @@ export interface IssueListPreferences {
   readonly label?: ReadonlyArray<string> | undefined;
   readonly assignee?: string | undefined;
   readonly order?: "created" | undefined;
+  /** Every repository the account reaches, not only the projects'. */
+  readonly everywhere?: true | undefined;
 }
 
 const DEFAULT_ISSUE_LIST_PREFERENCES = {
@@ -35,6 +37,7 @@ const IssueListPreferencesSchema = Schema.Struct({
   label: Schema.optional(Schema.Array(BoundedPreference).check(Schema.isMaxLength(20))),
   assignee: Schema.optional(BoundedPreference),
   order: Schema.optional(Schema.Literal("created")),
+  everywhere: Schema.optional(Schema.Literal(true)),
 });
 const decodePreferences = Schema.decodeUnknownOption(IssueListPreferencesSchema);
 
@@ -53,6 +56,7 @@ export function issueListPreferences(search: {
   readonly label?: ReadonlyArray<string> | undefined;
   readonly assignee?: string | undefined;
   readonly order?: "created" | undefined;
+  readonly everywhere?: true | undefined;
 }): IssueListPreferences {
   return {
     who: search.who,
@@ -62,6 +66,7 @@ export function issueListPreferences(search: {
     ...(search.label?.length ? { label: search.label } : {}),
     ...(search.assignee ? { assignee: search.assignee } : {}),
     ...(search.order ? { order: search.order } : {}),
+    ...(search.everywhere ? { everywhere: true } : {}),
   };
 }
 
