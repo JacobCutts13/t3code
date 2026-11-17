@@ -2983,6 +2983,7 @@ it.effect.each([
       "completed",
       "failed",
       "message",
+      "running-message",
       "unsettle",
       "unavailable",
       "subagent",
@@ -3114,12 +3115,75 @@ it.effect.each([
         assert.lengthOf((yield* projections.getThreadProjection(threadId)).runs, admitted ? 2 : 1);
         if (admitted) {
           const reflectionRun = projection.runs[1]!;
-          if (outcome === "message") {
+          if (outcome === "running-message") {
+            const providerThread = projection.providerThreads.find(
+              (entry) => entry.id === reflectionRun.providerThreadId,
+            )!;
+            const sessionId = ProviderSessionId.make(`running-reflection-session:${threadId}`);
+            yield* projections.apply({
+              type: "provider-session.attached",
+              id: EventId.make(`running-session:${threadId}`),
+              threadId,
+              occurredAt: now,
+              payload: {
+                id: sessionId,
+                driver: adapter.driver,
+                providerInstanceId: instanceId,
+                status: "ready",
+                cwd: "/repo",
+                model: modelSelection.model,
+                capabilities: CodexProviderCapabilitiesV2,
+                createdAt: now,
+                updatedAt: now,
+                lastError: null,
+              },
+            });
+            yield* projections.apply({
+              type: "provider-thread.updated",
+              id: EventId.make(`running-provider:${threadId}`),
+              threadId,
+              occurredAt: now,
+              payload: { ...providerThread, providerSessionId: sessionId, status: "active" },
+            });
+            yield* projections.apply({
+              type: "run.updated",
+              id: EventId.make(`running-reflection:${threadId}`),
+              threadId,
+              runId: reflectionRun.id,
+              occurredAt: now,
+              payload: { ...reflectionRun, status: "running", startedAt: now },
+            });
+            yield* projections.apply({
+              type: "provider-turn.updated",
+              id: EventId.make(`running-turn:${threadId}`),
+              threadId,
+              runId: reflectionRun.id,
+              occurredAt: now,
+              payload: {
+                id: ProviderTurnId.make(`reflection-turn:${threadId}`),
+                providerThreadId: providerThread.id,
+                nodeId: reflectionRun.rootNodeId!,
+                runAttemptId: reflectionRun.activeAttemptId!,
+                nativeTurnRef: {
+                  driver: adapter.driver,
+                  nativeId: "reflection-turn",
+                  strength: "strong",
+                },
+                ordinal: 1,
+                status: "running",
+                startedAt: now,
+                completedAt: null,
+              },
+            });
+          }
+          const superseded = outcome === "message" || outcome === "running-message";
+          if (superseded) {
             yield* orchestrator.dispatch({
               type: "message.dispatch",
               commandId: CommandId.make(`new:${threadId}`),
               threadId,
               messageId: MessageId.make(`new:${threadId}`),
+              deliveryIntent: "auto",
               text: "Continue with a new task.",
               attachments: [],
               createdBy: "user",
@@ -3175,14 +3239,22 @@ it.effect.each([
           const after = yield* projections.getThreadProjection(threadId);
           assert.lengthOf(
             after.providerSessions,
-            outcome === "message" || outcome === "unsettle" ? 1 : 0,
+            superseded || outcome === "unsettle" ? (outcome === "running-message" ? 2 : 1) : 0,
           );
-          assert.lengthOf(after.runs, outcome === "message" ? 3 : 2);
+          assert.lengthOf(after.runs, superseded ? 3 : 2);
           assert.equal(
             after.thread.settledOverride,
-            outcome === "message" ? null : outcome === "unsettle" ? "active" : "settled",
+            superseded ? null : outcome === "unsettle" ? "active" : "settled",
           );
-          if (outcome === "message" || outcome === "unsettle")
+          if (outcome === "running-message") {
+            assert.equal(after.runs.at(-1)?.status, "queued");
+            assert.notEqual(
+              after.messages.find((message) => message.id === MessageId.make(`new:${threadId}`))
+                ?.runId,
+              reflectionRun.id,
+            );
+          }
+          if ((superseded && outcome !== "running-message") || outcome === "unsettle")
             assert.include(
               ["cancelled", "interrupted"],
               after.runs.find((run) => run.id === reflectionRun.id)?.status,

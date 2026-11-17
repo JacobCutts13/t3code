@@ -4079,6 +4079,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
   ) {
     const projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+    let superseded = false;
     for (const run of projection.runs.filter(
       (candidate) => isActiveRun(candidate) || candidate.status === "queued",
     )) {
@@ -4090,6 +4091,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         )
       )
         continue;
+      superseded = true;
       if (run.status === "queued") {
         yield* dispatchQueuedRunCancel(
           { ...command, type: "queued-run.cancel", runId: run.id },
@@ -4110,6 +4112,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         );
       }
     }
+    return superseded;
   });
 
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
@@ -6903,12 +6906,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         : undefined,
     );
+    let supersededWikiReflection = false;
     if (
       projection.thread.settledOverride === "settled" &&
       command.notification === undefined &&
       command.scheduledTaskId === undefined
     ) {
-      yield* cancelWikiReflection(command, events, effects);
+      supersededWikiReflection = yield* cancelWikiReflection(command, events, effects);
       projection = yield* getProjectionWithPendingEvents(command.threadId, events);
     }
     if (command.steerFollowUpOfRunId !== undefined) {
@@ -7234,11 +7238,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       projection = applyToProjection(projection, event);
     }
     let modelSelection = command.modelSelection ?? projection.thread.modelSelection;
-    let dispatchMode = resolveMessageDispatchIntent(
-      projection,
-      command.dispatchMode,
-      command.deliveryIntent,
-    );
+    let dispatchMode = supersededWikiReflection
+      ? { type: "queue_after_active" as const }
+      : resolveMessageDispatchIntent(projection, command.dispatchMode, command.deliveryIntent);
     if (dispatchMode.type === "steer_active" || dispatchMode.type === "restart_active") {
       const targetRunId = dispatchMode.targetRunId;
       const target = projection.runs.find((run) => run.id === targetRunId);
