@@ -1,4 +1,4 @@
-/** Cockpit's read-only review session: team review, print the comment, post only on "post". */
+/** Cockpit's read-only review session: team review, then auto-post the verified findings as a comment. */
 export function buildReviewPrompt(pr: { readonly repository: string; readonly number: number }) {
   const { repository: repo, number } = pr;
   return (
@@ -16,11 +16,11 @@ export function buildReviewPrompt(pr: { readonly repository: string; readonly nu
     `(2) apply obvious mechanical fixes directly; ` +
     `(3) escalate non-obvious findings with file:line, the finding, why it is non-obvious, and 1–2 candidate approaches. ` +
     `Print an action report when done."\n` +
-    `   - Every critical and major finding, each with: file:line, severity, issue, evidence, suggested fix.\n` +
-    `   - The "What to verify" checklist from the review summary.\n\n` +
-    // oxlint-disable-next-line t3code/no-em-dash-copy -- cockpit's prompt verbatim; agent-facing, not product copy.
-    `Print the full comment body labelled "REVIEW COMMENT:" so I can read it — wait for me to type "post", then use the Write tool to write the body to /tmp/pr-review-comment.txt and submit with:\n` +
+    `   - Every critical and major finding that survived /review-team's verification (its action report, not the pre-verification summary), each with: file:line, severity, issue, its Example: walkthrough, suggested fix.\n` +
+    `   - The "What to verify" checklist, limited to those findings.\n\n` +
+    `Print the full comment body labelled "REVIEW COMMENT:", then post it without waiting for confirmation: use the Write tool to write the body to /tmp/pr-review-comment.txt and submit with:\n` +
     `  gh pr review ${number} --repo ${repo} --comment --body-file /tmp/pr-review-comment.txt\n\n` +
+    `If no critical or major finding survived verification, skip the comment: /review-team's approval already records the result.\n\n` +
     `IMPORTANT: Do NOT edit any source files. Do NOT commit or push anything. Read-only review only.`
   );
 }
