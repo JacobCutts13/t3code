@@ -15,13 +15,13 @@ import {
   type ReviewRequestSummary,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
-import { offHeadPullRequestCheckoutToast } from "~/components/pullRequest/pullRequestCheckoutToast";
-import { checkoutFailureDescription } from "~/components/pullRequest/pullRequestDetail.logic";
 import { findProjectForRepository } from "~/components/pullRequest/pullRequestList.logic";
-import { buildReviewPrompt } from "~/components/pullRequest/pullRequestReviewDispatch.logic";
+import {
+  buildReviewPrompt,
+  reviewBranchName,
+} from "~/components/pullRequest/pullRequestReviewDispatch.logic";
 import {
   buildIssuePrompt,
   issueBranchName,
@@ -37,7 +37,6 @@ import {
 import { useProjects } from "~/state/entities";
 import { useEnvironmentProviders } from "~/state/environments";
 import { issueEnvironment, refreshIssueLists } from "~/state/issues";
-import { gitEnvironment } from "~/state/git";
 import { EMPTY_SERVER_PROVIDERS } from "~/state/server";
 import { readEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "~/state/threads";
@@ -90,9 +89,6 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
   const setIssueState = useAtomCommand(issueEnvironment.setState, { reportFailure: false });
   const linkIssue = useAtomCommand(threadEnvironment.linkIssue, { reportFailure: false });
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
-    reportFailure: false,
-  });
-  const preparePullRequestThread = useAtomCommand(gitEnvironment.preparePullRequestThread, {
     reportFailure: false,
   });
   const linking = usePullRequestLinking(environmentId);
@@ -304,8 +300,9 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       : "This connection cannot check out pull requests or start threads.";
 
   /**
-   * Starts a read-only review agent on a pull request: checks out its head in a worktree of
-   * `project`, then starts a thread there with cockpit's review prompt and links the PR to it.
+   * Starts a review agent on a pull request like an issue dispatch: a thread in a new worktree of
+   * `project` off its default branch (with the project's nested repositories), linked to the PR.
+   * The /post-pr-review skill checks the PR's head out inside that worktree.
    */
   const dispatchReview = async (
     pr: ReviewRequestSummary,
@@ -317,34 +314,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     const modelSelection = modelFor(project, picked);
     if (modelSelection === null) return fail("Cannot start the review", "No model is available.");
     try {
-      const prepared = await preparePullRequestThread({
-        environmentId,
-        input: { cwd: project.workspaceRoot, reference: pr.url, mode: "review" },
-      });
-      if (prepared._tag === "Failure") {
-        return fail(
-          "Could not check out the pull request",
-          checkoutFailureDescription(
-            isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
-          ),
-        );
-      }
-      const { branch, worktreePath, isOnPullRequestHead } = prepared.value;
-      // Reviewing code that is not the PR's head would review the wrong change.
-      if (!isOnPullRequestHead) {
-        toastManager.add(
-          stackedThreadToast(
-            offHeadPullRequestCheckoutToast(sourceControlClients.get("github").changeRequest),
-          ),
-        );
-        return false;
-      }
+      const base = await baseFromRefs(project);
+      if (base === false) return false;
       const threadRef = await launch({
         project,
         modelSelection,
         title: `Review #${pr.number} ${pr.title}`,
         text: buildReviewPrompt(pr),
-        worktree: { kind: "existing", branch, worktreePath },
+        worktree: { kind: "new", baseBranch: base, branch: reviewBranchName(pr) },
       });
       if (threadRef === false) return false;
       await linking.changeLink(threadRef, pr.url, true).catch((error: unknown) => {
