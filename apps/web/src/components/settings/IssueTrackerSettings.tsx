@@ -1,5 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
+import {
+  issueTrackerSummary,
+  issueTrackerUnboundLabel,
+} from "@t3tools/client-runtime/state/issue-trackers";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { ChevronDownIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { useState, type ElementType } from "react";
@@ -263,7 +266,7 @@ function ProjectBindings({
     <>
       <SettingsRow
         title="Projects"
-        description={`Pick the ${tracker.displayName} ${tracker.scopeNoun} whose issues each project lists beside its repository's own.`}
+        description={`Each project lists every ${tracker.displayName} ${tracker.scopeNoun}'s issues beside its repository's own. Pick one ${tracker.scopeNoun} to narrow a project to it and to file its new issues there.`}
       />
       {projects.map((project) => {
         const bound = bindings[project.id];
@@ -288,12 +291,12 @@ function ProjectBindings({
                 >
                   <SelectValue>
                     {value === UNBOUND
-                      ? "Not bound"
+                      ? issueTrackerUnboundLabel(tracker)
                       : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
-                  <SelectItem value={UNBOUND}>Not bound</SelectItem>
+                  <SelectItem value={UNBOUND}>{issueTrackerUnboundLabel(tracker)}</SelectItem>
                   {tracker.scopes.map((scope) => (
                     <SelectItem key={scope.key} value={scope.key}>
                       {scope.name} ({scope.key})

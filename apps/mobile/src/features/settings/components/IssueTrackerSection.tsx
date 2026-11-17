@@ -1,4 +1,7 @@
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
+import {
+  issueTrackerSummary,
+  issueTrackerUnboundLabel,
+} from "@t3tools/client-runtime/state/issue-trackers";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type {
   EnvironmentId,
@@ -230,7 +233,7 @@ export function IssueTrackerProjectRows(props: {
         actions={[
           {
             id: UNBOUND,
-            title: "Not bound",
+            title: issueTrackerUnboundLabel(tracker),
             state: value === UNBOUND ? "on" : "off",
             attributes: { disabled: locked },
           },
@@ -249,7 +252,7 @@ export function IssueTrackerProjectRows(props: {
           valuePosition="trailing"
           value={
             value === UNBOUND
-              ? "Not bound"
+              ? issueTrackerUnboundLabel(tracker)
               : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)
           }
           disabled={locked}

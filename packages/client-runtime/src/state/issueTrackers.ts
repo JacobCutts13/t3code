@@ -57,9 +57,14 @@ export function createIssueTrackerEnvironmentAtoms<R, E>(
   };
 }
 
+/** What an unbound project reads from a connected tracker: every one of its scopes. */
+export function issueTrackerUnboundLabel(tracker: IssueTrackerConnection): string {
+  return `All ${tracker.scopeNoun}s`;
+}
+
 /**
- * The line under a tracker's name. A connected tracker lists nothing until a project is linked
- * to one of its scopes, so the line says how many are, and what to do when none is.
+ * The line under a tracker's name. Every project lists all of a connected tracker's scopes
+ * unless it is linked to one, so the line says how many are narrowed.
  */
 export function issueTrackerSummary(
   tracker: IssueTrackerConnection,
@@ -73,7 +78,7 @@ export function issueTrackerSummary(
   ).length;
   const projects =
     linked === 0
-      ? `no projects linked yet. Pick a ${tracker.scopeNoun} for a project to list its issues.`
-      : `${linked} ${linked === 1 ? "project" : "projects"} linked`;
+      ? `every project lists all ${tracker.scopeNoun}s`
+      : `${linked} ${linked === 1 ? "project" : "projects"} narrowed to one ${tracker.scopeNoun}`;
   return `Connected as ${tracker.account} · ${projects}`;
 }

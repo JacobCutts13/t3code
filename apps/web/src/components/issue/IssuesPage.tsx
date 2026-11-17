@@ -125,11 +125,6 @@ const REACH_OPTIONS = [
   { value: "everywhere", label: "All repositories", Icon: GlobeIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<"projects" | "everywhere">>;
 
-// Across every repository, "everyone" would be all of the tracker: there it means involving you.
-const EVERYWHERE_INVOLVEMENT_TABS = INVOLVEMENT_TABS.map((tab) =>
-  tab.value === "all" ? { ...tab, label: "Involving me" } : tab,
-);
-
 const PAGE_SIZE = 50;
 const EMPTY_SET: ReadonlySet<string> = new Set();
 const EMPTY_RECORD = {} as const;
@@ -601,9 +596,7 @@ export function IssuesPage() {
                   stateOptions={STATE_TABS}
                   onState={(status) => updateSearch({ status })}
                   involvement={search.who}
-                  involvementOptions={
-                    search.everywhere ? EVERYWHERE_INVOLVEMENT_TABS : INVOLVEMENT_TABS
-                  }
+                  involvementOptions={INVOLVEMENT_TABS}
                   onInvolvement={(who) => updateSearch({ who })}
                   scopes={filterScopes}
                   labels={search.label ?? []}

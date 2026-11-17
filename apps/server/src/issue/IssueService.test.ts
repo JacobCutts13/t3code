@@ -17,6 +17,7 @@ import {
   type TrackerIssueDetail,
 } from "@t3tools/source-control-core/server/IssueTracker";
 
+import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { PersistenceSqlError } from "../persistence/Errors.ts";
 import * as IssueTrackerBindings from "../persistence/IssueTrackerBindings.ts";
 import { normalizeGitRemoteUrl } from "@t3tools/shared/git";
@@ -140,6 +141,8 @@ function makeService(input: {
   readonly trackers: ReadonlyArray<IssueTrackerApi>;
   readonly bindings?: Record<string, IssueTrackerProjectBinding>;
   readonly bindingsFailure?: PersistenceSqlError;
+  /** Whether the standalone trackers have a stored credential. */
+  readonly connected?: boolean;
 }) {
   return IssueService.IssueService.pipe(
     Effect.provide(
@@ -172,6 +175,12 @@ function makeService(input: {
             }),
             Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({
               resolve: () => Effect.succeed(null),
+            }),
+            Layer.mock(ServerSecretStore.ServerSecretStore)({
+              get: () =>
+                Effect.succeed(
+                  input.connected === true ? Option.some(new Uint8Array([1])) : Option.none(),
+                ),
             }),
           ),
         ),
@@ -568,6 +577,70 @@ describe("IssueService with a standalone tracker", () => {
         _tag: "IssueOperationError",
         operation: "listProjects",
       });
+    }),
+  );
+
+  it.effect("gives every unbound project all of a connected tracker's scopes, writable", () =>
+    Effect.gen(function* () {
+      const read: string[] = [];
+      const projects = [
+        project({ id: "web", repository: "acme/web" }),
+        project({ id: "notes" }),
+        project({ id: "ops" }),
+      ];
+      const linear = fakeStandaloneTracker({
+        listIssues: (input) => Effect.die(`the account read covers ${input.scope}`),
+        listAccountIssues: (input) =>
+          Effect.sync(() => {
+            read.push(input.involvement);
+            return {
+              items: [
+                { ...issue("ENG-1"), scope: "ENG" },
+                { ...issue("OPS-2"), scope: "OPS" },
+              ],
+              nextCursor: null,
+            };
+          }),
+      });
+      const service = yield* makeService({
+        projects,
+        trackers: [fakeTracker(), linear],
+        bindings: { ["ops" as ProjectId]: { tracker: LINEAR, scope: "OPS" } },
+        connected: true,
+      });
+
+      // One read of the whole workspace; a bound team's issues stay credited to its project.
+      const result = yield* service.list({ state: "open" });
+      expect(read).toEqual(["all"]);
+      expect(
+        result.entries
+          .filter((entry) => entry.tracker === LINEAR)
+          .map((entry) => [entry.scope, entry.projectId]),
+      ).toEqual([
+        ["ENG", "web"],
+        ["OPS", "ops"],
+      ]);
+
+      // Any team's issue is the unbound project's own; the bound one keeps only its team.
+      const ref = { tracker: LINEAR, scope: "ENG", key: "ENG-1" };
+      expect(yield* service.detail({ ...ref, projectId: "notes" as ProjectId })).toMatchObject({
+        scope: "ENG",
+        writable: true,
+      });
+      expect(yield* service.detail({ ...ref, projectId: "ops" as ProjectId })).toMatchObject({
+        writable: false,
+      });
+
+      // New issues go to the git host; every team at once names no team to file in.
+      expect(yield* service.projectScope("web" as ProjectId)).toMatchObject({ tracker: GITHUB });
+      expect(yield* Effect.flip(service.projectScope("notes" as ProjectId))).toMatchObject({
+        reason: "tracker-unsupported",
+      });
+
+      // Without a stored credential nothing is read.
+      const disconnected = yield* makeService({ projects, trackers: [fakeTracker(), linear] });
+      yield* disconnected.list({ state: "open" });
+      expect(read).toEqual(["all"]);
     }),
   );
 });

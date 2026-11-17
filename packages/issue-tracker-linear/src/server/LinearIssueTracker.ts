@@ -328,7 +328,7 @@ function involvementFilter(input: {
   }
 }
 
-/** One team's issues, or with `team` null every team's that involve the viewer. */
+/** One team's issues, or with `team` null the whole workspace's. */
 function listQuery(
   input: Omit<Parameters<IssueTrackerApi["listIssues"]>[0], "scope">,
   team: string | null,
@@ -344,16 +344,6 @@ function listQuery(
       ? []
       : [{ assignee: { displayName: { eq: input.assignee } } }]),
     ...(input.labels ?? []).map((name) => ({ labels: { some: { name: { eq: name } } } })),
-    // Across teams, "everyone" would be the whole workspace; there it means involving the viewer.
-    ...(team === null && input.involvement === "all"
-      ? [
-          {
-            or: (["assigned", "authored", "mentioned"] as const).map((involvement) =>
-              involvementFilter({ involvement, viewer: input.viewer }),
-            ),
-          },
-        ]
-      : []),
   ];
   const filter: LinearApi.IssueFilter = {
     ...(team === null ? {} : { team: { key: { eq: team.trim().toUpperCase() } } }),
