@@ -16,7 +16,7 @@ import { useDispatchIssue } from "~/hooks/useDispatchIssue";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { cn } from "~/lib/utils";
 import { useProjects, useThreadShells } from "~/state/entities";
-import { issueEnvironment } from "~/state/issues";
+import { reviewRequestEnvironment } from "~/state/reviewRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { buildThreadRouteParams } from "~/threadRoutes";
 
@@ -51,7 +51,7 @@ const PickedProjectsSchema = Schema.Record(Schema.String, Schema.String);
 /** Open GitHub pull requests in any repository that ask the viewer, or a team of theirs, to review. */
 export function useReviewRequests(environmentId: EnvironmentId | null) {
   const query = useEnvironmentQuery(
-    environmentId === null ? null : issueEnvironment.reviewRequests({ environmentId, input: {} }),
+    environmentId === null ? null : reviewRequestEnvironment.list({ environmentId, input: {} }),
   );
   return {
     entries: query.data?.entries ?? [],

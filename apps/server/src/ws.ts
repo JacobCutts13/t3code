@@ -260,8 +260,7 @@ import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.
 import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
 import * as TextGenerators from "./textGeneration/TextGenerators.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
-import * as IssueService from "./issue/IssueService.ts";
-import * as LinearService from "./linear/LinearService.ts";
+import * as ReviewRequestService from "./pullRequest/ReviewRequestService.ts";
 import * as SourceControlSignIn from "./sourceControl/SourceControlSignIn.ts";
 import * as SourceControlBuiltInDrivers from "./sourceControl/builtInDrivers.ts";
 import * as SourceControlProviderRegistry from "./sourceControl/SourceControlProviderRegistry.ts";
@@ -1585,8 +1584,7 @@ export const layerWsRpc = (
       const sourceControlRepositories =
         yield* SourceControlRepositoryService.SourceControlRepositoryService;
       const sourceControlSignIn = yield* SourceControlSignIn.SourceControlSignIn;
-      const issues = yield* IssueService.IssueService;
-      const linear = yield* LinearService.LinearService;
+      const reviewRequests = yield* ReviewRequestService.ReviewRequestService;
       const withPullRequestViewer = pullRequests.withRoutingCredential;
       // The panel's reads for a pull request the user opened go out during a rate-limit pause.
       const openedPullRequestRead = Effect.provideService(SourceControlRateLimit.Interactive, true);
@@ -2781,13 +2779,7 @@ export const layerWsRpc = (
                 Effect.forkScoped,
               ),
           ),
-        [WS_METHODS.issuesList]: (input) => issues.list(input),
-        [WS_METHODS.issuesGet]: (input) => issues.get(input),
-        [WS_METHODS.pullRequestsReviewRequests]: () => issues.reviewRequests(),
-        [WS_METHODS.linearViewer]: () => linear.viewer,
-        [WS_METHODS.linearIssuesList]: (input) => linear.list(input),
-        [WS_METHODS.linearIssuesGet]: (input) => linear.get(input.id),
-        [WS_METHODS.linearIssueStart]: (input) => linear.start(input.id),
+        [WS_METHODS.pullRequestsReviewRequests]: () => reviewRequests.list(),
         [WS_METHODS.pullRequestsList]: (input) => pullRequests.list(input),
         [WS_METHODS.pullRequestsListStats]: (input) => pullRequests.listStats(input),
         [WS_METHODS.pullRequestsFilterOptions]: (input) => pullRequests.filterOptions(input),

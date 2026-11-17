@@ -287,6 +287,10 @@
       "types": "./src/state/issues.ts",
       "default": "./src/state/issues.ts"
     },
+    "./state/review-requests": {
+      "types": "./src/state/reviewRequests.ts",
+      "default": "./src/state/reviewRequests.ts"
+    },
     "./state/pull-requests": {
       "types": "./src/state/pullRequests.ts",
       "default": "./src/state/pullRequests.ts"

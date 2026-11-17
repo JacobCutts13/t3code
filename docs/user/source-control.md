@@ -143,23 +143,6 @@ If cloning or pushing asks for a username, run `origin auth setup-git` to point 
 credentials again. Origin repositories use HTTPS and are published privately. Repositories mirrored
 from GitHub keep their pull requests on GitHub; open those from the GitHub remote.
 
-### Linear
-
-Linear issues appear on the **Issues** page next to GitHub issues once T3 Code has a Linear personal API key.
-
-1. In Linear, open **Settings → Account → Security & access** and create a personal API key. T3 Code needs read access, plus write access if dispatch should move issues; a key limited to those is enough.
-2. In T3 Code, open **Settings → Source control → Linear**, paste the key, and click **Save**. The section shows the Linear user and workspace it connected to.
-
-The key is stored on the server, like a GitHub token, and you can save a 1Password reference instead. A server without a saved key uses `LINEAR_API_KEY` from its environment.
-
-## Dispatch an agent on an issue
-
-The **Issues** page lists your open GitHub and Linear issues. Use **Source** to show one tracker, and the other filters to switch between issues assigned to you and issues you opened.
-
-**Dispatch** starts a thread in a new worktree. The thread's first message is the issue, run through `/complete-task`. Choose the project in the issue details. A GitHub issue defaults to the project whose repository it belongs to, and T3 Code remembers your choice for each repository and Linear team. Dispatching a Linear issue also moves it to its team's first started state, such as In Progress.
-
-A **Dispatched** badge links to a thread that is already working on the issue's branch.
-
 ## Start, clone, or publish a project
 
 To start from nothing, choose **New project** in the command palette (`Cmd/Ctrl+K`), or
@@ -396,6 +379,15 @@ undoes it. Linked issues are listed in the thread's details beside its pull requ
 issues they work on with the `link_issue` tool.
 
 Writing to a tracker over a remote connection requires the `source-control:write` scope.
+
+### Dispatch an agent on an issue
+
+**Dispatch**, above an issue opened on the Issues page, starts a thread in a new worktree off the
+project's default branch. The thread's first message is the issue, run through `/complete-task`,
+and the issue is linked to the thread. The issue's own project is preselected; T3 Code remembers
+another choice for each repository or Linear team. Dispatching a Linear issue also moves it to its
+team's first started state, such as In Progress. A **Dispatched** badge links to a thread that is
+already working on the issue.
 
 ## GitHub stacks
 

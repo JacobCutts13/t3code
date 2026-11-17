@@ -1766,7 +1766,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         const router = ProviderInstanceId.make("openrouter");
         const withUsage = yield* serverSettings.updateSettings({
           cloudSpeechCredentials: { openai: usageReference, xai: "literal-fixture" },
-          linear: { apiKey: "lin_api_fixture" },
           textGenerators: {
             [router]: {
               kind: "openaiCompatible",
@@ -1820,17 +1819,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           secretReferences: false,
         });
         assert.notInclude(JSON.stringify(legacy), "op://");
-        assert.notInclude(JSON.stringify(legacy), "lin_api_fixture");
-        assert.notInclude(
-          JSON.stringify(
-            ServerSettingsModule.redactServerSettingsForClient(withUsage, {
-              secretReferences: true,
-            }),
-          ),
-          "lin_api_fixture",
-        );
-        assert.equal(legacy.linear.apiKey, SECRET_REDACTED);
-        assert.isTrue(Option.isSome(yield* secrets.get("linear-api-key")));
         assert.deepEqual(legacy.cloudSpeechCredentials, {
           openai: SECRET_REDACTED,
           xai: SECRET_REDACTED,
@@ -1847,7 +1835,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         assert.equal(configOf(legacy, openCode)?.serverPassword, SECRET_REDACTED);
         const echoed = yield* serverSettings.updateSettings({
           cloudSpeechCredentials: legacy.cloudSpeechCredentials,
-          linear: legacy.linear,
           sourceControlHosts: legacy.sourceControlHosts,
           usageLimitSources: legacy.usageLimitSources,
           textGenerators: legacy.textGenerators,
@@ -1867,7 +1854,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           xai: "literal-fixture",
           openrouter: "",
         });
-        assert.equal(echoed.linear.apiKey, "lin_api_fixture");
         assert.deepEqual(echoed.easDeviceHosts[0]?.accessToken, easReference);
         assert.deepEqual(echoed.simlockDeviceHosts[0]?.agentToken, simlockReference);
         assert.deepEqual(configOf(echoed, antigravity)?.apiKey, antigravityReference);
@@ -1965,7 +1951,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         "cloudSpeechCredentials.openai",
         "cloudSpeechCredentials.xai",
         "cloudSpeechCredentials.openrouter",
-        "linear.apiKey",
         "easDeviceHosts.[].accessToken",
         "simlockDeviceHosts.[].agentToken",
         "usageLimitSources.*.managementKey",

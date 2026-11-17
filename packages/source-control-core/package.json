@@ -23,9 +23,9 @@
       "types": "./src/server/driver.ts",
       "import": "./src/server/driver.ts"
     },
-    "./server/IssueProvider": {
-      "types": "./src/server/IssueProvider.ts",
-      "import": "./src/server/IssueProvider.ts"
+    "./server/ReviewRequestProvider": {
+      "types": "./src/server/ReviewRequestProvider.ts",
+      "import": "./src/server/ReviewRequestProvider.ts"
     },
     "./server/mergeMessage": {
       "types": "./src/server/mergeMessage.ts",

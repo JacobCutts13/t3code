@@ -69,6 +69,7 @@ import {
   PullRequestMetaLine,
   PullRequestStateGlyph,
 } from "../pullRequest/pullRequestPresentation";
+import { IssueDispatchBar } from "../issues/IssueDispatchBar";
 import { IssueCommentComposer } from "./IssueCommentComposer";
 import { IssueDetailGhost } from "./IssueDetailGhost";
 import { ReactionBar } from "../pullRequest/PullRequestReactions";
@@ -606,6 +607,7 @@ export function IssueDetailPanel({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {threadRef ? null : <IssueDispatchBar environmentId={environmentId} detail={detail} />}
       <div
         className={cn(
           "min-h-0 flex-1 overflow-y-auto",

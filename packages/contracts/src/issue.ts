@@ -49,6 +49,8 @@ export const IssueState = Schema.Struct({
   name: TrimmedNonEmptyString,
   /** How a closed state ended, where the tracker says: `completed`, or its word for not done. */
   closeReason: Schema.optional(TrimmedNonEmptyString),
+  /** Work on the issue has begun, where the tracker says so (Linear's `started` states). */
+  started: Schema.optional(Schema.Boolean),
 });
 export type IssueState = typeof IssueState.Type;
 

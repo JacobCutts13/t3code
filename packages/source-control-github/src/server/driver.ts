@@ -12,10 +12,10 @@ import { definition } from "../shared/definition.ts";
 
 import * as GitHubAppAccess from "./GitHubAppAccess.ts";
 import * as GitHubAppSignIn from "./GitHubAppSignIn.ts";
-import * as GitHubIssueProvider from "./GitHubIssueProvider.ts";
 import * as GitHubMediaFetch from "./gitHubMediaFetch.ts";
 import * as GitHubPullRequestApi from "./GitHubPullRequestApi.ts";
 import * as GitHubPullRequestProvider from "./GitHubPullRequestProvider.ts";
+import * as GitHubReviewRequestProvider from "./GitHubReviewRequestProvider.ts";
 import * as GitHubRest from "./GitHubRest.ts";
 import * as GitHubHttpClient from "./GitHubHttpClient.ts";
 import * as GitHubIssueTracker from "./GitHubIssueTracker.ts";
@@ -107,6 +107,7 @@ const makeInstance = Effect.gen(function* () {
       discovery: GitHubSourceControlProvider.makeDiscovery,
       pullRequests: GitHubPullRequestProvider.make,
       issues: GitHubIssueTracker.make,
+      reviewRequests: GitHubReviewRequestProvider.make,
       fetchMedia: GitHubMediaFetch.make.pipe(
         Effect.provideService(HttpClient.HttpClient, mediaHttpClient),
       ),
