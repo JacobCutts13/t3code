@@ -17,7 +17,6 @@ import {
   type TrackerIssueDetail,
 } from "@t3tools/source-control-core/server/IssueTracker";
 
-import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { PersistenceSqlError } from "../persistence/Errors.ts";
 import * as IssueTrackerBindings from "../persistence/IssueTrackerBindings.ts";
 import { normalizeGitRemoteUrl } from "@t3tools/shared/git";
@@ -141,8 +140,6 @@ function makeService(input: {
   readonly trackers: ReadonlyArray<IssueTrackerApi>;
   readonly bindings?: Record<string, IssueTrackerProjectBinding>;
   readonly bindingsFailure?: PersistenceSqlError;
-  /** Whether the standalone trackers have a stored credential. */
-  readonly connected?: boolean;
 }) {
   return IssueService.IssueService.pipe(
     Effect.provide(
@@ -175,12 +172,6 @@ function makeService(input: {
             }),
             Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({
               resolve: () => Effect.succeed(null),
-            }),
-            Layer.mock(ServerSecretStore.ServerSecretStore)({
-              get: () =>
-                Effect.succeed(
-                  input.connected === true ? Option.some(new Uint8Array([1])) : Option.none(),
-                ),
             }),
           ),
         ),
@@ -580,7 +571,7 @@ describe("IssueService with a standalone tracker", () => {
     }),
   );
 
-  it.effect("gives every unbound project all of a connected tracker's scopes, writable", () =>
+  it.effect("serves every scope, writable, to a project bound to all of them", () =>
     Effect.gen(function* () {
       const read: string[] = [];
       const projects = [
@@ -605,11 +596,14 @@ describe("IssueService with a standalone tracker", () => {
       const service = yield* makeService({
         projects,
         trackers: [fakeTracker(), linear],
-        bindings: { ["ops" as ProjectId]: { tracker: LINEAR, scope: "OPS" } },
-        connected: true,
+        bindings: {
+          ["web" as ProjectId]: { tracker: LINEAR, scope: "*" },
+          ["notes" as ProjectId]: { tracker: LINEAR, scope: "*" },
+          ["ops" as ProjectId]: { tracker: LINEAR, scope: "OPS" },
+        },
       });
 
-      // One read of the whole workspace; a bound team's issues stay credited to its project.
+      // One read of the whole workspace; a team bound on its own stays credited to its project.
       const result = yield* service.list({ state: "open" });
       expect(read).toEqual(["all"]);
       expect(
@@ -621,7 +615,7 @@ describe("IssueService with a standalone tracker", () => {
         ["OPS", "ops"],
       ]);
 
-      // Any team's issue is the unbound project's own; the bound one keeps only its team.
+      // Any team's issue is an all-teams project's own; a one-team project keeps only its team.
       const ref = { tracker: LINEAR, scope: "ENG", key: "ENG-1" };
       expect(yield* service.detail({ ...ref, projectId: "notes" as ProjectId })).toMatchObject({
         scope: "ENG",
@@ -631,16 +625,20 @@ describe("IssueService with a standalone tracker", () => {
         writable: false,
       });
 
-      // New issues go to the git host; every team at once names no team to file in.
+      // Every team at once names no team to file a new issue in, so the git host files them.
       expect(yield* service.projectScope("web" as ProjectId)).toMatchObject({ tracker: GITHUB });
       expect(yield* Effect.flip(service.projectScope("notes" as ProjectId))).toMatchObject({
         reason: "tracker-unsupported",
       });
 
-      // Without a stored credential nothing is read.
-      const disconnected = yield* makeService({ projects, trackers: [fakeTracker(), linear] });
-      yield* disconnected.list({ state: "open" });
-      expect(read).toEqual(["all"]);
+      // A tracker that cannot read across its scopes ignores the binding.
+      const perScope = yield* makeService({
+        projects,
+        trackers: [fakeTracker(), fakeStandaloneTracker()],
+        bindings: { ["notes" as ProjectId]: { tracker: LINEAR, scope: "*" } },
+      });
+      const notes = yield* perScope.list({ state: "open", projectId: "notes" as ProjectId });
+      expect(notes.trackers).toEqual([]);
     }),
   );
 });

@@ -1,5 +1,4 @@
-// A connected standalone tracker (Linear) lists every scope beside each project's git host, unless
-// Settings binds the project to one of its scopes.
+// A project bound to a standalone tracker (Linear) in settings lists it beside its git host's.
 // References outside the project's canonical repository may be read on the same host,
 // but every write must pass through requireWritable.
 import * as Context from "effect/Context";
@@ -7,6 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import {
+  ALL_ISSUE_SCOPES,
   IssueOperationError,
   IssueTrackerKind,
   IssueUnavailableError,
@@ -39,18 +39,16 @@ import {
   type IssueTrackerApi,
 } from "@t3tools/source-control-core/server/IssueTracker";
 
-import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as IssueTrackerBindings from "../persistence/IssueTrackerBindings.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
 import { sourceControlDefinitions } from "../sourceControl/sourceControlDefinitions.ts";
-import { issueTrackerSecretName } from "./IssueTrackerHostLive.ts";
 import * as IssueTrackerRegistry from "./IssueTrackerRegistry.ts";
 
 const DEFAULT_LIST_LIMIT = 50;
 const SCOPE_CONCURRENCY = 4;
-/** Every scope of one account: the cursor key of a read across them, and an unbound project's scope. */
-const ACCOUNT_SCOPE = "*";
+/** Every scope of one account: the cursor key of a read across them, and a binding to them all. */
+const ACCOUNT_SCOPE = ALL_ISSUE_SCOPES;
 
 const interactive =
   <I, A>(call: (input: I) => Effect.Effect<A, IssueError>) =>
@@ -174,32 +172,6 @@ const make = Effect.gen(function* () {
   const projects = yield* ProjectService.ProjectService;
   const repositoryIdentities = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
   const bindings = yield* IssueTrackerBindings.IssueTrackerBindingsRepository;
-  const secrets = yield* ServerSecretStore.ServerSecretStore;
-
-  /** Connected trackers that read across scopes; a project bound to none of them gets them all. */
-  const accountWideTrackers: Effect.Effect<
-    ReadonlyArray<ProjectTrackerBinding>,
-    IssueOperationError
-  > = Effect.filter(
-    registry.standalone.filter((api) => api.listAccountIssues !== undefined),
-    (api) => secrets.get(issueTrackerSecretName(api.kind)).pipe(Effect.map(Option.isSome)),
-  ).pipe(
-    Effect.map((connected) =>
-      connected.map((api) => ({
-        tracker: api.kind,
-        host: api.standalone.host,
-        scope: ACCOUNT_SCOPE,
-      })),
-    ),
-    Effect.mapError(
-      (cause) =>
-        new IssueOperationError({
-          operation: "listProjects",
-          detail: "The issue tracker credentials could not be read.",
-          cause,
-        }),
-    ),
-  );
 
   // Read per resolution so a binding saved in Settings applies without a restart.
   const resolveStandaloneBinding = (
@@ -210,6 +182,8 @@ const make = Effect.gen(function* () {
         const binding = bound.get(project.id);
         const api = binding === undefined ? null : registry.get(binding.tracker);
         if (binding === undefined || api === null || !isStandaloneIssueTracker(api)) return null;
+        // Every scope is read in one request, which only a tracker reading across them can do.
+        if (binding.scope === ACCOUNT_SCOPE && api.listAccountIssues === undefined) return null;
         return {
           tracker: binding.tracker,
           host: api.standalone.host,
@@ -229,13 +203,10 @@ const make = Effect.gen(function* () {
 
   /**
    * Where a project's issues live: its bound standalone tracker, its git host's, or both. The
-   * tracker bound in Settings leads, as the one the user chose for the project. An unbound
-   * project reads every scope of each connected tracker, after its git host's, which stays the
-   * one new issues are filed in.
+   * tracker bound in Settings leads, as the one the user chose for the project.
    */
   const resolveProjectTracker = (
     project: OrchestrationProjectShell,
-    accountWide: ReadonlyArray<ProjectTrackerBinding>,
   ): Effect.Effect<ReadonlyArray<ProjectTrackerBinding>, IssueOperationError> =>
     Effect.all([
       resolveStandaloneBinding(project),
@@ -247,13 +218,7 @@ const make = Effect.gen(function* () {
           resolveGitHostBinding({ ...project, repositoryIdentity }),
         ),
       ),
-    ]).pipe(
-      Effect.map(([standalone, gitHost]) => [
-        ...(standalone === null ? [] : [standalone]),
-        ...(gitHost === null ? [] : [gitHost]),
-        ...(standalone === null ? accountWide : []),
-      ]),
-    );
+    ]).pipe(Effect.map((resolved) => resolved.filter((binding) => binding !== null)));
 
   const listProjects = (filter: {
     readonly projectId?: IssueListInput["projectId"];
@@ -274,13 +239,10 @@ const make = Effect.gen(function* () {
           }),
       ),
       Effect.flatMap((shells) =>
-        Effect.map(accountWideTrackers, (accountWide) => ({ shells, accountWide })),
-      ),
-      Effect.flatMap(({ shells, accountWide }) =>
         Effect.forEach(
           shells,
           (project) =>
-            resolveProjectTracker(project, accountWide).pipe(
+            resolveProjectTracker(project).pipe(
               Effect.map((bindings) => bindings.map((binding) => ({ project, ...binding }))),
             ),
           { concurrency: SCOPE_CONCURRENCY },

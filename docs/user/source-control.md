@@ -368,10 +368,10 @@ Switch **My projects** to **All repositories** to also list GitHub issues anywhe
 reaches, including repositories without a project. GitHub there shows only issues that involve
 you. Such an issue opens read-only, and still needs one project on its host to be read through.
 
-To list Linear issues, connect Linear with an API key under Settings → Source control & issues.
-Every project then lists the issues of all your Linear teams, and can edit and dispatch any of
-them. Choose a team for a project there to narrow it to that team; new Linear issues are filed
-only from a project with a team chosen.
+To list a Linear team's issues beside a project's, connect Linear with an API key under
+Settings → Source control & issues, then choose the team for that project there. Choose
+**All teams** to list and edit every team's issues from that project; its new issues are then
+filed on its repository's host, not in Linear.
 
 Select an issue to open it beside the list: description, comments, state changes, linked pull
 requests, labels, assignees, and reactions. Linked pull requests open in the same panel. You can
