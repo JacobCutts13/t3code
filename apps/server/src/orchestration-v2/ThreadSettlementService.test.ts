@@ -704,6 +704,12 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
               ),
           ),
         ),
+      getThreadShell: (threadId) =>
+        options.projections
+          ? options.projections.getThreadShell(threadId)
+          : Effect.succeed(
+              shell({ ...options.currentThreads?.find((candidate) => candidate.id === threadId) }),
+            ),
       getThread: (threadId) => {
         if (options.projections) return options.projections.getThread(threadId);
         const thread = options.currentThreads?.find((candidate) => candidate.id === threadId);
@@ -713,6 +719,7 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
       },
     }),
     Layer.mock(Orchestrator.OrchestratorV2)({
+      finishWikiReflection: () => Effect.void,
       streamDomainEvents: Stream.fromPubSub(domainEvents).pipe(
         Stream.tap((event) => Queue.offer(observedEvents, event.id)),
       ),
@@ -2090,6 +2097,73 @@ describe("ThreadSettlementServiceV2 worker", () => {
 });
 
 describe("ThreadSettlementServiceV2 terminals", () => {
+  it.effect.each(["completed", "failed", "interrupted", "cancelled"] as const)(
+    "defers cleanup until a reflection is %s",
+    (status) =>
+      Effect.gen(function* () {
+        const store = yield* ProjectionStore.ProjectionStoreV2;
+        const thread = appThread("reflection", "settled", "/worktrees/reflection");
+        const marker = appThread("reflection-marker", "settled", "/worktrees/marker");
+        for (const entry of [thread, marker])
+          yield* store.apply({
+            type: "thread.created",
+            id: EventId.make(`created:${entry.id}`),
+            threadId: entry.id,
+            occurredAt: entry.createdAt,
+            payload: entry,
+          });
+        const now = DateTime.makeUnsafe(NOW);
+        const run: OrchestrationV2Run = {
+          id: RunId.make("reflection-run"),
+          threadId: thread.id,
+          ordinal: 1,
+          providerInstanceId: thread.providerInstanceId,
+          modelSelection: thread.modelSelection,
+          providerThreadId: null,
+          userMessageId: MessageId.make("reflection-message"),
+          rootNodeId: null,
+          activeAttemptId: null,
+          status: "starting",
+          requestedAt: now,
+          startedAt: null,
+          completedAt: null,
+          checkpointId: null,
+          contextHandoffId: null,
+        };
+        yield* store.apply({
+          type: "run.created",
+          id: EventId.make("created:reflection-run"),
+          threadId: thread.id,
+          runId: run.id,
+          occurredAt: now,
+          payload: run,
+        });
+        const fixture = yield* makeHarness({
+          snapshot: makeSnapshot([]),
+          projections: store,
+          existingWorktreePaths: [thread.worktreePath!, marker.worktreePath!],
+        });
+        yield* Effect.gen(function* () {
+          const service = yield* ThreadSettlementService.ThreadSettlementServiceV2;
+          yield* startHarness(service, fixture.activation, fixture.snapshotReads);
+          yield* fixture.publishEvent(settledEvent(thread));
+          yield* fixture.publishEvent(settledEvent(marker));
+          assert.equal((yield* Queue.take(fixture.scriptRuns)).threadId, marker.id);
+          const ended: OrchestrationV2DomainEvent = {
+            type: "run.updated",
+            id: EventId.make("ended:reflection-run"),
+            threadId: thread.id,
+            runId: run.id,
+            occurredAt: now,
+            payload: { ...run, status, completedAt: now },
+          };
+          yield* store.apply(ended);
+          yield* fixture.publishEvent(ended);
+          assert.equal((yield* Queue.take(fixture.scriptRuns)).threadId, thread.id);
+        }).pipe(Effect.provide(fixture.layer));
+      }).pipe(Effect.provide(projectionStoreSql)),
+  );
+
   it.effect.each(["re-engaged", "deleted"] as const)(
     "skips settlement actions for a thread %s before the event ran",
     (state) =>

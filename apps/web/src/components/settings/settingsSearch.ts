@@ -659,6 +659,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["claude context compaction idle cache tokens usage summary resume"],
   },
   {
+    id: "wiki-reflection-on-settle",
+    title: "Run wiki reflection on settle",
+    to: "/settings/threads",
+    searchTerms: ["wiki learning reflection skill settle cleanup"],
+    requiresThreadAutoSettlement: true,
+    scope: "project-defaults",
+  },
+  {
     id: "auto-settle-merged-threads",
     title: "Auto-settle merged threads",
     to: "/settings/threads",

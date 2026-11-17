@@ -703,6 +703,7 @@ export function notificationChildThreadId(
     case "monitor":
     case "background_task":
     case "system":
+    case "wiki_reflection":
       return undefined;
     default:
       source satisfies never;

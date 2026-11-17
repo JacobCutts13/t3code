@@ -13,6 +13,7 @@ import {
   runRanAfter,
   usageLimitBlockedRun,
 } from "@t3tools/shared/orchestrationV2ThreadError";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { threadIssueKeysEqual } from "@t3tools/contracts";
 import { canonicalizeGitCafePullRequestUrl } from "@t3tools/source-control-definitions/registry";
 import { threadPullRequestsOf } from "../sourceControl/threadPullRequests.ts";
@@ -28,6 +29,7 @@ import {
   CommandId,
   type GuestMessageId,
   isCompactionCommandMessage,
+  isListedThreadLineage,
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
   MessageId,
@@ -92,6 +94,7 @@ import {
   derivePendingBackgroundWork,
   pendingBackgroundTurnItems,
 } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -415,6 +418,10 @@ export interface OrchestratorV2Shape {
   readonly dispatch: (
     command: OrchestrationV2ServerCommand,
   ) => Effect.Effect<OrchestratorV2DispatchResult, OrchestratorV2Error>;
+  readonly finishWikiReflection: (
+    threadId: ThreadId,
+    runId: RunId,
+  ) => Effect.Effect<void, OrchestratorV2Error>;
   readonly autoArmLimitRecovery: (input: {
     readonly commandId: CommandId;
     readonly threadId: ThreadId;
@@ -4066,6 +4073,45 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     return decided.success;
   });
 
+  const cancelWikiReflection = Effect.fn("Orchestrator.cancelWikiReflection")(function* (
+    command: { readonly commandId: CommandId; readonly threadId: ThreadId },
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+  ) {
+    const projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+    for (const run of projection.runs.filter(
+      (candidate) => isActiveRun(candidate) || candidate.status === "queued",
+    )) {
+      if (
+        !projection.messages.some(
+          (message) =>
+            message.id === run.userMessageId &&
+            message.notification?.source.kind === "wiki_reflection",
+        )
+      )
+        continue;
+      if (run.status === "queued") {
+        yield* dispatchQueuedRunCancel(
+          { ...command, type: "queued-run.cancel", runId: run.id },
+          events,
+          "cohort",
+        );
+      } else {
+        yield* dispatchRunInterrupt(
+          {
+            ...command,
+            type: "run.interrupt",
+            runId: run.id,
+            holdQueue: false,
+            reason: "Wiki reflection superseded by new activity.",
+          },
+          events,
+          effects,
+        );
+      }
+    }
+  });
+
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
     command: Extract<
       OrchestrationV2ServerCommand,
@@ -4208,6 +4254,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           commandType: command.type,
           cause: `Thread ${command.threadId} is no longer empty.`,
         });
+    }
+    if (command.type === "thread.unsettle" && thread.settledOverride === "settled") {
+      yield* cancelWikiReflection(command, events, effects);
     }
     if (command.type === "thread.archive" && thread.archivedAt !== null) {
       return yield* new OrchestratorDispatchError({
@@ -5484,6 +5533,94 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }),
         { concurrency: 1, discard: true },
       );
+    }
+
+    if (
+      command.type === "thread.settle" &&
+      thread.settledOverride !== "settled" &&
+      isListedThreadLineage(thread.lineage)
+    ) {
+      const settings = yield* serverSettings.getSettings.pipe(Effect.orDie);
+      if (
+        resolveProjectSettings(settings, thread.projectId).settings.sidebarWikiReflectionOnSettle
+      ) {
+        const { runs } = yield* projectionStore
+          .getThreadRecords(command.threadId, ["runs"])
+          .pipe(mapDispatchError(command));
+        if (runs.some((run) => run.status === "completed")) {
+          const settledAt = DateTime.formatIso(updatedThread.settledAt!);
+          const reflectionEvents = yield* Ref.make(yield* Ref.get(events));
+          const reflectionEffects = yield* Ref.make<Array<PendingOrchestrationEffectV2>>([]);
+          const admission = yield* Effect.exit(
+            dispatchMessage(
+              {
+                type: "message.dispatch",
+                commandId: command.commandId,
+                threadId: command.threadId,
+                messageId: MessageId.make(`wiki-reflection:${command.commandId}`),
+                text: "/wiki-reflection\nBriefly capture durable learnings from this conversation and remove proven stale related wiki content. Follow the skill's direct-to-main workflow. If the skill or wiki is unavailable, report that and finish without edits. This is a settlement reflection; do not resume the original task or unsettle the thread.",
+                attachments: [],
+                dispatchMode: { type: "queue_after_active" },
+                createdBy: "agent",
+                creationSource: "server",
+                notification: {
+                  source: { kind: "wiki_reflection", settledAt },
+                  outcome: "updated",
+                  summary: "Wiki reflection on settle",
+                },
+              },
+              reflectionEvents,
+              reflectionEffects,
+            ),
+          );
+          if (Exit.isSuccess(admission)) {
+            yield* Ref.set(events, yield* Ref.get(reflectionEvents));
+            const admittedEffects = yield* Ref.get(reflectionEffects);
+            yield* Ref.update(effects, (existing) => [...existing, ...admittedEffects]);
+          } else {
+            if (Cause.hasInterruptsOnly(admission.cause))
+              return yield* Effect.failCause(admission.cause);
+            yield* Effect.logWarning("Wiki reflection admission failed", {
+              threadId: command.threadId,
+              cause: admission.cause,
+            });
+            const run = runs.findLast((candidate) => candidate.status === "completed")!;
+            yield* emit(
+              events,
+              command,
+            )({
+              type: "turn-item.updated",
+              threadId: command.threadId,
+              runId: run.id,
+              occurredAt: now,
+              payload: {
+                id: idAllocator.derive.runSignalTurnItem({
+                  runId: run.id,
+                  signal: "wiki-reflection-skipped",
+                }),
+                threadId: command.threadId,
+                runId: run.id,
+                nodeId: run.rootNodeId,
+                providerThreadId: run.providerThreadId,
+                providerTurnId: null,
+                nativeItemRef: null,
+                parentItemId: null,
+                ordinal: yield* nextTurnItemOrdinal(
+                  yield* getProjectionWithPendingEvents(command.threadId, events),
+                ),
+                status: "completed",
+                title: "Wiki reflection could not start",
+                startedAt: now,
+                completedAt: now,
+                updatedAt: now,
+                type: "system_notice",
+                message:
+                  "The thread settled, but wiki reflection could not start. Check that its provider and model are available.",
+              },
+            });
+          }
+        }
+      }
     }
 
     if (command.type === "thread.archive") {
@@ -6766,6 +6903,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         : undefined,
     );
+    if (
+      projection.thread.settledOverride === "settled" &&
+      command.notification === undefined &&
+      command.scheduledTaskId === undefined
+    ) {
+      yield* cancelWikiReflection(command, events, effects);
+      projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+    }
     if (command.steerFollowUpOfRunId !== undefined) {
       const source = projection.runs.find((run) => run.id === command.steerFollowUpOfRunId);
       if (
@@ -6968,7 +7113,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         : run.id === command.restartContinuationOfRunId,
     )?.delegatedTaskId;
 
-    if (projection.thread.settledOverride !== null) {
+    const reflectionSource = command.notification?.source;
+    const wikiReflection = reflectionSource?.kind === "wiki_reflection";
+    if (
+      wikiReflection &&
+      (command.createdBy !== "agent" ||
+        command.creationSource !== "server" ||
+        projection.thread.settledOverride !== "settled" ||
+        projection.thread.settledAt === null ||
+        DateTime.formatIso(projection.thread.settledAt) !== reflectionSource.settledAt)
+    ) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: "Wiki reflection no longer belongs to this settlement.",
+      });
+    }
+    if (projection.thread.settledOverride !== null && !wikiReflection) {
       const now = yield* DateTime.now;
       const thread: OrchestrationV2AppThread = {
         ...projection.thread,
@@ -16209,6 +16370,57 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return effectOutbox.awaitSettled(`effect:restart-continuation:${run.id}`).pipe(Effect.ignore);
     }),
     dispatch: dispatchWithReceipt,
+    finishWikiReflection: Effect.fn("Orchestrator.finishWikiReflection")(
+      function (threadId, runId) {
+        return threadDispatch.withLock(
+          threadId,
+          Effect.gen(function* () {
+            const thread = yield* projectionStore
+              .getThread(threadId)
+              .pipe(
+                Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })),
+              );
+            if (
+              thread.deletedAt !== null ||
+              thread.archivedAt !== null ||
+              thread.settledOverride !== "settled"
+            )
+              return;
+            const projection = yield* projectionStore
+              .getThreadRecords(threadId, ["runs", "messages", "providerSessions"], {
+                messageRunIds: [runId],
+                messageRoles: ["user"],
+              })
+              .pipe(
+                Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })),
+              );
+            const run = projection.runs.findLast((candidate) => candidate.status !== "queued");
+            const source = projection.messages.find((message) => message.id === run?.userMessageId)
+              ?.notification?.source;
+            if (
+              run?.id !== runId ||
+              isActiveRun(run) ||
+              source?.kind !== "wiki_reflection" ||
+              thread.settledAt === null ||
+              source.settledAt !== DateTime.formatIso(thread.settledAt) ||
+              projection.runs.some(
+                (candidate) => isActiveRun(candidate) || candidate.status === "queued",
+              )
+            )
+              return;
+            for (const session of projection.providerSessions) {
+              yield* dispatchWithReceiptEffect({
+                type: "provider-session.detach",
+                commandId: CommandId.make(`wiki-reflection-finished:${runId}:${session.id}`),
+                threadId,
+                providerSessionId: session.id,
+                reason: "Wiki reflection finished on a settled thread.",
+              });
+            }
+          }),
+        );
+      },
+    ),
     autoArmLimitRecovery: Effect.fn("OrchestratorV2.autoArmLimitRecovery")(function (input) {
       return threadDispatch.withLock(
         input.threadId,

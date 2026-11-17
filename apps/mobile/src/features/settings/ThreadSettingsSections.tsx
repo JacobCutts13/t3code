@@ -101,6 +101,7 @@ export function AutoSettleSettingsRows(props: {
     patch: Partial<AutoSettleSettings> & {
       autoResumeLimitedThreads?: boolean;
       snoozeLimitedThreads?: boolean;
+      sidebarWikiReflectionOnSettle?: boolean;
     },
   ) => props.write(patch);
 
@@ -146,6 +147,14 @@ export function AutoSettleSettingsRows(props: {
         </SettingsSection>
       ) : null}
       <SettingsSection title="Auto-settle">
+        <SettingsSwitchRow
+          icon="arrow.triangle.branch"
+          label="Run wiki reflection on settle"
+          subtitle="Requires /wiki-reflection on the server and uses an extra agent turn before cleanup."
+          value={uniformMobileSetting(displayTargets, "sidebarWikiReflectionOnSettle")}
+          disabled={disabledFor("sidebarWikiReflectionOnSettle")}
+          onValueChange={(value) => writeToAll({ sidebarWikiReflectionOnSettle: value })}
+        />
         <SettingsSwitchRow
           icon="arrow.triangle.branch"
           label="Auto-settle merged threads"

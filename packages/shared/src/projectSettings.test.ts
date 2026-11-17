@@ -56,11 +56,22 @@ describe("resolveProjectSettings", () => {
     const settings = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       defaultAutoPull: true,
       sidebarAutoSettleAfterDays: 3,
+      sidebarWikiReflectionOnSettle: true,
       projectSettingsOverrides: {
-        [projectId]: { defaultAutoPull: false, sidebarAutoSettleAfterDays: null },
+        [projectId]: {
+          defaultAutoPull: false,
+          sidebarAutoSettleAfterDays: null,
+          sidebarWikiReflectionOnSettle: false,
+        },
       },
     });
     const resolved = resolveProjectSettings(settings, projectId);
+    expect(DEFAULT_SERVER_SETTINGS.sidebarWikiReflectionOnSettle).toBe(false);
+    expect(resolved.settings.sidebarWikiReflectionOnSettle).toBe(false);
+    expect(resolved.sources.sidebarWikiReflectionOnSettle).toBe("project");
+    expect(
+      resolveProjectSettings(settings, otherProjectId).settings.sidebarWikiReflectionOnSettle,
+    ).toBe(true);
     expect(resolved.settings.defaultAutoPull).toBe(false);
     expect(resolved.settings.sidebarAutoSettleAfterDays).toBeNull();
     expect(resolved.settings.defaultThreadEnvMode).toBe(settings.defaultThreadEnvMode);

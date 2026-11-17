@@ -503,6 +503,10 @@ export function useSettingsRestore(onRestored?: () => void) {
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
       ? ["Keep threads with a PR"]
       : []),
+    ...(settings.sidebarWikiReflectionOnSettle !==
+    DEFAULT_UNIFIED_SETTINGS.sidebarWikiReflectionOnSettle
+      ? ["Run wiki reflection on settle"]
+      : []),
     ...(settings.sidebarAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge
       ? ["Auto-settle merged threads"]
       : []),
@@ -682,6 +686,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
       sidebarAutoSettleAfterDays: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays,
       sidebarAutoSettleKeepPullRequests: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests,
+      sidebarWikiReflectionOnSettle: DEFAULT_UNIFIED_SETTINGS.sidebarWikiReflectionOnSettle,
       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
       autoResumeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads,
       snoozeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads,
@@ -1912,6 +1917,37 @@ export function ThreadsSettingsPanel() {
 
       {hasServerTargets ? (
         <SettingsSection id="auto-settle" title="Auto-settle">
+          <SettingsRow
+            serverScoped
+            settingKeys={["sidebarWikiReflectionOnSettle"]}
+            {...searchableSetting("wiki-reflection-on-settle")}
+            description="Ask the agent to run /wiki-reflection before cleanup when a thread settles. Requires the skill on the server and uses an extra agent turn."
+            resetAction={
+              settings.sidebarWikiReflectionOnSettle !==
+              DEFAULT_UNIFIED_SETTINGS.sidebarWikiReflectionOnSettle ? (
+                <SettingResetButton
+                  label="wiki reflection on settle"
+                  onClick={() =>
+                    updateSettings({
+                      sidebarWikiReflectionOnSettle:
+                        DEFAULT_UNIFIED_SETTINGS.sidebarWikiReflectionOnSettle,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <ScopedSwitch
+                settingKeys={["sidebarWikiReflectionOnSettle"]}
+                checked={settings.sidebarWikiReflectionOnSettle}
+                onCheckedChange={(checked) =>
+                  updateSettings({ sidebarWikiReflectionOnSettle: Boolean(checked) })
+                }
+                aria-label="Run wiki reflection on settle"
+              />
+            }
+          />
+
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}

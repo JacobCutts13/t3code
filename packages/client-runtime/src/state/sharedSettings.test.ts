@@ -5,13 +5,17 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 
-import { filterSharedServerPatch } from "./sharedSettings.ts";
+import { filterSharedServerPatch, splitSharedServerPatch } from "./sharedSettings.ts";
 
 describe("filterSharedServerPatch", () => {
   it("holds the restart preference until the target's config loads", () => {
     const patch = { continueThreadsAfterServerUpdate: true, sidebarAutoSettleAfterDays: 7 };
     expect(filterSharedServerPatch(patch, undefined)).toEqual({ sidebarAutoSettleAfterDays: 7 });
     expect(filterSharedServerPatch(patch, DEFAULT_SERVER_SETTINGS)).toEqual(patch);
+    expect(splitSharedServerPatch({ sidebarWikiReflectionOnSettle: true })).toEqual({
+      sharedPatch: { sidebarWikiReflectionOnSettle: true },
+      localPatch: {},
+    });
   });
 
   it.each([true, false])(
