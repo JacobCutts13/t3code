@@ -3,18 +3,9 @@ import { describe, expect, it } from "vite-plus/test";
 import { buildReviewPrompt } from "./pullRequestReviewDispatch.logic";
 
 describe("buildReviewPrompt", () => {
-  it("names the pull request, posts verified findings without confirmation, and forbids writes", () => {
-    const prompt = buildReviewPrompt({ repository: "team-plain/services", number: 12833 });
-    expect(prompt).toMatch(
-      /^This is a read-only code review session for PR #12833 in team-plain\/services\./,
-    );
-    expect(prompt).toContain("post it without waiting for confirmation");
-    expect(prompt).not.toContain('wait for me to type "post"');
-    expect(prompt).toContain(
-      "gh pr review 12833 --repo team-plain/services --comment --body-file /tmp/pr-review-comment.txt",
-    );
-    expect(prompt).toMatch(
-      /Do NOT edit any source files\. Do NOT commit or push anything\. Read-only review only\.$/,
+  it("hands the pull request to the /post-pr-review skill", () => {
+    expect(buildReviewPrompt({ repository: "team-plain/services", number: 12833 })).toBe(
+      "/post-pr-review team-plain/services#12833",
     );
   });
 });
