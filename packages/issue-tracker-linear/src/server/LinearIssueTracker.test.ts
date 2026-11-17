@@ -213,22 +213,12 @@ describe("LinearIssueTracker", () => {
     }),
   );
 
-  it.effect("lists every team's issues involving the viewer, each naming its team", () =>
+  it.effect("lists every team's issues, each naming its team", () =>
     Effect.gen(function* () {
       const { tracker } = fakeLinear({
         T3Issues: (variables) => {
           expect(variables.filter).not.toHaveProperty("team");
-          expect(variables.filter).toMatchObject({
-            and: [
-              {
-                or: [
-                  { assignee: { displayName: { eq: "julius" } } },
-                  { creator: { displayName: { eq: "julius" } } },
-                  { subscribers: { some: { displayName: { eq: "julius" } } } },
-                ],
-              },
-            ],
-          });
+          expect(variables.filter).not.toHaveProperty("and");
           return {
             issues: { nodes: [issue("ENG-1")], pageInfo: { hasNextPage: false, endCursor: null } },
           };

@@ -1,5 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
+import {
+  issueTrackerAllScopesLabel,
+  issueTrackerSummary,
+} from "@t3tools/client-runtime/state/issue-trackers";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { ChevronDownIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { useState, type ElementType } from "react";
@@ -9,6 +12,7 @@ import type {
   IssueTrackerConnectionList,
   ProjectId,
 } from "@t3tools/contracts";
+import { ALL_ISSUE_SCOPES } from "@t3tools/contracts";
 
 import { useEnvironmentQuery } from "../../state/query";
 import { issueTrackerEnvironment } from "../../state/issueTrackers";
@@ -263,7 +267,7 @@ function ProjectBindings({
     <>
       <SettingsRow
         title="Projects"
-        description={`Pick the ${tracker.displayName} ${tracker.scopeNoun} whose issues each project lists beside its repository's own.`}
+        description={`Pick the ${tracker.displayName} ${tracker.scopeNoun} whose issues each project lists beside its repository's own, or all of them.`}
       />
       {projects.map((project) => {
         const bound = bindings[project.id];
@@ -289,11 +293,16 @@ function ProjectBindings({
                   <SelectValue>
                     {value === UNBOUND
                       ? "Not bound"
-                      : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)}
+                      : value === ALL_ISSUE_SCOPES
+                        ? issueTrackerAllScopesLabel(tracker)
+                        : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
                   <SelectItem value={UNBOUND}>Not bound</SelectItem>
+                  <SelectItem value={ALL_ISSUE_SCOPES}>
+                    {issueTrackerAllScopesLabel(tracker)}
+                  </SelectItem>
                   {tracker.scopes.map((scope) => (
                     <SelectItem key={scope.key} value={scope.key}>
                       {scope.name} ({scope.key})

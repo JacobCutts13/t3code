@@ -570,4 +570,75 @@ describe("IssueService with a standalone tracker", () => {
       });
     }),
   );
+
+  it.effect("serves every scope, writable, to a project bound to all of them", () =>
+    Effect.gen(function* () {
+      const read: string[] = [];
+      const projects = [
+        project({ id: "web", repository: "acme/web" }),
+        project({ id: "notes" }),
+        project({ id: "ops" }),
+      ];
+      const linear = fakeStandaloneTracker({
+        listIssues: (input) => Effect.die(`the account read covers ${input.scope}`),
+        listAccountIssues: (input) =>
+          Effect.sync(() => {
+            read.push(input.involvement);
+            return {
+              items: [
+                { ...issue("ENG-1"), scope: "ENG" },
+                { ...issue("OPS-2"), scope: "OPS" },
+              ],
+              nextCursor: null,
+            };
+          }),
+      });
+      const service = yield* makeService({
+        projects,
+        trackers: [fakeTracker(), linear],
+        bindings: {
+          ["web" as ProjectId]: { tracker: LINEAR, scope: "*" },
+          ["notes" as ProjectId]: { tracker: LINEAR, scope: "*" },
+          ["ops" as ProjectId]: { tracker: LINEAR, scope: "OPS" },
+        },
+      });
+
+      // One read of the whole workspace; a team bound on its own stays credited to its project.
+      const result = yield* service.list({ state: "open" });
+      expect(read).toEqual(["all"]);
+      expect(
+        result.entries
+          .filter((entry) => entry.tracker === LINEAR)
+          .map((entry) => [entry.scope, entry.projectId]),
+      ).toEqual([
+        ["ENG", "web"],
+        ["OPS", "ops"],
+      ]);
+
+      // Any team's issue is an all-teams project's own; a one-team project keeps only its team.
+      const ref = { tracker: LINEAR, scope: "ENG", key: "ENG-1" };
+      expect(yield* service.detail({ ...ref, projectId: "notes" as ProjectId })).toMatchObject({
+        scope: "ENG",
+        writable: true,
+      });
+      expect(yield* service.detail({ ...ref, projectId: "ops" as ProjectId })).toMatchObject({
+        writable: false,
+      });
+
+      // Every team at once names no team to file a new issue in, so the git host files them.
+      expect(yield* service.projectScope("web" as ProjectId)).toMatchObject({ tracker: GITHUB });
+      expect(yield* Effect.flip(service.projectScope("notes" as ProjectId))).toMatchObject({
+        reason: "tracker-unsupported",
+      });
+
+      // A tracker that cannot read across its scopes ignores the binding.
+      const perScope = yield* makeService({
+        projects,
+        trackers: [fakeTracker(), fakeStandaloneTracker()],
+        bindings: { ["notes" as ProjectId]: { tracker: LINEAR, scope: "*" } },
+      });
+      const notes = yield* perScope.list({ state: "open", projectId: "notes" as ProjectId });
+      expect(notes.trackers).toEqual([]);
+    }),
+  );
 });

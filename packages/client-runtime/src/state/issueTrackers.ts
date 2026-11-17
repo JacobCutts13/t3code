@@ -57,6 +57,11 @@ export function createIssueTrackerEnvironmentAtoms<R, E>(
   };
 }
 
+/** The binding choice that gives a project every one of the tracker's scopes. */
+export function issueTrackerAllScopesLabel(tracker: IssueTrackerConnection): string {
+  return `All ${tracker.scopeNoun}s`;
+}
+
 /**
  * The line under a tracker's name. A connected tracker lists nothing until a project is linked
  * to one of its scopes, so the line says how many are, and what to do when none is.

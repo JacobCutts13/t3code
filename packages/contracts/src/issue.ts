@@ -552,6 +552,9 @@ export const StandaloneIssueTrackerDescriptor = Schema.Struct({
 });
 export type StandaloneIssueTrackerDescriptor = typeof StandaloneIssueTrackerDescriptor.Type;
 
+/** The binding scope that gives a project every scope of its tracker, each one writable. */
+export const ALL_ISSUE_SCOPES = "*";
+
 /** Which standalone tracker scope a project's issues come from, beside its git host's own. */
 export const IssueTrackerProjectBinding = Schema.Struct({
   tracker: IssueTrackerKind,

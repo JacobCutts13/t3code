@@ -6,6 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import {
+  ALL_ISSUE_SCOPES,
   IssueOperationError,
   IssueTrackerKind,
   IssueUnavailableError,
@@ -46,8 +47,8 @@ import * as IssueTrackerRegistry from "./IssueTrackerRegistry.ts";
 
 const DEFAULT_LIST_LIMIT = 50;
 const SCOPE_CONCURRENCY = 4;
-/** The cursor key's scope for a read across every scope of one account. */
-const ACCOUNT_SCOPE = "*";
+/** Every scope of one account: the cursor key of a read across them, and a binding to them all. */
+const ACCOUNT_SCOPE = ALL_ISSUE_SCOPES;
 
 const interactive =
   <I, A>(call: (input: I) => Effect.Effect<A, IssueError>) =>
@@ -181,6 +182,8 @@ const make = Effect.gen(function* () {
         const binding = bound.get(project.id);
         const api = binding === undefined ? null : registry.get(binding.tracker);
         if (binding === undefined || api === null || !isStandaloneIssueTracker(api)) return null;
+        // Every scope is read in one request, which only a tracker reading across them can do.
+        if (binding.scope === ACCOUNT_SCOPE && api.listAccountIssues === undefined) return null;
         return {
           tracker: binding.tracker,
           host: api.standalone.host,
@@ -289,7 +292,8 @@ const make = Effect.gen(function* () {
           return Effect.fail(new IssueUnavailableError({ reason: "tracker-unsupported" }));
         }
         const scope = ref.scope.trim();
-        const writable = scope.toLowerCase() === own.scope.toLowerCase();
+        const writable =
+          own.scope === ACCOUNT_SCOPE || scope.toLowerCase() === own.scope.toLowerCase();
         return Effect.succeed({ ...own, scope, writable });
       }),
     );
@@ -311,13 +315,18 @@ const make = Effect.gen(function* () {
     // With `everywhere`, a tracker that reads across scopes is read once per account instead.
     const accounts = new Map<string, SupportedProject>();
     for (const project of supported) {
-      if (input.everywhere === true && project.api.listAccountIssues !== undefined) {
+      if (
+        project.api.listAccountIssues !== undefined &&
+        (input.everywhere === true || project.scope === ACCOUNT_SCOPE)
+      ) {
         if (!accounts.has(project.host)) accounts.set(project.host, project);
         continue;
       }
       const key = listCursorKey(project.host, project.scope);
       if (!scopes.has(key)) scopes.set(key, project);
     }
+    // The account read already covers a bound scope on its host, and credits it to that project.
+    for (const [key, project] of scopes) if (accounts.has(project.host)) scopes.delete(key);
     const continuing = input.cursors;
     const viewers = new Map<string, string>();
     const trackers = new Map<string, IssueTrackerSummary>();
@@ -676,7 +685,8 @@ const make = Effect.gen(function* () {
     "IssueService.projectScope",
   )(function* (projectId) {
     const { supported } = yield* listProjects({ projectId });
-    const [own] = supported;
+    // Every scope at once names no container to file a new issue in.
+    const own = supported.find((candidate) => candidate.scope !== ACCOUNT_SCOPE);
     if (own === undefined) {
       return yield* new IssueUnavailableError({ reason: "tracker-unsupported" });
     }

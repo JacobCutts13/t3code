@@ -1,4 +1,7 @@
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
+import {
+  issueTrackerAllScopesLabel,
+  issueTrackerSummary,
+} from "@t3tools/client-runtime/state/issue-trackers";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type {
   EnvironmentId,
@@ -6,6 +9,7 @@ import type {
   IssueTrackerConnectionList,
   ProjectId,
 } from "@t3tools/contracts";
+import { ALL_ISSUE_SCOPES } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
@@ -234,6 +238,12 @@ export function IssueTrackerProjectRows(props: {
             state: value === UNBOUND ? "on" : "off",
             attributes: { disabled: locked },
           },
+          {
+            id: ALL_ISSUE_SCOPES,
+            title: issueTrackerAllScopesLabel(tracker),
+            state: value === ALL_ISSUE_SCOPES ? "on" : "off",
+            attributes: { disabled: locked },
+          },
           ...tracker.scopes.map((scope) => ({
             id: scope.key,
             title: `${scope.name} (${scope.key})`,
@@ -250,7 +260,9 @@ export function IssueTrackerProjectRows(props: {
           value={
             value === UNBOUND
               ? "Not bound"
-              : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)
+              : value === ALL_ISSUE_SCOPES
+                ? issueTrackerAllScopesLabel(tracker)
+                : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)
           }
           disabled={locked}
         />
