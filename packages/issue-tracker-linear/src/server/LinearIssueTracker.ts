@@ -22,6 +22,7 @@ import {
 } from "@t3tools/contracts";
 import {
   IssueTrackerError,
+  type IssueTrackerApi,
   type StandaloneIssueTrackerApi,
   type TrackerIssueSummary,
 } from "@t3tools/source-control-core/server/IssueTracker";
@@ -327,6 +328,63 @@ function involvementFilter(input: {
   }
 }
 
+/** One team's issues, or with `team` null every team's that involve the viewer. */
+function listQuery(
+  input: Omit<Parameters<IssueTrackerApi["listIssues"]>[0], "scope">,
+  team: string | null,
+) {
+  // `ENG-12`, `#12` or `12` asks for one issue of this team by number.
+  const reference =
+    input.query === undefined
+      ? null
+      : /^(?:[A-Za-z][A-Za-z0-9]*-|#)?(\d+)$/.exec(input.query.trim());
+  // Each is its own clause: an assignee filter must narrow "assigned to me", not replace it.
+  const clauses: LinearApi.IssueFilter[] = [
+    ...(input.assignee === undefined
+      ? []
+      : [{ assignee: { displayName: { eq: input.assignee } } }]),
+    ...(input.labels ?? []).map((name) => ({ labels: { some: { name: { eq: name } } } })),
+    // Across teams, "everyone" would be the whole workspace; there it means involving the viewer.
+    ...(team === null && input.involvement === "all"
+      ? [
+          {
+            or: (["assigned", "authored", "mentioned"] as const).map((involvement) =>
+              involvementFilter({ involvement, viewer: input.viewer }),
+            ),
+          },
+        ]
+      : []),
+  ];
+  const filter: LinearApi.IssueFilter = {
+    ...(team === null ? {} : { team: { key: { eq: team.trim().toUpperCase() } } }),
+    ...involvementFilter(input),
+    ...(input.state === "all"
+      ? {}
+      : {
+          state: {
+            type:
+              input.state === "closed" ? { in: CLOSED_STATE_TYPES } : { nin: CLOSED_STATE_TYPES },
+          },
+        }),
+    ...(clauses.length === 0 ? {} : { and: clauses }),
+    ...(input.query === undefined
+      ? {}
+      : {
+          or: [
+            { title: { containsIgnoreCase: input.query } },
+            { description: { containsIgnoreCase: input.query } },
+            ...(reference === null ? [] : [{ number: { eq: Number(reference[1]) } }]),
+          ],
+        }),
+  };
+  return {
+    filter,
+    first: input.limit,
+    after: input.cursor,
+    orderBy: input.sort === "created" ? ("createdAt" as const) : ("updatedAt" as const),
+  };
+}
+
 const notFound = (operation: string) =>
   new IssueTrackerError({
     tracker: LinearApi.KIND,
@@ -434,57 +492,21 @@ export const make: Effect.Effect<StandaloneIssueTrackerApi, never, LinearApi.Lin
       // The id, not the display name: it is what the involvement filters compare against.
       getViewer: () => linear.viewer().pipe(Effect.map((data) => toActor(data.viewer).login)),
 
-      listIssues: (input) => {
-        // `ENG-12`, `#12` or `12` asks for one issue of this team by number.
-        const reference =
-          input.query === undefined
-            ? null
-            : /^(?:[A-Za-z][A-Za-z0-9]*-|#)?(\d+)$/.exec(input.query.trim());
-        // Each is its own clause: an assignee filter must narrow "assigned to me", not replace it.
-        const clauses: LinearApi.IssueFilter[] = [
-          ...(input.assignee === undefined
-            ? []
-            : [{ assignee: { displayName: { eq: input.assignee } } }]),
-          ...(input.labels ?? []).map((name) => ({ labels: { some: { name: { eq: name } } } })),
-        ];
-        const filter: LinearApi.IssueFilter = {
-          team: { key: { eq: input.scope.trim().toUpperCase() } },
-          ...involvementFilter(input),
-          ...(input.state === "all"
-            ? {}
-            : {
-                state: {
-                  type:
-                    input.state === "closed"
-                      ? { in: CLOSED_STATE_TYPES }
-                      : { nin: CLOSED_STATE_TYPES },
-                },
-              }),
-          ...(clauses.length === 0 ? {} : { and: clauses }),
-          ...(input.query === undefined
-            ? {}
-            : {
-                or: [
-                  { title: { containsIgnoreCase: input.query } },
-                  { description: { containsIgnoreCase: input.query } },
-                  ...(reference === null ? [] : [{ number: { eq: Number(reference[1]) } }]),
-                ],
-              }),
-        };
-        return linear
-          .listIssues({
-            filter,
-            first: input.limit,
-            after: input.cursor,
-            orderBy: input.sort === "created" ? "createdAt" : "updatedAt",
-          })
-          .pipe(
-            Effect.map((page) => ({
-              items: page.nodes.map((node) => toSummary(node)),
-              nextCursor: page.nextCursor,
-            })),
-          );
-      },
+      listIssues: (input) =>
+        linear.listIssues(listQuery(input, input.scope)).pipe(
+          Effect.map((page) => ({
+            items: page.nodes.map((node) => toSummary(node)),
+            nextCursor: page.nextCursor,
+          })),
+        ),
+
+      listAccountIssues: (input) =>
+        linear.listIssues(listQuery(input, null)).pipe(
+          Effect.map((page) => ({
+            items: page.nodes.map((node) => ({ ...toSummary(node), scope: node.team.key })),
+            nextCursor: page.nextCursor,
+          })),
+        ),
 
       getIssue: Effect.fn("LinearIssueTracker.getIssue")(function* (input) {
         const identifier = yield* requireIdentifier("getIssue", input.key);

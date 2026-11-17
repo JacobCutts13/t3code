@@ -434,6 +434,54 @@ describe("IssueService", () => {
       expect(through.entries.map((entry) => entry.key)).toEqual(["4"]);
     }),
   );
+
+  it.effect("lists every repository once per account when asked for everywhere", () =>
+    Effect.gen(function* () {
+      const asked: Array<{ involvement: string; cursor: string | undefined }> = [];
+      const service = yield* makeService({
+        projects: [
+          project({ id: "web", repository: "acme/web" }),
+          project({ id: "api", repository: "acme/api" }),
+        ],
+        trackers: [
+          fakeTracker({
+            listIssues: () => Effect.die("per-scope reads are replaced by the account read"),
+            listAccountIssues: (input) => {
+              asked.push({ involvement: input.involvement, cursor: input.cursor });
+              return Effect.succeed(
+                input.cursor === undefined
+                  ? {
+                      items: [
+                        { ...issue("7", "2026-07-03T00:00:00Z"), scope: "elsewhere/lib" },
+                        { ...issue("8"), scope: "Acme/API" },
+                      ],
+                      nextCursor: "more",
+                    }
+                  : { items: [], nextCursor: null },
+              );
+            },
+          }),
+        ],
+      });
+      const result = yield* service.list({ state: "open", everywhere: true });
+      // A repository without a project reads through another project on its host; its own
+      // project serves a repository that has one, so that issue stays writable.
+      expect(result.entries.map((entry) => [entry.scope, entry.key, entry.projectId])).toEqual([
+        ["elsewhere/lib", "7", "web"],
+        ["Acme/API", "8", "api"],
+      ]);
+      expect(result.nextCursors).toEqual({ "github.com *": "more" });
+      expect(asked).toEqual([{ involvement: "all", cursor: undefined }]);
+
+      const next = yield* service.list({
+        state: "open",
+        everywhere: true,
+        cursors: result.nextCursors,
+      });
+      expect(next.entries).toEqual([]);
+      expect(asked.at(-1)).toEqual({ involvement: "all", cursor: "more" });
+    }),
+  );
 });
 
 describe("IssueService with a standalone tracker", () => {

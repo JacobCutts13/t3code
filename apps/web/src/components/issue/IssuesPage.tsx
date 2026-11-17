@@ -26,6 +26,8 @@ import {
   CalendarArrowDownIcon,
   CircleCheckIcon,
   ClockIcon,
+  FolderIcon,
+  GlobeIcon,
   LayersIcon,
   PenLineIcon,
   Plug2Icon,
@@ -118,6 +120,16 @@ const SORT_OPTIONS = [
   { value: "created", label: "Newest", Icon: CalendarArrowDownIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<IssueListSort>>;
 
+const REACH_OPTIONS = [
+  { value: "projects", label: "My projects", Icon: FolderIcon },
+  { value: "everywhere", label: "All repositories", Icon: GlobeIcon },
+] as const satisfies ReadonlyArray<PullRequestFilterOption<"projects" | "everywhere">>;
+
+// Across every repository, "everyone" would be all of the tracker: there it means involving you.
+const EVERYWHERE_INVOLVEMENT_TABS = INVOLVEMENT_TABS.map((tab) =>
+  tab.value === "all" ? { ...tab, label: "Involving me" } : tab,
+);
+
 const PAGE_SIZE = 50;
 const EMPTY_SET: ReadonlySet<string> = new Set();
 const EMPTY_RECORD = {} as const;
@@ -179,6 +191,7 @@ export function IssuesPage() {
     ...(search.label?.length ? { labels: search.label } : {}),
     ...(search.assignee ? { assignee: search.assignee } : {}),
     ...(search.order ? { sort: search.order } : {}),
+    ...(search.everywhere ? { everywhere: true } : {}),
   };
   const targets: ReadonlyArray<IssueListTarget> = capableEnvironments.map((e) => ({
     environmentId: e.environmentId,
@@ -233,6 +246,7 @@ export function IssuesPage() {
       ...(merged.label?.length ? { label: merged.label } : {}),
       ...(merged.assignee ? { assignee: merged.assignee } : {}),
       ...(merged.order ? { order: merged.order } : {}),
+      everywhere: merged.everywhere ? true : undefined,
       ...(merged.selectedEnvironmentId
         ? { selectedEnvironmentId: merged.selectedEnvironmentId }
         : {}),
@@ -565,12 +579,31 @@ export function IssuesPage() {
                     updateSearch({ order: order === "created" ? "created" : undefined })
                   }
                 />
+                <PullRequestCompactFilterMenu
+                  label="Which repositories"
+                  triggerIcon={
+                    search.everywhere ? (
+                      <GlobeIcon aria-hidden className="size-4" />
+                    ) : (
+                      <FolderIcon aria-hidden className="size-4" />
+                    )
+                  }
+                  triggerLabel={search.everywhere ? "All repositories" : "My projects"}
+                  outlined
+                  value={search.everywhere ? "everywhere" : "projects"}
+                  options={REACH_OPTIONS}
+                  onChange={(reach) =>
+                    updateSearch({ everywhere: reach === "everywhere" ? true : undefined })
+                  }
+                />
                 <IssueFiltersMenu
                   state={search.status}
                   stateOptions={STATE_TABS}
                   onState={(status) => updateSearch({ status })}
                   involvement={search.who}
-                  involvementOptions={INVOLVEMENT_TABS}
+                  involvementOptions={
+                    search.everywhere ? EVERYWHERE_INVOLVEMENT_TABS : INVOLVEMENT_TABS
+                  }
                   onInvolvement={(who) => updateSearch({ who })}
                   scopes={filterScopes}
                   labels={search.label ?? []}

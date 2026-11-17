@@ -16,6 +16,7 @@ import * as GitHubRest from "./GitHubRest.ts";
 import { readIssueTemplates } from "./gitHubIssueTemplates.ts";
 import * as GitHubRequestPolicy from "./GitHubRequestPolicy.ts";
 import * as GitHubGraphQlClient from "./gitHubGraphQlClient.ts";
+import { AccountIssuesGraphQLGroup } from "./accountIssues.graphql.ts";
 import { IssuesGraphQLGroup } from "./issues.graphql.ts";
 import { AddReaction, RemoveReaction } from "./pullRequestMutations.graphql.ts";
 import { gitHubReactionContent } from "./gitHubPullRequestJson.ts";
@@ -25,6 +26,7 @@ import {
   decodeIssueMetadataJson,
   toIssueCandidates,
   toIssueComments,
+  toAccountIssueSearch,
   toIssueDetail,
   toIssueSearch,
 } from "./gitHubIssueJson.ts";
@@ -65,8 +67,9 @@ const INVOLVEMENT_QUALIFIER: Record<IssueInvolvement, string | null> = {
   mentioned: "mentions",
 };
 
+/** `scope` null searches every repository the viewer reaches. */
 function searchQuery(input: {
-  readonly scope: string;
+  readonly scope: string | null;
   readonly state: "all" | "open" | "closed";
   readonly involvement: IssueInvolvement;
   readonly viewer: string;
@@ -75,10 +78,14 @@ function searchQuery(input: {
   readonly assignee?: string | undefined;
   readonly sort: IssueListSort;
 }): string {
-  const qualifier = INVOLVEMENT_QUALIFIER[input.involvement];
+  // Across repositories, "everyone" would be all of GitHub; there it means involving the viewer.
+  const qualifier =
+    input.scope === null && input.involvement === "all"
+      ? "involves"
+      : INVOLVEMENT_QUALIFIER[input.involvement];
   return [
     "is:issue",
-    `repo:${input.scope.trim()}`,
+    ...(input.scope === null ? [] : [`repo:${input.scope.trim()}`]),
     ...(input.state === "all" ? [] : [`is:${input.state}`]),
     ...(qualifier === null ? [] : [`${qualifier}:${input.viewer}`]),
     ...(input.labels ?? []).map((label) => `label:${quotedTerm(label)}`),
@@ -118,6 +125,7 @@ const FAILURE_DETAIL: Record<IssueTrackerError["reason"], string> = {
 
 const group = GraphQLGroup.merge(
   IssuesGraphQLGroup,
+  AccountIssuesGraphQLGroup,
   GraphQLGroup.make(AddReaction, RemoveReaction),
 ).middleware(GitHubGraphQlClient.GitHubGraphQlAuth);
 
@@ -220,6 +228,15 @@ export const make = Effect.gen(function* () {
             .pipe(graphql(input.host, "listIssues"), Effect.map(toIssueSearch)),
         ),
       ),
+
+    listAccountIssues: (input) =>
+      client
+        .AccountIssueSearch({
+          q: searchQuery({ ...input, scope: null }),
+          cursor: input.cursor,
+          rows: Math.min(Math.max(Math.trunc(input.limit), 1), 100),
+        })
+        .pipe(graphql(input.host, "listAccountIssues"), Effect.map(toAccountIssueSearch)),
 
     getIssue: Effect.fn("GitHubIssueTracker.getIssue")(function* (input) {
       const { owner, name, number } = yield* issue(input, "getIssue");

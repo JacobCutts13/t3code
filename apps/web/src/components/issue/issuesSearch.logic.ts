@@ -31,6 +31,7 @@ export const issuesSearchFromUrl = (raw: Record<string, unknown>): IssuesSearch 
   label: labels(raw.label),
   assignee: bounded(raw.assignee),
   order: raw.order === "created" ? "created" : undefined,
+  everywhere: raw.everywhere === true || raw.everywhere === "true" ? true : undefined,
   ...present<"selectedEnvironmentId", EnvironmentId>(
     "selectedEnvironmentId",
     bounded(raw.selectedEnvironmentId),

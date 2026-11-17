@@ -46,6 +46,8 @@ import * as IssueTrackerRegistry from "./IssueTrackerRegistry.ts";
 
 const DEFAULT_LIST_LIMIT = 50;
 const SCOPE_CONCURRENCY = 4;
+/** The cursor key's scope for a read across every scope of one account. */
+const ACCOUNT_SCOPE = "*";
 
 const interactive =
   <I, A>(call: (input: I) => Effect.Effect<A, IssueError>) =>
@@ -306,7 +308,13 @@ const make = Effect.gen(function* () {
     // Worktrees of one repository are separate projects, and every repository of an Azure
     // DevOps project shares its work items; read each scope once.
     const scopes = new Map<string, SupportedProject>();
+    // With `everywhere`, a tracker that reads across scopes is read once per account instead.
+    const accounts = new Map<string, SupportedProject>();
     for (const project of supported) {
+      if (input.everywhere === true && project.api.listAccountIssues !== undefined) {
+        if (!accounts.has(project.host)) accounts.set(project.host, project);
+        continue;
+      }
       const key = listCursorKey(project.host, project.scope);
       if (!scopes.has(key)) scopes.set(key, project);
     }
@@ -318,7 +326,7 @@ const make = Effect.gen(function* () {
     const nextCursors: Record<string, string> = {};
 
     const viewerRequests = new Map<string, Effect.Effect<string, IssueTrackerError>>();
-    for (const project of scopes.values()) {
+    for (const project of [...scopes.values(), ...accounts.values()]) {
       if (viewerRequests.has(project.host)) continue;
       const request = yield* Effect.cached(
         project.api
@@ -400,6 +408,62 @@ const make = Effect.gen(function* () {
               scope: project.scope,
               projectId: project.project.id,
               projectTitle: project.project.title,
+            });
+          }
+          if (page.success.nextCursor !== null) nextCursors[key] = page.success.nextCursor;
+        }),
+      { concurrency: SCOPE_CONCURRENCY, discard: true },
+    );
+
+    yield* Effect.forEach(
+      accounts.values(),
+      (carrier) =>
+        Effect.gen(function* () {
+          const key = listCursorKey(carrier.host, ACCOUNT_SCOPE);
+          if (continuing !== undefined && continuing[key] === undefined) return;
+          const cursor = continuing?.[key];
+          const page = yield* viewerRequests.get(carrier.host)!.pipe(
+            Effect.flatMap((viewer) =>
+              carrier.api.listAccountIssues!({
+                cwd: carrier.project.workspaceRoot,
+                host: carrier.host,
+                state: input.state,
+                involvement: input.involvement ?? "all",
+                viewer,
+                limit,
+                query: input.query,
+                labels: input.labels,
+                assignee: input.assignee,
+                sort: input.sort ?? "updated",
+                cursor,
+              }),
+            ),
+            Effect.result,
+          );
+          if (page._tag === "Failure") {
+            if (cursor !== undefined) nextCursors[key] = cursor;
+            recordFailure(carrier, page.failure);
+            errors.push({
+              projectId: carrier.project.id,
+              projectTitle: carrier.project.title,
+              message: trackerDetail(page.failure),
+            });
+            return;
+          }
+          for (const item of page.success.items) {
+            // The scope's own project serves it writable; any other scope reads through the carrier.
+            const owner =
+              supported.find(
+                (project) =>
+                  project.host === carrier.host &&
+                  project.scope.toLowerCase() === item.scope.toLowerCase(),
+              ) ?? carrier;
+            entries.push({
+              ...item,
+              tracker: carrier.tracker,
+              host: carrier.host,
+              projectId: owner.project.id,
+              projectTitle: owner.project.title,
             });
           }
           if (page.success.nextCursor !== null) nextCursors[key] = page.success.nextCursor;

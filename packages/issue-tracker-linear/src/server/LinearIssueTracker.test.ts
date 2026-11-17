@@ -213,6 +213,40 @@ describe("LinearIssueTracker", () => {
     }),
   );
 
+  it.effect("lists every team's issues involving the viewer, each naming its team", () =>
+    Effect.gen(function* () {
+      const { tracker } = fakeLinear({
+        T3Issues: (variables) => {
+          expect(variables.filter).not.toHaveProperty("team");
+          expect(variables.filter).toMatchObject({
+            and: [
+              {
+                or: [
+                  { assignee: { displayName: { eq: "julius" } } },
+                  { creator: { displayName: { eq: "julius" } } },
+                  { subscribers: { some: { displayName: { eq: "julius" } } } },
+                ],
+              },
+            ],
+          });
+          return {
+            issues: { nodes: [issue("ENG-1")], pageInfo: { hasNextPage: false, endCursor: null } },
+          };
+        },
+      });
+      const page = yield* (yield* tracker).listAccountIssues({
+        cwd: "/w/web",
+        host: "linear.app",
+        state: "open",
+        involvement: "all",
+        viewer: "julius",
+        sort: "updated",
+        limit: 50,
+      });
+      expect(page.items.map((item) => [item.scope, item.key])).toEqual([["ENG", "ENG-1"]]);
+    }),
+  );
+
   it.effect("reacts to a comment only when it belongs to the issue named", () =>
     Effect.gen(function* () {
       const created: Array<unknown> = [];
