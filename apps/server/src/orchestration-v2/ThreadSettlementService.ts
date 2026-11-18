@@ -800,7 +800,7 @@ export const make = Effect.gen(function* () {
           event.payload.status,
         )
           ? orchestrator
-              .finishWikiReflection(event.threadId, event.payload.id)
+              .finishSettlementPrompt(event.threadId, event.payload.id)
               .pipe(
                 Effect.andThen(cleanUpSettledThread(event.threadId)),
                 Effect.andThen(enqueueThread(event.threadId)),

@@ -5,6 +5,7 @@ import {
   type ServerSettingsPatch,
 } from "@t3tools/contracts";
 import { useEnvironmentsWithScope } from "../../state/session";
+import { SettlePromptField } from "./components/SettlePromptField";
 import { AutoSettleDaysField } from "./components/AutoSettleDaysField";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
@@ -101,7 +102,7 @@ export function AutoSettleSettingsRows(props: {
     patch: Partial<AutoSettleSettings> & {
       autoResumeLimitedThreads?: boolean;
       snoozeLimitedThreads?: boolean;
-      sidebarWikiReflectionOnSettle?: boolean;
+      threadSettlePrompt?: string;
     },
   ) => props.write(patch);
 
@@ -147,13 +148,13 @@ export function AutoSettleSettingsRows(props: {
         </SettingsSection>
       ) : null}
       <SettingsSection title="Auto-settle">
-        <SettingsSwitchRow
-          icon="arrow.triangle.branch"
-          label="Run wiki reflection on settle"
-          subtitle="Requires /wiki-reflection on the server and uses an extra agent turn before cleanup."
-          value={uniformMobileSetting(displayTargets, "sidebarWikiReflectionOnSettle")}
-          disabled={disabledFor("sidebarWikiReflectionOnSettle")}
-          onValueChange={(value) => writeToAll({ sidebarWikiReflectionOnSettle: value })}
+        <SettlePromptField
+          key={displayTargets
+            .map((target) => `${target.environment.environmentId}:${target.projectId}`)
+            .join(",")}
+          value={uniformMobileSetting(displayTargets, "threadSettlePrompt")}
+          disabled={disabledFor("threadSettlePrompt")}
+          onSave={(value) => writeToAll({ threadSettlePrompt: value })}
         />
         <SettingsSwitchRow
           icon="arrow.triangle.branch"

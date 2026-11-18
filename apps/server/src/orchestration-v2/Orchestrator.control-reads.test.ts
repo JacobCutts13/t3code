@@ -2977,7 +2977,8 @@ it.effect(
 );
 
 it.effect.each([
-  { enabled: false, outcome: "completed" as const },
+  { enabled: false, prompt: "", outcome: "completed" as const },
+  { enabled: false, prompt: " \n ", outcome: "completed" as const },
   ...(
     [
       "completed",
@@ -2992,23 +2993,24 @@ it.effect.each([
     ] as const
   ).map((outcome) => ({
     enabled: true,
+    prompt: "Summarise the changes.\nRecord any follow-up work.",
     outcome,
   })),
 ])(
-  "admits wiki reflection atomically on manual and automatic settlement (enabled=$enabled, $outcome)",
-  ({ enabled, outcome }) =>
+  "admits settlement prompt atomically on manual and automatic settlement (enabled=$enabled, $outcome)",
+  ({ enabled, prompt, outcome }) =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const projections = yield* ProjectionStore.ProjectionStoreV2;
       const events = yield* EventSink.EventSinkV2;
       const admitted = enabled && !["unavailable", "subagent", "side-chat"].includes(outcome);
       for (const automatic of [false, true]) {
-        const threadId = ThreadId.make(`thread:wiki-reflection:${automatic}`);
+        const threadId = ThreadId.make(`thread:settlement-prompt:${automatic}`);
         yield* orchestrator.dispatch({
           type: "thread.create",
           commandId: CommandId.make(`create:${threadId}`),
           threadId,
-          projectId: ProjectId.make("project:wiki-reflection"),
+          projectId: ProjectId.make("project:settlement-prompt"),
           title: "Finished work",
           modelSelection,
           runtimeMode: "full-access",
@@ -3098,11 +3100,11 @@ it.effect.each([
           const reflection = projection.messages.find(
             (message) => message.id !== original.userMessageId,
           )!;
-          assert.include(reflection.text, "/wiki-reflection");
+          assert.equal(reflection.text, prompt);
           assert.equal(reflection.createdBy, "agent");
           assert.deepInclude(reflection.notification, {
             source: {
-              kind: "wiki_reflection",
+              kind: "settlement_prompt",
               settledAt: DateTime.formatIso(projection.thread.settledAt!),
             },
           });
@@ -3235,7 +3237,7 @@ it.effect.each([
               lastError: null,
             },
           });
-          yield* orchestrator.finishWikiReflection(threadId, reflectionRun.id);
+          yield* orchestrator.finishSettlementPrompt(threadId, reflectionRun.id);
           const after = yield* projections.getThreadProjection(threadId);
           assert.lengthOf(
             after.providerSessions,
@@ -3267,12 +3269,12 @@ it.effect.each([
           layerDatabase,
           ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
           ProviderReplayHarness.layerWithRegistry(
-            { name: "wiki-reflection" },
+            { name: "settlement-prompt" },
             ProviderAdapterRegistry.layerFromAdapters([adapter]),
             {
               databaseLayer: layerDatabase,
               runEffectWorker: false,
-              sidebarWikiReflectionOnSettle: enabled,
+              threadSettlePrompt: prompt,
             },
           ),
         ),

@@ -1372,7 +1372,7 @@ export const OrchestrationV2NotificationSource = kindUnionWithFallback(
     }),
     Schema.Struct({ kind: Schema.Literal("background_task") }),
     Schema.Struct({ kind: Schema.Literal("system") }),
-    Schema.Struct({ kind: Schema.Literal("wiki_reflection"), settledAt: IsoDateTime }),
+    Schema.Struct({ kind: Schema.Literal("settlement_prompt"), settledAt: IsoDateTime }),
   ],
   (kind) => Schema.Struct({ kind }),
   () => ({ kind: "background_task" }),

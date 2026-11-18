@@ -8,7 +8,7 @@ const SHARED_SERVER_SETTING_KEYS = [
   "continueThreadsAfterServerUpdate",
   "sidebarAutoSettleAfterDays",
   "sidebarAutoSettleOnMerge",
-  "sidebarWikiReflectionOnSettle",
+  "threadSettlePrompt",
   "autoResumeLimitedThreads",
   "snoozeLimitedThreads",
   "snoozePresets",

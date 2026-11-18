@@ -719,7 +719,7 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
       },
     }),
     Layer.mock(Orchestrator.OrchestratorV2)({
-      finishWikiReflection: () => Effect.void,
+      finishSettlementPrompt: () => Effect.void,
       streamDomainEvents: Stream.fromPubSub(domainEvents).pipe(
         Stream.tap((event) => Queue.offer(observedEvents, event.id)),
       ),

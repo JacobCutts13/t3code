@@ -12,8 +12,8 @@ describe("filterSharedServerPatch", () => {
     const patch = { continueThreadsAfterServerUpdate: true, sidebarAutoSettleAfterDays: 7 };
     expect(filterSharedServerPatch(patch, undefined)).toEqual({ sidebarAutoSettleAfterDays: 7 });
     expect(filterSharedServerPatch(patch, DEFAULT_SERVER_SETTINGS)).toEqual(patch);
-    expect(splitSharedServerPatch({ sidebarWikiReflectionOnSettle: true })).toEqual({
-      sharedPatch: { sidebarWikiReflectionOnSettle: true },
+    expect(splitSharedServerPatch({ threadSettlePrompt: "Summarise the changes." })).toEqual({
+      sharedPatch: { threadSettlePrompt: "Summarise the changes." },
       localPatch: {},
     });
   });

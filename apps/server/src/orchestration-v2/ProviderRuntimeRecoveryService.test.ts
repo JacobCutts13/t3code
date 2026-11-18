@@ -518,8 +518,8 @@ it.effect.each([
   "starting-other-request",
   "starting-own-request",
   "starting-scheduled",
-  "starting-wiki-reflection",
-  "starting-wiki-reflection-stale",
+  "starting-settlement-prompt",
+  "starting-settlement-prompt-stale",
   "starting-steered",
   "running",
   "running-delegated",
@@ -536,10 +536,10 @@ it.effect.each([
   const resent =
     scenario === "starting-scheduled" ||
     scenario === "running-delegated" ||
-    scenario === "starting-wiki-reflection";
+    scenario === "starting-settlement-prompt";
   const terminalized =
     status === "preparing" ||
-    scenario === "starting-wiki-reflection-stale" ||
+    scenario === "starting-settlement-prompt-stale" ||
     scenario === "starting-own-request" ||
     scenario === "starting-steered" ||
     scenario === "running-delegated-capped" ||
@@ -563,8 +563,8 @@ it.effect.each([
       id: threadId,
       archivedAt: null,
       deletedAt: null,
-      settledOverride: scenario.startsWith("starting-wiki-reflection") ? "settled" : null,
-      settledAt: scenario.startsWith("starting-wiki-reflection")
+      settledOverride: scenario.startsWith("starting-settlement-prompt") ? "settled" : null,
+      settledAt: scenario.startsWith("starting-settlement-prompt")
         ? DateTime.makeUnsafe("2026-11-01T19:30:00.000Z")
         : null,
       snoozedUntil:
@@ -672,19 +672,19 @@ it.effect.each([
                   ? { createdBy: "agent", creationSource: "server" }
                   : { createdBy: "user" }),
               ...(scenario === "starting-scheduled" ? { scheduledTaskId: "scheduled-task" } : {}),
-              ...(scenario.startsWith("starting-wiki-reflection")
+              ...(scenario.startsWith("starting-settlement-prompt")
                 ? {
                     createdBy: "agent",
                     creationSource: "server",
                     notification: {
                       source: {
-                        kind: "wiki_reflection",
+                        kind: "settlement_prompt",
                         settledAt: scenario.endsWith("stale")
                           ? "2026-11-01T19:00:00.000Z"
                           : "2026-11-01T19:30:00.000Z",
                       },
                       outcome: "updated",
-                      summary: "Wiki reflection on settle",
+                      summary: "Settlement prompt on settle",
                     },
                   }
                 : {}),
