@@ -174,6 +174,14 @@ when the thread settles** enabled in Settings > Projects > Actions. You can also
 that action so T3 can stop its terminal and child processes. Commands started through an
 agent's own shell tools are managed by the provider.
 
+Set **Prompt to run on settle** in **Settings → Threads** to send the agent an
+instruction when finished threads settle, manually or automatically. Leave it empty
+(the default) to disable it. You can enter plain text, such as “Summarise the changes
+and update the project notes”, or a skill invocation such as `/wiki-reflection` if
+that skill is available to the agent. This uses an extra agent turn; the thread
+stays settled and cleanup waits for it to finish. Changing the prompt does not
+run it on threads that were already settled.
+
 To reclaim disk space from settled work, turn on **Run in the thread's worktree when the
 thread settles** for one of the project's actions, or set `"runOnSettle": true` on a
 `t3.json` script, for example `cargo clean`. It runs each time a thread in its own

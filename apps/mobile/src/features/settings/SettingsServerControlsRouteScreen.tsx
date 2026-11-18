@@ -60,6 +60,7 @@ const PAGE_PROJECT_KEYS: Record<SettingsPage, readonly ProjectScopedServerSettin
     "defaultRuntimeMode",
     "responseStreamingMode",
     "enableAgentBrowserAccess",
+    "threadSettlePrompt",
     "sidebarAutoSettleOnMerge",
     "sidebarAutoSettleAfterDays",
   ],
@@ -134,6 +135,7 @@ const STREAMING_CHOICES: ReadonlyArray<{
 
 // Only servers with thread auto-settlement store these, so other targets get the rest of a patch.
 const AUTO_SETTLE_SETTING_KEYS: ReadonlySet<string> = new Set([
+  "threadSettlePrompt",
   "sidebarAutoSettleOnMerge",
   "sidebarAutoSettleAfterDays",
   "autoResumeLimitedThreads",

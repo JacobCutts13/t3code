@@ -13,6 +13,7 @@ import {
   runRanAfter,
   usageLimitBlockedRun,
 } from "@t3tools/shared/orchestrationV2ThreadError";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { threadIssueKeysEqual } from "@t3tools/contracts";
 import { canonicalizeGitCafePullRequestUrl } from "@t3tools/source-control-definitions/registry";
 import { threadPullRequestsOf } from "../sourceControl/threadPullRequests.ts";
@@ -28,6 +29,7 @@ import {
   CommandId,
   type GuestMessageId,
   isCompactionCommandMessage,
+  isListedThreadLineage,
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
   MessageId,
@@ -92,6 +94,7 @@ import {
   derivePendingBackgroundWork,
   pendingBackgroundTurnItems,
 } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -415,6 +418,10 @@ export interface OrchestratorV2Shape {
   readonly dispatch: (
     command: OrchestrationV2ServerCommand,
   ) => Effect.Effect<OrchestratorV2DispatchResult, OrchestratorV2Error>;
+  readonly finishSettlementPrompt: (
+    threadId: ThreadId,
+    runId: RunId,
+  ) => Effect.Effect<void, OrchestratorV2Error>;
   readonly autoArmLimitRecovery: (input: {
     readonly commandId: CommandId;
     readonly threadId: ThreadId;
@@ -4066,6 +4073,48 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     return decided.success;
   });
 
+  const cancelSettlementPrompt = Effect.fn("Orchestrator.cancelSettlementPrompt")(function* (
+    command: { readonly commandId: CommandId; readonly threadId: ThreadId },
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+  ) {
+    const projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+    let superseded = false;
+    for (const run of projection.runs.filter(
+      (candidate) => isActiveRun(candidate) || candidate.status === "queued",
+    )) {
+      if (
+        !projection.messages.some(
+          (message) =>
+            message.id === run.userMessageId &&
+            message.notification?.source.kind === "settlement_prompt",
+        )
+      )
+        continue;
+      superseded = true;
+      if (run.status === "queued") {
+        yield* dispatchQueuedRunCancel(
+          { ...command, type: "queued-run.cancel", runId: run.id },
+          events,
+          "cohort",
+        );
+      } else {
+        yield* dispatchRunInterrupt(
+          {
+            ...command,
+            type: "run.interrupt",
+            runId: run.id,
+            holdQueue: false,
+            reason: "Settlement prompt superseded by new activity.",
+          },
+          events,
+          effects,
+        );
+      }
+    }
+    return superseded;
+  });
+
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
     command: Extract<
       OrchestrationV2ServerCommand,
@@ -4208,6 +4257,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           commandType: command.type,
           cause: `Thread ${command.threadId} is no longer empty.`,
         });
+    }
+    if (command.type === "thread.unsettle" && thread.settledOverride === "settled") {
+      yield* cancelSettlementPrompt(command, events, effects);
     }
     if (command.type === "thread.archive" && thread.archivedAt !== null) {
       return yield* new OrchestratorDispatchError({
@@ -5484,6 +5536,93 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }),
         { concurrency: 1, discard: true },
       );
+    }
+
+    if (
+      command.type === "thread.settle" &&
+      thread.settledOverride !== "settled" &&
+      isListedThreadLineage(thread.lineage)
+    ) {
+      const settings = yield* serverSettings.getSettings.pipe(Effect.orDie);
+      const prompt = resolveProjectSettings(settings, thread.projectId).settings.threadSettlePrompt;
+      if (prompt.trim() !== "") {
+        const { runs } = yield* projectionStore
+          .getThreadRecords(command.threadId, ["runs"])
+          .pipe(mapDispatchError(command));
+        if (runs.some((run) => run.status === "completed")) {
+          const settledAt = DateTime.formatIso(updatedThread.settledAt!);
+          const promptEvents = yield* Ref.make(yield* Ref.get(events));
+          const promptEffects = yield* Ref.make<Array<PendingOrchestrationEffectV2>>([]);
+          const admission = yield* Effect.exit(
+            dispatchMessage(
+              {
+                type: "message.dispatch",
+                commandId: command.commandId,
+                threadId: command.threadId,
+                messageId: MessageId.make(`settlement-prompt:${command.commandId}`),
+                text: prompt,
+                attachments: [],
+                dispatchMode: { type: "queue_after_active" },
+                createdBy: "agent",
+                creationSource: "server",
+                notification: {
+                  source: { kind: "settlement_prompt", settledAt },
+                  outcome: "updated",
+                  summary: "Prompt on settle",
+                },
+              },
+              promptEvents,
+              promptEffects,
+            ),
+          );
+          if (Exit.isSuccess(admission)) {
+            yield* Ref.set(events, yield* Ref.get(promptEvents));
+            const admittedEffects = yield* Ref.get(promptEffects);
+            yield* Ref.update(effects, (existing) => [...existing, ...admittedEffects]);
+          } else {
+            if (Cause.hasInterruptsOnly(admission.cause))
+              return yield* Effect.failCause(admission.cause);
+            yield* Effect.logWarning("Settlement prompt admission failed", {
+              threadId: command.threadId,
+              cause: admission.cause,
+            });
+            const run = runs.findLast((candidate) => candidate.status === "completed")!;
+            yield* emit(
+              events,
+              command,
+            )({
+              type: "turn-item.updated",
+              threadId: command.threadId,
+              runId: run.id,
+              occurredAt: now,
+              payload: {
+                id: idAllocator.derive.runSignalTurnItem({
+                  runId: run.id,
+                  signal: "settlement-prompt-skipped",
+                }),
+                threadId: command.threadId,
+                runId: run.id,
+                nodeId: run.rootNodeId,
+                providerThreadId: run.providerThreadId,
+                providerTurnId: null,
+                nativeItemRef: null,
+                parentItemId: null,
+                ordinal: yield* nextTurnItemOrdinal(
+                  yield* getProjectionWithPendingEvents(command.threadId, events),
+                ),
+                status: "completed",
+                title: "Settlement prompt could not start",
+                startedAt: now,
+                completedAt: now,
+                updatedAt: now,
+                type: "system_notice",
+                message:
+                  "The thread settled, but settlement prompt could not start. Check that its provider and model are available.",
+              },
+            });
+          }
+        }
+      }
     }
 
     if (command.type === "thread.archive") {
@@ -6766,6 +6905,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         : undefined,
     );
+    let supersededSettlementPrompt = false;
+    if (
+      projection.thread.settledOverride === "settled" &&
+      command.notification === undefined &&
+      command.scheduledTaskId === undefined
+    ) {
+      supersededSettlementPrompt = yield* cancelSettlementPrompt(command, events, effects);
+      projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+    }
     if (command.steerFollowUpOfRunId !== undefined) {
       const source = projection.runs.find((run) => run.id === command.steerFollowUpOfRunId);
       if (
@@ -6968,7 +7116,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         : run.id === command.restartContinuationOfRunId,
     )?.delegatedTaskId;
 
-    if (projection.thread.settledOverride !== null) {
+    const promptSource = command.notification?.source;
+    const settlementPrompt = promptSource?.kind === "settlement_prompt";
+    if (
+      settlementPrompt &&
+      (command.createdBy !== "agent" ||
+        command.creationSource !== "server" ||
+        projection.thread.settledOverride !== "settled" ||
+        projection.thread.settledAt === null ||
+        DateTime.formatIso(projection.thread.settledAt) !== promptSource.settledAt)
+    ) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: "Settlement prompt no longer belongs to this settlement.",
+      });
+    }
+    if (projection.thread.settledOverride !== null && !settlementPrompt) {
       const now = yield* DateTime.now;
       const thread: OrchestrationV2AppThread = {
         ...projection.thread,
@@ -7073,11 +7237,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       projection = applyToProjection(projection, event);
     }
     let modelSelection = command.modelSelection ?? projection.thread.modelSelection;
-    let dispatchMode = resolveMessageDispatchIntent(
-      projection,
-      command.dispatchMode,
-      command.deliveryIntent,
-    );
+    let dispatchMode = supersededSettlementPrompt
+      ? { type: "queue_after_active" as const }
+      : resolveMessageDispatchIntent(projection, command.dispatchMode, command.deliveryIntent);
     if (dispatchMode.type === "steer_active" || dispatchMode.type === "restart_active") {
       const targetRunId = dispatchMode.targetRunId;
       const target = projection.runs.find((run) => run.id === targetRunId);
@@ -16209,6 +16371,57 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return effectOutbox.awaitSettled(`effect:restart-continuation:${run.id}`).pipe(Effect.ignore);
     }),
     dispatch: dispatchWithReceipt,
+    finishSettlementPrompt: Effect.fn("Orchestrator.finishSettlementPrompt")(
+      function (threadId, runId) {
+        return threadDispatch.withLock(
+          threadId,
+          Effect.gen(function* () {
+            const thread = yield* projectionStore
+              .getThread(threadId)
+              .pipe(
+                Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })),
+              );
+            if (
+              thread.deletedAt !== null ||
+              thread.archivedAt !== null ||
+              thread.settledOverride !== "settled"
+            )
+              return;
+            const projection = yield* projectionStore
+              .getThreadRecords(threadId, ["runs", "messages", "providerSessions"], {
+                messageRunIds: [runId],
+                messageRoles: ["user"],
+              })
+              .pipe(
+                Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })),
+              );
+            const run = projection.runs.findLast((candidate) => candidate.status !== "queued");
+            const source = projection.messages.find((message) => message.id === run?.userMessageId)
+              ?.notification?.source;
+            if (
+              run?.id !== runId ||
+              isActiveRun(run) ||
+              source?.kind !== "settlement_prompt" ||
+              thread.settledAt === null ||
+              source.settledAt !== DateTime.formatIso(thread.settledAt) ||
+              projection.runs.some(
+                (candidate) => isActiveRun(candidate) || candidate.status === "queued",
+              )
+            )
+              return;
+            for (const session of projection.providerSessions) {
+              yield* dispatchWithReceiptEffect({
+                type: "provider-session.detach",
+                commandId: CommandId.make(`settlement-prompt-finished:${runId}:${session.id}`),
+                threadId,
+                providerSessionId: session.id,
+                reason: "Settlement prompt finished on a settled thread.",
+              });
+            }
+          }),
+        );
+      },
+    ),
     autoArmLimitRecovery: Effect.fn("OrchestratorV2.autoArmLimitRecovery")(function (input) {
       return threadDispatch.withLock(
         input.threadId,

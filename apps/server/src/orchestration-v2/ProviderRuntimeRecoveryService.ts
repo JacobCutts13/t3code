@@ -445,23 +445,42 @@ export const make = Effect.gen(function* () {
         retryableMessageIds.has(run.userMessageId),
       );
       // Nobody reviews a delegated, agent-sent or scheduled prompt, so it is sent again instead.
-      const unattendedRuns = continueAfterRestart
-        ? unstartedRuns.filter((run) =>
-            queuedMessages.some(
-              (message) =>
-                message.id === run.userMessageId &&
-                !retryableMessageIds.has(message.id) &&
-                message.notification === undefined &&
-                message.delegatedCompletion === undefined &&
-                (message.scheduledTaskId !== undefined || message.creationSource === "mcp"),
-            ),
-          )
-        : [];
+      const settlementPromptRuns = unstartedRuns.filter((run) =>
+        queuedMessages.some(
+          (message) =>
+            message.id === run.userMessageId &&
+            message.createdBy === "agent" &&
+            message.creationSource === "server" &&
+            message.notification?.source.kind === "settlement_prompt" &&
+            projection.thread.settledOverride === "settled" &&
+            projection.thread.settledAt !== null &&
+            message.notification.source.settledAt ===
+              DateTime.formatIso(projection.thread.settledAt) &&
+            projection.thread.archivedAt === null &&
+            projection.thread.deletedAt === null,
+        ),
+      );
+      const unattendedRuns = [
+        ...settlementPromptRuns,
+        ...(continueAfterRestart
+          ? unstartedRuns.filter((run) =>
+              queuedMessages.some(
+                (message) =>
+                  message.id === run.userMessageId &&
+                  !retryableMessageIds.has(message.id) &&
+                  message.notification === undefined &&
+                  message.delegatedCompletion === undefined &&
+                  (message.scheduledTaskId !== undefined || message.creationSource === "mcp"),
+              ),
+            )
+          : []),
+      ];
       const resentRuns: Array<OrchestrationV2ThreadProjection["runs"][number]> = [];
       const resends: Array<EffectOutbox.PendingOrchestrationEffectV2> = [];
       for (const run of unattendedRuns) {
         if (
-          restartContinuationBlocked(projection, run, now, false) ||
+          (!settlementPromptRuns.includes(run) &&
+            restartContinuationBlocked(projection, run, now, false)) ||
           (yield* restartStopRequested(projections.getThreadRecords, projection.thread, run).pipe(
             Effect.mapError(
               (cause) =>

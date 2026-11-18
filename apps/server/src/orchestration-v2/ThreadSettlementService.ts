@@ -701,6 +701,13 @@ export const make = Effect.gen(function* () {
     function* (threadId: ThreadId) {
       const settled = yield* projections.getThread(threadId);
       if (settled.deletedAt !== null || settled.settledOverride !== "settled") return;
+      const shell = yield* projections.getThreadShell(threadId);
+      if (
+        shell !== null &&
+        (shell.activeRunId !== null ||
+          ["queued", "preparing", "starting", "running", "waiting"].includes(shell.status))
+      )
+        return;
       yield* terminals.closeOnSettle({ threadId });
       const worktreePath = settled.worktreePath;
       if (worktreePath === null || !(yield* fileSystem.exists(worktreePath))) return;
@@ -792,7 +799,12 @@ export const make = Effect.gen(function* () {
         return ["completed", "interrupted", "failed", "cancelled", "rolled_back"].includes(
           event.payload.status,
         )
-          ? enqueueThread(event.threadId)
+          ? orchestrator
+              .finishSettlementPrompt(event.threadId, event.payload.id)
+              .pipe(
+                Effect.andThen(cleanUpSettledThread(event.threadId)),
+                Effect.andThen(enqueueThread(event.threadId)),
+              )
           : Effect.void;
       default:
         return Effect.void;

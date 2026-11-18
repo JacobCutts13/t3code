@@ -518,6 +518,8 @@ it.effect.each([
   "starting-other-request",
   "starting-own-request",
   "starting-scheduled",
+  "starting-settlement-prompt",
+  "starting-settlement-prompt-stale",
   "starting-steered",
   "running",
   "running-delegated",
@@ -531,9 +533,13 @@ it.effect.each([
     : scenario.startsWith("running")
       ? "running"
       : scenario;
-  const resent = scenario === "starting-scheduled" || scenario === "running-delegated";
+  const resent =
+    scenario === "starting-scheduled" ||
+    scenario === "running-delegated" ||
+    scenario === "starting-settlement-prompt";
   const terminalized =
     status === "preparing" ||
+    scenario === "starting-settlement-prompt-stale" ||
     scenario === "starting-own-request" ||
     scenario === "starting-steered" ||
     scenario === "running-delegated-capped" ||
@@ -557,7 +563,10 @@ it.effect.each([
       id: threadId,
       archivedAt: null,
       deletedAt: null,
-      settledOverride: null,
+      settledOverride: scenario.startsWith("starting-settlement-prompt") ? "settled" : null,
+      settledAt: scenario.startsWith("starting-settlement-prompt")
+        ? DateTime.makeUnsafe("2026-11-01T19:30:00.000Z")
+        : null,
       snoozedUntil:
         scenario === "running-delegated-snoozed"
           ? DateTime.makeUnsafe("2099-07-25T09:00:00.000Z")
@@ -663,6 +672,22 @@ it.effect.each([
                   ? { createdBy: "agent", creationSource: "server" }
                   : { createdBy: "user" }),
               ...(scenario === "starting-scheduled" ? { scheduledTaskId: "scheduled-task" } : {}),
+              ...(scenario.startsWith("starting-settlement-prompt")
+                ? {
+                    createdBy: "agent",
+                    creationSource: "server",
+                    notification: {
+                      source: {
+                        kind: "settlement_prompt",
+                        settledAt: scenario.endsWith("stale")
+                          ? "2026-11-01T19:00:00.000Z"
+                          : "2026-11-01T19:30:00.000Z",
+                      },
+                      outcome: "updated",
+                      summary: "Settlement prompt on settle",
+                    },
+                  }
+                : {}),
             },
           ]
         : [],

@@ -2975,3 +2975,309 @@ it.effect(
       assert.equal(yield* captureReads, quietParent);
     }).pipe(Effect.provide(layerTest)),
 );
+
+it.effect.each([
+  { enabled: false, prompt: "", outcome: "completed" as const },
+  { enabled: false, prompt: " \n ", outcome: "completed" as const },
+  ...(
+    [
+      "completed",
+      "failed",
+      "message",
+      "running-message",
+      "unsettle",
+      "unavailable",
+      "subagent",
+      "side-chat",
+      "fork",
+    ] as const
+  ).map((outcome) => ({
+    enabled: true,
+    prompt: "Summarise the changes.\nRecord any follow-up work.",
+    outcome,
+  })),
+])(
+  "admits settlement prompt atomically on manual and automatic settlement (enabled=$enabled, $outcome)",
+  ({ enabled, prompt, outcome }) =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const events = yield* EventSink.EventSinkV2;
+      const admitted = enabled && !["unavailable", "subagent", "side-chat"].includes(outcome);
+      for (const automatic of [false, true]) {
+        const threadId = ThreadId.make(`thread:settlement-prompt:${automatic}`);
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(`create:${threadId}`),
+          threadId,
+          projectId: ProjectId.make("project:settlement-prompt"),
+          title: "Finished work",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          createdBy: "user",
+          creationSource: "web",
+        });
+        yield* orchestrator.dispatch({
+          type: "thread.settle",
+          commandId: CommandId.make(`empty-settle:${threadId}`),
+          threadId,
+        });
+        assert.lengthOf((yield* projections.getThreadProjection(threadId)).runs, 0);
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make(`message:${threadId}`),
+          threadId,
+          messageId: MessageId.make(`message:${threadId}`),
+          text: "Investigate and fix the bug.",
+          attachments: [],
+          createdBy: "user",
+          creationSource: "web",
+          dispatchMode: { type: "start_immediately" },
+        });
+        const original = (yield* projections.getThreadProjection(threadId)).runs[0]!;
+        const now = yield* DateTime.now;
+        yield* projections.apply({
+          id: EventId.make(`complete:${threadId}`),
+          type: "run.updated",
+          threadId,
+          runId: original.id,
+          occurredAt: now,
+          payload: { ...original, status: "completed", completedAt: now },
+        });
+        if (outcome === "subagent" || outcome === "side-chat" || outcome === "fork") {
+          const thread = yield* projections.getThread(threadId);
+          yield* projections.apply({
+            type: "thread.metadata-updated",
+            id: EventId.make(`lineage:${threadId}`),
+            threadId,
+            occurredAt: now,
+            payload: {
+              ...thread,
+              lineage: {
+                rootThreadId: ThreadId.make("wiki-parent"),
+                parentThreadId: ThreadId.make("wiki-parent"),
+                relationshipToParent: outcome === "subagent" ? "subagent" : "fork",
+                ...(outcome === "side-chat" ? { sideChat: true } : {}),
+              },
+            },
+          });
+        }
+        if (outcome === "unavailable") {
+          const thread = yield* projections.getThread(threadId);
+          const missing = ProviderInstanceId.make("removed-provider");
+          yield* projections.apply({
+            type: "thread.metadata-updated",
+            id: EventId.make(`removed-provider:${threadId}`),
+            threadId,
+            occurredAt: now,
+            payload: {
+              ...thread,
+              providerInstanceId: missing,
+              modelSelection: { instanceId: missing, model: "removed" },
+            },
+          });
+        }
+        const commandId = CommandId.make(`settle:${threadId}`);
+        const command = automatic
+          ? {
+              type: "thread.auto-settle" as const,
+              commandId,
+              threadId,
+              snapshotAt: (yield* projections.getThread(threadId)).updatedAt,
+            }
+          : { type: "thread.settle" as const, commandId, threadId };
+        yield* orchestrator.dispatch(command);
+        const projection = yield* projections.getThreadProjection(threadId);
+        assert.equal(projection.thread.settledOverride, "settled");
+        assert.isNotNull(projection.thread.settledAt);
+        assert.lengthOf(projection.runs, admitted ? 2 : 1);
+        const committed = yield* events.readByCommandId({ commandId }).pipe(Stream.runCollect);
+        assert.equal(committed[0]?.event.type, "thread.settled");
+        if (admitted) {
+          const reflection = projection.messages.find(
+            (message) => message.id !== original.userMessageId,
+          )!;
+          assert.equal(reflection.text, prompt);
+          assert.equal(reflection.createdBy, "agent");
+          assert.deepInclude(reflection.notification, {
+            source: {
+              kind: "settlement_prompt",
+              settledAt: DateTime.formatIso(projection.thread.settledAt!),
+            },
+          });
+          assert.isTrue(committed.some(({ event }) => event.type === "message.updated"));
+          assert.isTrue(committed.some(({ event }) => event.type === "run.created"));
+        }
+        if (outcome === "unavailable")
+          assert.isTrue(projection.turnItems.some((item) => item.type === "system_notice"));
+        yield* orchestrator.dispatch(command);
+        assert.lengthOf((yield* projections.getThreadProjection(threadId)).runs, admitted ? 2 : 1);
+        if (admitted) {
+          const reflectionRun = projection.runs[1]!;
+          if (outcome === "running-message") {
+            const providerThread = projection.providerThreads.find(
+              (entry) => entry.id === reflectionRun.providerThreadId,
+            )!;
+            const sessionId = ProviderSessionId.make(`running-reflection-session:${threadId}`);
+            yield* projections.apply({
+              type: "provider-session.attached",
+              id: EventId.make(`running-session:${threadId}`),
+              threadId,
+              occurredAt: now,
+              payload: {
+                id: sessionId,
+                driver: adapter.driver,
+                providerInstanceId: instanceId,
+                status: "ready",
+                cwd: "/repo",
+                model: modelSelection.model,
+                capabilities: CodexProviderCapabilitiesV2,
+                createdAt: now,
+                updatedAt: now,
+                lastError: null,
+              },
+            });
+            yield* projections.apply({
+              type: "provider-thread.updated",
+              id: EventId.make(`running-provider:${threadId}`),
+              threadId,
+              occurredAt: now,
+              payload: { ...providerThread, providerSessionId: sessionId, status: "active" },
+            });
+            yield* projections.apply({
+              type: "run.updated",
+              id: EventId.make(`running-reflection:${threadId}`),
+              threadId,
+              runId: reflectionRun.id,
+              occurredAt: now,
+              payload: { ...reflectionRun, status: "running", startedAt: now },
+            });
+            yield* projections.apply({
+              type: "provider-turn.updated",
+              id: EventId.make(`running-turn:${threadId}`),
+              threadId,
+              runId: reflectionRun.id,
+              occurredAt: now,
+              payload: {
+                id: ProviderTurnId.make(`reflection-turn:${threadId}`),
+                providerThreadId: providerThread.id,
+                nodeId: reflectionRun.rootNodeId!,
+                runAttemptId: reflectionRun.activeAttemptId!,
+                nativeTurnRef: {
+                  driver: adapter.driver,
+                  nativeId: "reflection-turn",
+                  strength: "strong",
+                },
+                ordinal: 1,
+                status: "running",
+                startedAt: now,
+                completedAt: null,
+              },
+            });
+          }
+          const superseded = outcome === "message" || outcome === "running-message";
+          if (superseded) {
+            yield* orchestrator.dispatch({
+              type: "message.dispatch",
+              commandId: CommandId.make(`new:${threadId}`),
+              threadId,
+              messageId: MessageId.make(`new:${threadId}`),
+              deliveryIntent: "auto",
+              text: "Continue with a new task.",
+              attachments: [],
+              createdBy: "user",
+              creationSource: "web",
+              dispatchMode: { type: "start_immediately" },
+            });
+          } else if (outcome === "unsettle") {
+            yield* orchestrator.dispatch({
+              type: "thread.unsettle",
+              commandId: CommandId.make(`unsettle:${threadId}`),
+              threadId,
+              reason: "user",
+            });
+          } else {
+            yield* projections.apply({
+              id: EventId.make(`reflection-ended:${threadId}`),
+              type: "run.updated",
+              threadId,
+              runId: reflectionRun.id,
+              occurredAt: now,
+              payload: {
+                ...reflectionRun,
+                status: outcome === "failed" ? "failed" : "completed",
+                completedAt: now,
+              },
+            });
+            yield* orchestrator.dispatch({
+              type: "thread.settle",
+              commandId: CommandId.make(`repeat-settle:${threadId}`),
+              threadId,
+            });
+          }
+          const sessionId = ProviderSessionId.make(`reflection-session:${threadId}`);
+          yield* projections.apply({
+            type: "provider-session.attached",
+            id: EventId.make(`reflection-session:${threadId}`),
+            threadId,
+            occurredAt: now,
+            payload: {
+              id: sessionId,
+              driver: adapter.driver,
+              providerInstanceId: instanceId,
+              status: "ready",
+              cwd: "/repo",
+              model: modelSelection.model,
+              capabilities: CodexProviderCapabilitiesV2,
+              createdAt: now,
+              updatedAt: now,
+              lastError: null,
+            },
+          });
+          yield* orchestrator.finishSettlementPrompt(threadId, reflectionRun.id);
+          const after = yield* projections.getThreadProjection(threadId);
+          assert.lengthOf(
+            after.providerSessions,
+            superseded || outcome === "unsettle" ? (outcome === "running-message" ? 2 : 1) : 0,
+          );
+          assert.lengthOf(after.runs, superseded ? 3 : 2);
+          assert.equal(
+            after.thread.settledOverride,
+            superseded ? null : outcome === "unsettle" ? "active" : "settled",
+          );
+          if (outcome === "running-message") {
+            assert.equal(after.runs.at(-1)?.status, "queued");
+            assert.notEqual(
+              after.messages.find((message) => message.id === MessageId.make(`new:${threadId}`))
+                ?.runId,
+              reflectionRun.id,
+            );
+          }
+          if ((superseded && outcome !== "running-message") || outcome === "unsettle")
+            assert.include(
+              ["cancelled", "interrupted"],
+              after.runs.find((run) => run.id === reflectionRun.id)?.status,
+            );
+        }
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          layerDatabase,
+          ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+          ProviderReplayHarness.layerWithRegistry(
+            { name: "settlement-prompt" },
+            ProviderAdapterRegistry.layerFromAdapters([adapter]),
+            {
+              databaseLayer: layerDatabase,
+              runEffectWorker: false,
+              threadSettlePrompt: prompt,
+            },
+          ),
+        ),
+      ),
+    ),
+);

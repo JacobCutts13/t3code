@@ -62,6 +62,7 @@ import { useScopedModelDisabledReason } from "./useScopedModelAvailability";
 import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
 import { scopedIdleCompaction } from "./scopedSettings";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
+import { ThreadSettlePromptSettings } from "./ThreadSettlePromptSettings";
 import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
 import { SnoozePresetsRow } from "./SnoozePresetsSettings";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
@@ -503,6 +504,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
       ? ["Keep threads with a PR"]
       : []),
+    ...(settings.threadSettlePrompt !== DEFAULT_UNIFIED_SETTINGS.threadSettlePrompt
+      ? ["Prompt to run on settle"]
+      : []),
     ...(settings.sidebarAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge
       ? ["Auto-settle merged threads"]
       : []),
@@ -682,6 +686,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
       sidebarAutoSettleAfterDays: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays,
       sidebarAutoSettleKeepPullRequests: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests,
+      threadSettlePrompt: DEFAULT_UNIFIED_SETTINGS.threadSettlePrompt,
       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
       autoResumeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads,
       snoozeLimitedThreads: DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads,
@@ -1912,6 +1917,8 @@ export function ThreadsSettingsPanel() {
 
       {hasServerTargets ? (
         <SettingsSection id="auto-settle" title="Auto-settle">
+          <ThreadSettlePromptSettings />
+
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}

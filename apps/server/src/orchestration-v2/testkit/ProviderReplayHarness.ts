@@ -206,6 +206,7 @@ export function runOrchestratorV2ProviderReplayScenario<
     readonly runContinuationWorker?: boolean;
     readonly recoverOnStartup?: boolean;
     readonly continueThreadsAfterServerUpdate?: boolean;
+    readonly threadSettlePrompt?: string;
     readonly managedPolicy?: ManagedPolicyDocument;
   } = {},
 ): Effect.Effect<
@@ -249,6 +250,7 @@ export function layerProviderReplay<Transcript extends ProviderReplayTranscript,
     readonly runContinuationWorker?: boolean;
     readonly recoverOnStartup?: boolean;
     readonly continueThreadsAfterServerUpdate?: boolean;
+    readonly threadSettlePrompt?: string;
     readonly managedPolicy?: ManagedPolicyDocument;
     readonly replayGate?: ProviderReplayGate;
   } = {},
@@ -283,6 +285,7 @@ export function layerWithRegistry<Error>(
     readonly runContinuationWorker?: boolean;
     readonly recoverOnStartup?: boolean;
     readonly continueThreadsAfterServerUpdate?: boolean;
+    readonly threadSettlePrompt?: string;
     /** Lets a test hold a projection read open to order concurrent dispatches. */
     readonly wrapProjectionStore?: (
       store: ProjectionStore.ProjectionStoreV2Shape,
@@ -321,6 +324,7 @@ export function layerWithRegistry<Error>(
       ServerSettings.layerTest(
         {
           responseStreamingMode: "turn",
+          threadSettlePrompt: options.threadSettlePrompt ?? "",
           ...(options.continueThreadsAfterServerUpdate === undefined
             ? {}
             : { continueThreadsAfterServerUpdate: options.continueThreadsAfterServerUpdate }),

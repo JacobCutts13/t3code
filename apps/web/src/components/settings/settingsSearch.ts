@@ -659,6 +659,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["claude context compaction idle cache tokens usage summary resume"],
   },
   {
+    id: "thread-settle-prompt",
+    title: "Prompt to run on settle",
+    to: "/settings/threads",
+    searchTerms: ["prompt instructions message skill settle cleanup"],
+    requiresThreadAutoSettlement: true,
+    scope: "project-defaults",
+  },
+  {
     id: "auto-settle-merged-threads",
     title: "Auto-settle merged threads",
     to: "/settings/threads",
