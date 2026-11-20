@@ -547,9 +547,9 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
     it.effect("expands a home-relative T3 home the way the server does", () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
-        const homeFor = (t3Home: string) =>
+        const homeFor = (t3Home: string, mode: "dev" | "live" = "dev") =>
           createDevRunnerEnv({
-            mode: "dev",
+            mode,
             baseEnv: {},
             serverOffset: 0,
             webOffset: 0,
@@ -575,6 +575,8 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         // An explicit ~/.t3 would put state in the live userdata; leaving it implicit selects ~/.t3/dev.
         assert.equal(yield* homeFor("~/.t3"), undefined);
         assert.equal(yield* homeFor("/home/dev/.t3/"), undefined);
+        // `live` runs the live install, so it keeps ~/.t3.
+        assert.equal(yield* homeFor("~/.t3", "live"), path.join("/home/dev", ".t3"));
       }),
     );
 
