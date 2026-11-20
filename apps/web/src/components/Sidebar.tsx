@@ -65,6 +65,7 @@ import {
   flattenThreadTree,
   resolveThreadTreeRowRef,
   sortThreadTreeRoots,
+  threadForkBlockedReason,
   type OlderSettledScope,
 } from "@t3tools/client-runtime/state/threads";
 
@@ -178,7 +179,6 @@ import { ProjectRowActions } from "./ProjectComboboxRow";
 import {
   buildDraftActionMenuItems,
   buildThreadActionMenuItems,
-  resolveThreadForkBlockedReason,
   threadActionRequiresOperate,
 } from "./threadActionMenu.logic";
 import { useForkThread } from "../hooks/useForkThread";
@@ -521,15 +521,12 @@ function useSidebarThreads(input: {
   const isChildrenCollapsed = (thread: EnvironmentThreadShell) =>
     threadChildrenCollapsedById[threadShellKey(thread)] === true;
   // Collapsed shelves and folders keep the open thread's row; a nested one keeps its root's.
-  const routeRootKey = (() => {
-    if (routeRowThreadKey === null) return null;
-    let thread = threads.find((candidate) => threadShellKey(candidate) === routeRowThreadKey);
-    for (let parent = thread && tree.parent(thread); parent !== undefined;) {
-      thread = parent;
-      parent = tree.parent(parent);
-    }
-    return thread === undefined ? routeRowThreadKey : threadShellKey(thread);
-  })();
+  const routeThread =
+    routeRowThreadKey === null
+      ? undefined
+      : threads.find((candidate) => threadShellKey(candidate) === routeRowThreadKey);
+  const routeRootKey =
+    routeThread === undefined ? routeRowThreadKey : threadShellKey(tree.root(routeThread));
   const nestRows = (list: readonly EnvironmentThreadShell[]) =>
     flattenThreadTree(tree, list, isChildrenCollapsed);
   const withDescendants = (list: readonly EnvironmentThreadShell[]) =>
@@ -2733,14 +2730,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               ),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
               // Rows arrange quiet shells; the live one knows whether the latest run finished.
-              forkBlockedReason: resolveThreadForkBlockedReason(
-                readThreadShell(threadRef) ?? thread,
-              ),
+              forkBlockedReason: threadForkBlockedReason(readThreadShell(threadRef) ?? thread),
               supports: {
                 settlement: configLoaded,
                 autoSettleOptOut: supportsAutoSettleOptOut,
                 snooze: configLoaded,
-                pinning: configLoaded,
+                // Only top-level rows take a pinned place; a nested row stays under its parent.
+                pinning: configLoaded && (nestingByThreadKey.get(threadKey)?.depth ?? 0) === 0,
                 titleRegeneration: configLoaded,
               },
               snoozePresets,

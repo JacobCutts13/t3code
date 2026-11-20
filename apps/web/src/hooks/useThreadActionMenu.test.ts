@@ -107,6 +107,8 @@ vi.mock("../components/Sidebar.snooze", () => ({
 vi.mock("./useCopyToClipboard", () => ({
   useCopyToClipboard: () => ({ copyToClipboard: () => recordEffect("copy") }),
 }));
+vi.mock("./useForkThread", () => ({ useForkThread: () => vi.fn() }));
+vi.mock("@t3tools/client-runtime/state/threads", () => ({ threadForkBlockedReason: () => null }));
 vi.mock("./useHandleNewThread", () => ({
   useNewThreadHandler: () => async () => recordEffect("draft"),
 }));

@@ -47,6 +47,8 @@ export interface ThreadTree<T> {
   /** Direct children, oldest first. */
   readonly children: (thread: T) => readonly T[];
   readonly parent: (thread: T) => T | undefined;
+  /** The outermost listed ancestor, or the thread itself. */
+  readonly root: (thread: T) => T;
 }
 
 const NO_CHILDREN: readonly never[] = [];
@@ -97,6 +99,12 @@ export function buildThreadTree<T extends ThreadTreeThread>(rows: readonly T[]):
     roots,
     children: (thread) => childrenByKey.get(refOf(thread)) ?? NO_CHILDREN,
     parent: (thread) => parentByKey.get(refOf(thread)),
+    root: (thread) => {
+      let root = thread;
+      for (let parent = parentByKey.get(refOf(root)); parent; parent = parentByKey.get(refOf(root)))
+        root = parent;
+      return root;
+    },
   };
 }
 
@@ -145,26 +153,13 @@ export function sortThreadTreeRoots<T>(
   sort: (threads: readonly T[]) => readonly T[],
   keepsOwnPlace: (root: T) => boolean = () => false,
 ): T[] {
-  const members = new Map<T, readonly T[]>();
-  for (const root of roots) {
-    const descendants = keepsOwnPlace(root) ? [] : threadTreeDescendants(tree, root);
-    if (descendants.length > 0) members.set(root, descendants);
-  }
-  if (members.size === 0) return [...sort(roots)];
-  const rootOf = new Map<T, T>();
-  for (const root of roots) rootOf.set(root, root);
-  for (const [root, descendants] of members) {
-    for (const descendant of descendants) rootOf.set(descendant, root);
-  }
-  const ordered: T[] = [];
-  const placed = new Set<T>();
-  for (const thread of sort([...rootOf.keys()])) {
-    const root = rootOf.get(thread)!;
-    if (placed.has(root)) continue;
-    placed.add(root);
-    ordered.push(root);
-  }
-  return ordered;
+  const members = roots.flatMap((root) =>
+    keepsOwnPlace(root) ? [root] : [root, ...threadTreeDescendants(tree, root)],
+  );
+  if (members.length === roots.length) return [...sort(roots)];
+  const ordered = new Set<T>();
+  for (const thread of sort(members)) ordered.add(tree.root(thread));
+  return [...ordered];
 }
 
 /**
@@ -206,4 +201,14 @@ export function resolveThreadTreeRowRef<
     ancestorRef = threadTreeParentRef(ancestor);
   }
   return { environmentId: row.environmentId, threadId: row.id };
+}
+
+/** Why Fork is unavailable, or null. The server forks at the latest completed run and stays authoritative. */
+export function threadForkBlockedReason(thread: {
+  readonly lineage: { readonly sideChat?: boolean | undefined };
+  readonly latestRun: { readonly completedAt: string | null } | null;
+}): string | null {
+  if (thread.lineage.sideChat === true) return "Side chats can't be forked";
+  if (thread.latestRun?.completedAt == null) return "Available after a completed turn";
+  return null;
 }

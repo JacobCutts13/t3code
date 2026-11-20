@@ -117,15 +117,6 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
 }
 
 /** Forking starts from the thread's latest completed run, and a side chat has no fork of its own. */
-export function resolveThreadForkBlockedReason(thread: {
-  readonly lineage: { readonly sideChat?: boolean | undefined };
-  readonly latestRun: { readonly completedAt: string | null } | null;
-}): string | null {
-  if (thread.lineage.sideChat === true) return "Side chats can't be forked";
-  if (thread.latestRun?.completedAt == null) return "Available after a completed turn";
-  return null;
-}
-
 export function buildThreadActionMenuItems(
   state: ThreadActionMenuState,
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {

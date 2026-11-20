@@ -18,7 +18,6 @@ import { useRouter } from "@tanstack/react-router";
 import { pickSnoozePreset, resolveSnoozePresets } from "../components/Sidebar.snooze";
 import {
   buildThreadActionMenuItems,
-  resolveThreadForkBlockedReason,
   threadActionRequiresOperate,
   type ThreadActionMenuId,
 } from "../components/threadActionMenu.logic";
@@ -45,6 +44,7 @@ import {
 } from "@t3tools/client-runtime/state/project-grouping";
 import { buildPhysicalToLogicalProjectKeyMap } from "../sidebarProjectGrouping";
 import { threadRuntimeCanArchive } from "@t3tools/client-runtime/state/models";
+import { threadForkBlockedReason } from "@t3tools/client-runtime/state/threads";
 import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useForkThread } from "./useForkThread";
 import { useNewThreadHandler } from "./useHandleNewThread";
@@ -147,7 +147,7 @@ export function useThreadActionMenu(input: {
         snoozePresets,
         canShareWithGuest,
         canTurnIntoProject: canTurnThreadIntoProject(threadRef),
-        forkBlockedReason: resolveThreadForkBlockedReason(thread),
+        forkBlockedReason: threadForkBlockedReason(thread),
       });
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;

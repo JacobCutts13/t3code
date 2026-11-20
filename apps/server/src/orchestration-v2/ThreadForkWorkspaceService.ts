@@ -8,13 +8,13 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
-import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Semaphore from "effect/Semaphore";
 
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
@@ -63,8 +63,9 @@ const make = Effect.gen(function* () {
   const git = yield* GitVcsDriver.GitVcsDriver;
   const checkpoints = yield* CheckpointStore.CheckpointStore;
   const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
-  // One fork of a source at a time, so retries never race and branch numbering stays unique.
-  const sourceLocks = yield* KeyedLock.make<ThreadId>();
+  // One fork at a time: retries and reused target ids never race, and branch numbering stays
+  // unique across sources sharing a worktree.
+  const forkLock = yield* Semaphore.make(1);
 
   const performFork = Effect.fn("ThreadForkWorkspaceService.performFork")(function* (
     input: ThreadForkWorkspaceInput,
@@ -182,6 +183,41 @@ const make = Effect.gen(function* () {
 
       return yield* Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
+          const removeWorktree = (path: string) =>
+            gitWorkflow.removeWorktree({ cwd: project.workspaceRoot, path, force: true }).pipe(
+              Effect.andThen(
+                gitWorkflow.deleteLocalBranch({
+                  cwd: project.workspaceRoot,
+                  refName: branch,
+                  force: true,
+                }),
+              ),
+              Effect.ignoreCause({ log: true }),
+            );
+          // A failed checkout hook leaves the worktree on our new branch; find it by that branch.
+          const removeLeftoverWorktree = git
+            .execute({
+              operation: "ThreadForkWorkspaceService.fork",
+              cwd: project.workspaceRoot,
+              args: ["worktree", "list", "--porcelain", "-z"],
+            })
+            .pipe(
+              Effect.flatMap(({ stdout }) => {
+                const entry = stdout
+                  .split("\0\0")
+                  .map((block) => block.split("\0"))
+                  .find((lines) => lines.includes(`branch refs/heads/${branch}`));
+                const path = entry?.[0]?.replace(/^worktree /, "");
+                return path === undefined
+                  ? gitWorkflow.deleteLocalBranch({
+                      cwd: project.workspaceRoot,
+                      refName: branch,
+                      force: true,
+                    })
+                  : removeWorktree(path);
+              }),
+              Effect.ignoreCause({ log: true }),
+            );
           const created = yield* restore(
             gitWorkflow
               .createWorktree({
@@ -191,20 +227,13 @@ const make = Effect.gen(function* () {
                 path: null,
               })
               .pipe(failWith("Unable to create the fork's worktree")),
+          ).pipe(
+            Effect.onError((cause) =>
+              Cause.hasInterruptsOnly(cause) ? Effect.void : removeLeftoverWorktree,
+            ),
           );
           const worktreePath = created.worktree.path;
-          const removeCreatedWorktree = gitWorkflow
-            .removeWorktree({ cwd: project.workspaceRoot, path: worktreePath, force: true })
-            .pipe(
-              Effect.andThen(
-                gitWorkflow.deleteLocalBranch({
-                  cwd: project.workspaceRoot,
-                  refName: created.worktree.refName,
-                  force: true,
-                }),
-              ),
-              Effect.ignoreCause({ log: true }),
-            );
+          const removeCreatedWorktree = removeWorktree(worktreePath);
 
           yield* Effect.gen(function* () {
             const restored = yield* checkpoints
@@ -256,7 +285,7 @@ const make = Effect.gen(function* () {
   const fork = Effect.fn("ThreadForkWorkspaceService.fork")(function* (
     input: ThreadForkWorkspaceInput,
   ) {
-    return yield* sourceLocks.withLock(input.sourceThreadId, performFork(input));
+    return yield* forkLock.withPermits(1)(performFork(input));
   });
 
   return ThreadForkWorkspaceService.of({ fork });

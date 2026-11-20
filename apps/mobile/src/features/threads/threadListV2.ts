@@ -147,12 +147,6 @@ export function resolveThreadListV2SwipeActions(input: {
 }
 
 /** Forks start at the latest completed run, so a thread without one cannot fork yet. */
-export function threadListV2CanFork(
-  thread: Pick<EnvironmentThreadShell, "lineage" | "latestRun">,
-): boolean {
-  return thread.lineage.sideChat !== true && thread.latestRun?.completedAt != null;
-}
-
 // Nested keeps iOS menus short: UIKit scrolls a taller menu, and that scroll
 // cancels press-drag-release selection.
 export function layoutThreadListV2RowMenuActions(input: {
@@ -815,6 +809,13 @@ export function buildThreadListV2Items(input: {
   // Search lists matches flat; otherwise children render under their parent, so only roots
   // are placed in sections and sorted.
   const tree = buildThreadTree(listedThreads);
+  const isSnoozedRow = (thread: EnvironmentThreadShell) =>
+    (input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true) &&
+    effectiveSnoozed(thread, { now });
+  const isSettledRow = (thread: EnvironmentThreadShell) =>
+    (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
+    thread.settledOverride === "settled" &&
+    queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true;
   for (const thread of rankedMatches === null ? tree.roots : listedThreads) {
     if (matchingThreads !== null && !matchingThreads.has(thread)) {
       const key = threadSearchMatchKey({
@@ -824,9 +825,7 @@ export function buildThreadListV2Items(input: {
       if (input.matchedThreadKeys?.has(key) !== true) continue;
       contentOnlyThreadKeys.add(key);
     }
-    const supportsSettlement = input.settlementEnvironmentIds?.has(thread.environmentId) ?? true;
-    const supportsSnooze = input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true;
-    if (supportsSnooze && effectiveSnoozed(thread, { now })) {
+    if (isSnoozedRow(thread)) {
       snoozed.push(thread);
       if (
         thread.snoozedUntil != null &&
@@ -837,9 +836,7 @@ export function buildThreadListV2Items(input: {
       }
       continue;
     }
-    const hasQueuedMessages =
-      queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) === true;
-    if (supportsSettlement && thread.settledOverride === "settled" && !hasQueuedMessages) {
+    if (isSettledRow(thread)) {
       settled.push(thread);
     } else if (thread.pinnedAt != null) {
       pinned.push(thread);
@@ -912,12 +909,10 @@ export function buildThreadListV2Items(input: {
   // A collapsed shelf keeps the selected row's group, so it keeps the row's root.
   const selectedThreadKey = (() => {
     const key = input.selectedThreadKey ?? null;
-    let thread = listedThreads.find((row) => `${row.environmentId}:${row.id}` === key);
-    for (let parent = thread && tree.parent(thread); parent !== undefined;) {
-      thread = parent;
-      parent = tree.parent(parent);
-    }
-    return thread === undefined ? key : `${thread.environmentId}:${thread.id}`;
+    const thread = listedThreads.find((row) => `${row.environmentId}:${row.id}` === key);
+    if (thread === undefined) return key;
+    const root = tree.root(thread);
+    return `${root.environmentId}:${root.id}`;
   })();
   const visibleWorking =
     input.workingShelfExpanded === true
@@ -972,14 +967,8 @@ export function buildThreadListV2Items(input: {
         continue;
       }
       // A child keeps its own status, so it looks like the shelf its own state belongs to.
-      const childSnoozed =
-        (input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true) &&
-        effectiveSnoozed(thread, { now });
-      const childSlim =
-        childSnoozed ||
-        ((input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
-          thread.settledOverride === "settled" &&
-          queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true);
+      const childSnoozed = isSnoozedRow(thread);
+      const childSlim = childSnoozed || isSettledRow(thread);
       items.push({
         thread,
         variant: childSlim ? "slim" : "card",

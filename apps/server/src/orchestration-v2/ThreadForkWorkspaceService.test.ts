@@ -246,6 +246,26 @@ it.layer(layerGit)("ThreadForkWorkspaceService", (it) => {
     }).pipe(Effect.scoped),
   );
 
+  it.effect("removes the new worktree and branch when its checkout hook fails", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const { repo, parentWorktree } = yield* setupRepo;
+      const hook = NodePath.join(repo, ".git", "hooks", "post-checkout");
+      yield* fs.writeFileString(hook, "#!/bin/sh\nexit 1\n");
+      yield* fs.chmod(hook, 0o755);
+      const harness = newHarness(parentWorktree);
+      const exit = yield* Effect.exit(runFork(harness, repo));
+
+      assert.isTrue(Exit.isFailure(exit));
+      assert.equal(harness.dispatched.length, 0);
+      assert.equal(yield* git(repo, ["branch", "--list", "feature/x-fork-*"]), "");
+      assert.equal(
+        (yield* git(repo, ["worktree", "list", "--porcelain"])).match(/^worktree /gm)?.length,
+        2,
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("refuses to fork a worktree with uncommitted submodule changes", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

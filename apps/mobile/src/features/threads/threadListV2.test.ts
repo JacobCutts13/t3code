@@ -46,7 +46,6 @@ import {
   threadListV2ListItemsAreEqual,
   threadListV2RowAccessibilityLabel,
   threadHasUnseenCompletion,
-  threadListV2CanFork,
   type ThreadListV2Item,
   type ThreadListV2ListItem,
 } from "./threadListV2";
@@ -150,30 +149,6 @@ describe("layoutThreadListV2RowMenuActions", () => {
       nested: true,
     });
     expect(slim.at(-1)?.subactions?.[0]?.id).toBe("arrange");
-  });
-});
-
-describe("threadListV2CanFork", () => {
-  it("allows a fork once the latest run has completed", () => {
-    const thread = makeThread({ id: ThreadId.make("fork-source"), title: "Source" });
-    const run = {
-      runId: RunId.make("run-fork-source"),
-      status: "running",
-      requestedAt: NOW,
-      startedAt: NOW,
-      completedAt: null,
-      assistantMessageId: null,
-    } as const;
-    expect(threadListV2CanFork(thread)).toBe(false);
-    expect(threadListV2CanFork({ ...thread, latestRun: run })).toBe(false);
-    const completed = {
-      ...thread,
-      latestRun: { ...run, status: "completed" as const, completedAt: NOW },
-    };
-    expect(threadListV2CanFork(completed)).toBe(true);
-    expect(
-      threadListV2CanFork({ ...completed, lineage: { ...completed.lineage, sideChat: true } }),
-    ).toBe(false);
   });
 });
 

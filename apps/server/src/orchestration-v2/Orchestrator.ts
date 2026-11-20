@@ -1850,9 +1850,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           child.deletedAt === null &&
           child.lineage.parentThreadId === threadId &&
           child.lineage.sideChat !== true &&
-          (child.lineage.relationshipToParent === "fork" ||
-            (child.lineage.relationshipToParent === "subagent" &&
-              child.creationSource !== "provider"))
+          child.lineage.relationshipToParent !== null &&
+          !isProviderNativeSubagentThread(child)
         ) {
           children.push(child);
         }
@@ -15983,18 +15982,32 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ),
         ),
       );
-    if (command.type === "thread.archive" || command.type === "thread.unarchive")
-      return yield* threadDispatch.withLock(
-        command.threadId,
-        archiveCascadeThreadIds(command).pipe(
-          Effect.flatMap((cascadeThreadIds) =>
-            cascadeThreadIds.reduceRight(
-              (locked, threadId) => threadDispatch.withLock(threadId, locked),
-              dispatchWithReceiptEffect(command, cascadeThreadIds),
+    if (command.type === "thread.archive" || command.type === "thread.unarchive") {
+      // The group is read before its locks are held, so read it again under them; a fork or
+      // re-archive in between changes it, and the next attempt locks the new group.
+      const lockedCascade = (attemptsLeft: number) =>
+        threadDispatch.withLock(
+          command.threadId,
+          archiveCascadeThreadIds(command).pipe(
+            Effect.flatMap((cascadeThreadIds) =>
+              cascadeThreadIds.reduceRight(
+                (locked, threadId) => threadDispatch.withLock(threadId, locked),
+                archiveCascadeThreadIds(command).pipe(
+                  Effect.flatMap((current) =>
+                    attemptsLeft > 0 && current.join("\0") !== cascadeThreadIds.join("\0")
+                      ? Effect.succeedNone
+                      : Effect.asSome(dispatchWithReceiptEffect(command, cascadeThreadIds)),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      );
+        );
+      for (let attemptsLeft = 3; ; attemptsLeft--) {
+        const result = yield* lockedCascade(attemptsLeft);
+        if (Option.isSome(result)) return result.value;
+      }
+    }
     // Taken before the lineage read, so a message whose read yields keeps its
     // place ahead of later messages to the same thread.
     const message =

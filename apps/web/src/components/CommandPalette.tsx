@@ -106,7 +106,6 @@ import { isDesktopLocalConnectionTarget } from "../connection/desktopLocal";
 import { useDesktopLocalBootstraps } from "../connection/useDesktopLocalBootstraps";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useForkThread } from "../hooks/useForkThread";
-import { resolveThreadForkBlockedReason } from "./threadActionMenu.logic";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { copyThreadReference } from "../lib/copyThreadReference";
 import {
@@ -153,7 +152,11 @@ import {
   useVisibleThreadShells,
   waitForProject,
 } from "../state/entities";
-import { isShownUnderParent, visibleLinkedThreads } from "@t3tools/client-runtime/state/threads";
+import {
+  isShownUnderParent,
+  threadForkBlockedReason,
+  visibleLinkedThreads,
+} from "@t3tools/client-runtime/state/threads";
 import {
   resolveThreadActionProjectRef,
   startNewThreadFromContext,
@@ -1539,7 +1542,7 @@ function OpenCommandPaletteDialog(props: {
 
   if (activeThread !== null && canOperateActiveThread) {
     const thread = activeThread;
-    const forkBlockedReason = resolveThreadForkBlockedReason(thread);
+    const forkBlockedReason = threadForkBlockedReason(thread);
     actionItems.push({
       kind: "action",
       value: "action:fork-thread",

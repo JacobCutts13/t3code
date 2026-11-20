@@ -1,10 +1,7 @@
+import { threadForkBlockedReason } from "@t3tools/client-runtime/state/threads";
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  buildThreadActionMenuItems,
-  resolveThreadForkBlockedReason,
-  type ThreadActionMenuState,
-} from "./threadActionMenu.logic";
+import { buildThreadActionMenuItems, type ThreadActionMenuState } from "./threadActionMenu.logic";
 
 const baseState: ThreadActionMenuState = {
   canOperate: true,
@@ -99,7 +96,7 @@ describe("buildThreadActionMenuItems", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,
       branch: "main",
-      forkBlockedReason: resolveThreadForkBlockedReason(thread),
+      forkBlockedReason: threadForkBlockedReason(thread),
     });
     const ids = items.map((item) => item.id);
     expect(ids.indexOf("fork")).toBe(ids.indexOf("new-thread-on-branch") + 1);
