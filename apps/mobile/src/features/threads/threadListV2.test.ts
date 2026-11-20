@@ -46,6 +46,8 @@ import {
   threadListV2ListItemsAreEqual,
   threadListV2RowAccessibilityLabel,
   threadHasUnseenCompletion,
+  threadListV2CanFork,
+  type ThreadListV2Item,
   type ThreadListV2ListItem,
 } from "./threadListV2";
 
@@ -148,6 +150,30 @@ describe("layoutThreadListV2RowMenuActions", () => {
       nested: true,
     });
     expect(slim.at(-1)?.subactions?.[0]?.id).toBe("arrange");
+  });
+});
+
+describe("threadListV2CanFork", () => {
+  it("allows a fork once the latest run has completed", () => {
+    const thread = makeThread({ id: ThreadId.make("fork-source"), title: "Source" });
+    const run = {
+      runId: RunId.make("run-fork-source"),
+      status: "running",
+      requestedAt: NOW,
+      startedAt: NOW,
+      completedAt: null,
+      assistantMessageId: null,
+    } as const;
+    expect(threadListV2CanFork(thread)).toBe(false);
+    expect(threadListV2CanFork({ ...thread, latestRun: run })).toBe(false);
+    const completed = {
+      ...thread,
+      latestRun: { ...run, status: "completed" as const, completedAt: NOW },
+    };
+    expect(threadListV2CanFork(completed)).toBe(true);
+    expect(
+      threadListV2CanFork({ ...completed, lineage: { ...completed.lineage, sideChat: true } }),
+    ).toBe(false);
   });
 });
 
@@ -1325,32 +1351,138 @@ describe("cross-section thread drops", () => {
   });
 });
 
-it("excludes subagents from navigation, search and ordering while retaining user forks", () => {
-  const root = makeThread({ id: ThreadId.make("root"), title: "Root" });
-  const child = makeThread({
-    id: ThreadId.make("child"),
-    title: "Child",
-    lineage: { parentThreadId: root.id, rootThreadId: root.id, relationshipToParent: "subagent" },
+describe("nested child threads", () => {
+  const childOf = (
+    parent: EnvironmentThreadShell,
+    id: string,
+    relationshipToParent: "fork" | "subagent",
+    extra: Partial<EnvironmentThreadShell> = {},
+  ) =>
+    makeThread({
+      id: ThreadId.make(id),
+      title: id,
+      createdAt: "2026-06-01T01:00:00.000Z",
+      lineage: { parentThreadId: parent.id, rootThreadId: parent.id, relationshipToParent },
+      ...extra,
+    });
+  const root = makeThread({
+    id: ThreadId.make("root"),
+    title: "Root",
+    createdAt: "2026-05-01T00:00:00.000Z",
   });
-  const fork = makeThread({
-    id: ThreadId.make("fork"),
-    title: "Fork",
-    lineage: { parentThreadId: root.id, rootThreadId: root.id, relationshipToParent: "fork" },
+  const subagent = childOf(root, "child", "subagent");
+  const fork = childOf(root, "fork", "fork");
+  const grandchild = childOf(fork, "fork-fork", "fork");
+  const providerSubagent = childOf(root, "provider-subagent", "subagent", {
+    source: makeRawThreadShell({
+      id: ThreadId.make("provider-subagent"),
+      creationSource: "provider",
+    }),
   });
-  const threads = [root, child, fork];
-  expect(
-    buildThreadListV2Items({ threads, environmentId: null, searchQuery: "", now: NOW }).items.map(
-      (item) => item.thread.id,
-    ),
-  ).toEqual([fork.id, root.id]);
-  expect(
-    buildThreadListV2Items({ threads, environmentId: null, searchQuery: "Child", now: NOW }).items,
-  ).toEqual([]);
-  expect(
-    getThreadListV2OrderedSection({ threads, section: "active", now: NOW }).map(
-      (thread) => thread.id,
-    ),
-  ).toEqual([fork.id, root.id]);
+  const sideChat = childOf(root, "side-chat", "fork", {
+    lineage: {
+      parentThreadId: root.id,
+      rootThreadId: root.id,
+      relationshipToParent: "fork",
+      sideChat: true,
+    },
+  });
+  const other = makeThread({
+    id: ThreadId.make("other"),
+    title: "Other",
+    createdAt: "2026-05-15T00:00:00.000Z",
+  });
+  const threads = [root, subagent, fork, grandchild, providerSubagent, sideChat, other];
+  const rows = (items: readonly ThreadListV2Item[]) =>
+    items.map((item) => [
+      item.thread.id,
+      item.depth ?? 0,
+      item.childCount ?? 0,
+      item.childrenCollapsed ?? false,
+    ]);
+
+  it("renders app children and forks under their parent, which ranks by its group's activity", () => {
+    const layout = buildThreadListV2Items({
+      threads,
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+    });
+    // Root is older than Other, but its children are newer, so the group comes first.
+    expect(rows(layout.items)).toEqual([
+      ["root", 0, 2, false],
+      ["child", 1, 0, false],
+      ["fork", 1, 1, false],
+      ["fork-fork", 2, 0, false],
+      ["other", 0, 0, false],
+    ]);
+    // Children never take a place in manual order.
+    expect(
+      getThreadListV2OrderedSection({ threads, section: "active", now: NOW }).map(
+        (thread) => thread.id,
+      ),
+    ).toEqual([root.id, other.id]);
+  });
+
+  it("hides a collapsed parent's descendants and keeps its count", () => {
+    const layout = buildThreadListV2Items({
+      threads,
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+      collapsedThreadKeys: new Set([`${environmentId}:fork`]),
+    });
+    expect(rows(layout.items)).toEqual([
+      ["root", 0, 2, false],
+      ["child", 1, 0, false],
+      ["fork", 1, 1, true],
+      ["other", 0, 0, false],
+    ]);
+  });
+
+  it("gives a child its own row when its parent is not listed, and searches children flat", () => {
+    const archivedRoot = { ...root, archivedAt: NOW };
+    expect(
+      buildThreadListV2Items({
+        threads: [archivedRoot, subagent, fork, grandchild],
+        environmentId: null,
+        searchQuery: "",
+        now: NOW,
+      }).items.map((item) => [item.thread.id, item.depth ?? 0]),
+    ).toEqual([
+      ["child", 0],
+      ["fork", 0],
+      ["fork-fork", 1],
+    ]);
+    expect(
+      buildThreadListV2Items({
+        threads,
+        environmentId: null,
+        searchQuery: "child",
+        now: NOW,
+      }).items.map((item) => [item.thread.id, item.depth]),
+    ).toEqual([["child", undefined]]);
+  });
+
+  it("keeps the selected child's group on a collapsed shelf", () => {
+    const settled = { settledOverride: "settled" as const, settledAt: NOW };
+    const layout = buildThreadListV2Items({
+      threads: [
+        { ...root, ...settled },
+        { ...fork, ...settled },
+        { ...other, ...settled },
+      ],
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+      settledShelfExpanded: false,
+      selectedThreadKey: `${environmentId}:fork`,
+    });
+    expect(rows(layout.items)).toEqual([
+      ["root", 0, 1, false],
+      ["fork", 1, 0, false],
+    ]);
+  });
 });
 
 const BASE_MS = Date.parse(NOW);
@@ -1421,6 +1553,22 @@ describe("threadListV2ListItemsAreEqual", () => {
       pendingTasks: [queued],
       snoozeLabelNow: NOW,
     });
+
+  it("notices a row's nesting or collapse changing", () => {
+    const row = (nesting: Partial<ThreadListV2Item>) =>
+      buildThreadListV2ListItems({
+        items: [{ ...layout.items[0]!, ...nesting }],
+        pendingTasks: [],
+        snoozeLabelNow: NOW,
+      })[0]!;
+    expect(threadListV2ListItemsAreEqual(row({}), row({ depth: 1 }))).toBe(false);
+    expect(
+      threadListV2ListItemsAreEqual(
+        row({ childCount: 2, childrenCollapsed: true }),
+        row({ childCount: 2, childrenCollapsed: false }),
+      ),
+    ).toBe(false);
+  });
 
   it("treats rebuilt wrappers over identical rows as equal", () => {
     const first = build();

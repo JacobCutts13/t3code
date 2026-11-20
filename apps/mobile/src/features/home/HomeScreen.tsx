@@ -150,6 +150,7 @@ interface HomeScreenProps {
   readonly onSelectPendingTask: (pendingTask: PendingNewTask) => void;
   readonly onDeletePendingTask: (pendingTask: PendingNewTask) => void;
   readonly onNewThreadOnBranch: (thread: EnvironmentThreadShell) => void;
+  readonly onForkThread: (thread: EnvironmentThreadShell) => void;
   readonly onNewThreadInProject: (project: EnvironmentProject) => void;
 }
 
@@ -382,6 +383,8 @@ export function HomeScreen(props: HomeScreenProps) {
     setSettledVisibleCount((count) => count + THREAD_LIST_V2_SETTLED_PAGE_COUNT);
   const {
     loaded: shelfPreferencesLoaded,
+    collapsedThreadKeys,
+    toggleThreadChildren,
     settledShelfExpanded,
     snoozedShelfExpanded,
     workingShelfEnabled,
@@ -432,6 +435,7 @@ export function HomeScreen(props: HomeScreenProps) {
     snoozedShelfExpanded,
     settledShelfExpanded,
     selectedThreadKey,
+    collapsedThreadKeys,
   });
   // Called as `props.onSelectThread(...)`, the compiler would cache this handler on the whole
   // props object, which is new on every render of Home's parent.
@@ -449,6 +453,8 @@ export function HomeScreen(props: HomeScreenProps) {
     onSelectThread(thread);
   };
   useThreadJumpShortcuts(threadListV2Items, selectThread);
+  const handleToggleThreadChildren = (thread: EnvironmentThreadShell) =>
+    toggleThreadChildren(scopedThreadKey(thread.environmentId, thread.id));
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the list's visible range after commit to enable swipe gestures on those rows
   useEffect(() => {
     if (swipeEnabled) activateVisibleRows(threadListV2Items);
@@ -527,6 +533,11 @@ export function HomeScreen(props: HomeScreenProps) {
         selected={scopedThreadKey(thread.environmentId, thread.id) === selectedThreadKey}
         fullSwipeWidth={fullSwipeWidth}
         onNewThreadOnBranch={props.onNewThreadOnBranch}
+        onForkThread={props.onForkThread}
+        depth={item.item.depth}
+        childCount={item.item.childCount}
+        childrenCollapsed={item.item.childrenCollapsed}
+        onToggleThreadChildren={handleToggleThreadChildren}
         thread={thread}
         variant={item.item.variant}
         hasQueuedMessages={item.hasQueuedMessages}

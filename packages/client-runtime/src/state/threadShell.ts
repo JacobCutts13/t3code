@@ -17,6 +17,7 @@ import { Atom } from "effect/reactivity";
 import type { EnvironmentThreadShell, PendingSubagentRequest } from "./models.ts";
 import { presentThreadShell, threadRuntimeIsActive } from "./models.ts";
 import { hiddenThreadKeys, NO_HIDDEN_THREADS } from "./threadTagFilter.ts";
+import { isThreadTreeRow } from "./threadTree.ts";
 import { type EnvironmentCatalogState, enabledEnvironmentIds } from "./connections.ts";
 import {
   arrayElementsEqual,
@@ -765,6 +766,29 @@ export function createEnvironmentThreadShellAtoms(input: {
     return next;
   }).pipe(Atom.withLabel("environment-navigation-thread-shells"));
 
+  /** navigationThreadShellsAtom plus the child threads a list nests under their parents. */
+  let previousTreeShells: ReadonlyArray<EnvironmentThreadShell> = [];
+  const treeThreadShellsAtom = Atom.make((get) => {
+    const next: EnvironmentThreadShell[] = [];
+    const hidden = get(hiddenThreadKeysAtom);
+    for (const environmentId of enabledEnvironmentIds(get(input.catalogValueAtom))) {
+      const subagentRequests = get(pendingSubagentRequestsAtom(environmentId));
+      for (const thread of get(environmentThreadsAtom(environmentId))) {
+        if (
+          thread.archivedAt !== null ||
+          hidden.has(threadKey({ environmentId, threadId: thread.id }))
+        ) {
+          continue;
+        }
+        const shell = scopedThread(environmentId, thread, subagentRequests);
+        if (isThreadTreeRow(shell)) next.push(shell);
+      }
+    }
+    if (arrayElementsEqual(previousTreeShells, next)) return previousTreeShells;
+    previousTreeShells = next;
+    return next;
+  }).pipe(Atom.withLabel("environment-tree-thread-shells"));
+
   return {
     environmentThreadsAtom,
     environmentThreadIndexAtom,
@@ -777,6 +801,7 @@ export function createEnvironmentThreadShellAtoms(input: {
     anyEnvironmentHidingAtom,
     quietThreadShellsAtom,
     navigationThreadShellsAtom,
+    treeThreadShellsAtom,
     delegatedUnderParentAtom,
     pendingSubagentRequestsAtom,
     threadShellsForProjectRefsAtom: (refs: ReadonlyArray<ScopedProjectRef>) =>

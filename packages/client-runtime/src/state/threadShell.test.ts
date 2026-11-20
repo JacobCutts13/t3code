@@ -391,6 +391,16 @@ describe("v2 thread shell lists", () => {
         .get(threads.navigationThreadShellsAtom)
         .map((thread) => `${thread.environmentId}/${thread.id}`);
     expect(listed()).toEqual([`${environmentId}/${parent.id}`]);
+    // Lists that nest children get the task and its helper as rows of their own.
+    expect(
+      registry
+        .get(threads.treeThreadShellsAtom)
+        .map((thread) => `${thread.environmentId}/${thread.id}`),
+    ).toEqual([
+      `${environmentId}/${parent.id}`,
+      `${remoteEnvironmentId}/${task.id}`,
+      `${remoteEnvironmentId}/${helper.id}`,
+    ]);
 
     // The helper the task started there asks for approval: the parent here hears of it.
     registry.set(snapshotAtom(remoteEnvironmentId), {
