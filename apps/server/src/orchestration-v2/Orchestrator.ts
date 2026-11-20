@@ -15993,11 +15993,26 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               cascadeThreadIds.reduceRight(
                 (locked, threadId) => threadDispatch.withLock(threadId, locked),
                 archiveCascadeThreadIds(command).pipe(
-                  Effect.flatMap((current) =>
-                    attemptsLeft > 0 && current.join("\0") !== cascadeThreadIds.join("\0")
-                      ? Effect.succeedNone
-                      : Effect.asSome(dispatchWithReceiptEffect(command, cascadeThreadIds)),
-                  ),
+                  Effect.flatMap((current) => {
+                    const changed = current.join("\0") !== cascadeThreadIds.join("\0");
+                    if (changed && attemptsLeft > 0) return Effect.succeedNone;
+                    return (
+                      changed
+                        ? Effect.logWarning(
+                            "Archive cascade kept changing; using the locked group",
+                            {
+                              threadId: command.threadId,
+                              locked: cascadeThreadIds.length,
+                              current: current.length,
+                            },
+                          )
+                        : Effect.void
+                    ).pipe(
+                      Effect.andThen(
+                        Effect.asSome(dispatchWithReceiptEffect(command, cascadeThreadIds)),
+                      ),
+                    );
+                  }),
                 ),
               ),
             ),

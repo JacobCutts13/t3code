@@ -38,11 +38,11 @@ export function useForkThread() {
     toastManager.add(
       stackedThreadToast({ type: "error", title: "Failed to fork thread", description }),
     );
-  return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id" | "title">) => {
+  return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id">) => {
     const targetThreadId = newThreadId();
     const result = await forkThread({
       environmentId: thread.environmentId,
-      input: { sourceThreadId: thread.id, targetThreadId, title: `${thread.title} fork` },
+      input: { sourceThreadId: thread.id, targetThreadId },
     });
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {

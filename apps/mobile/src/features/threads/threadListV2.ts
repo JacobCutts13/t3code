@@ -146,7 +146,6 @@ export function resolveThreadListV2SwipeActions(input: {
   };
 }
 
-/** Forks start at the latest completed run, so a thread without one cannot fork yet. */
 // Nested keeps iOS menus short: UIKit scrolls a taller menu, and that scroll
 // cancels press-drag-release selection.
 export function layoutThreadListV2RowMenuActions(input: {

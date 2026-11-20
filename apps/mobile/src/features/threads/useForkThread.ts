@@ -18,7 +18,7 @@ import { waitForThreadShell } from "./threadForkNavigation";
 export function useForkThread() {
   const forkThread = useAtomCommand(threadEnvironment.forkThread, { reportFailure: false });
   const selectDetail = useSelectWorkspaceDetail();
-  return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id" | "title">) => {
+  return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id">) => {
     const targetThreadId = ThreadId.make(uuidv4());
     void Haptics.selectionAsync();
     const result = await forkThread({
@@ -26,7 +26,6 @@ export function useForkThread() {
       input: {
         sourceThreadId: thread.id,
         targetThreadId,
-        title: `${thread.title} fork`,
         creationSource: "mobile",
       },
     });
