@@ -55,4 +55,12 @@ describe("launcher lock", () => {
     lock.release();
     assert.deepEqual(JSON.parse(NodeFS.readFileSync(file, "utf8")), { pid: 20 });
   });
+
+  it("passes the holder's lock age so a launcher without an app can count as stale", () => {
+    const file = tempLockFile();
+    NodeFS.writeFileSync(file, JSON.stringify({ pid: 10 }));
+    NodeFS.utimesSync(file, new Date(0), new Date(0));
+    const isLauncher = (_pid, ageMs) => ageMs < 60_000;
+    assert.isTrue(acquireLauncherLock({ file, pid: 20, claim: true, isLauncher }).acquired);
+  });
 });
