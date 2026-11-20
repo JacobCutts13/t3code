@@ -123,16 +123,16 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    try {
-      const created = await createFromRepos({
-        environmentId,
-        repos: selected,
-        name: projectName.trim(),
-      });
-      if (created) closeCreateProjectFromRepos();
-    } finally {
-      setSaving(false);
-    }
+    // `.finally` rather than `try`/`finally`, which React Compiler cannot compile.
+    await createFromRepos({
+      environmentId,
+      repos: selected,
+      name: projectName.trim(),
+    })
+      .then((created) => {
+        if (created) closeCreateProjectFromRepos();
+      })
+      .finally(() => setSaving(false));
   };
 
   const saveStable = useStableCallback(save);
