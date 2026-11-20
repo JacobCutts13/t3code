@@ -6,6 +6,7 @@
   "422ced5cda40580e": "Hämta basgren",
   "47e6147265a28164": "Checka ut filer",
   "4735345a111c1581": "Initiera submoduler",
+  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "Kör konfigurationsskript",
   "cbbdd0430fbe5fea": "Starta agent",
   "2a918ed2e51ab64a": "Ansluter",
@@ -680,6 +681,8 @@
   "f0ab079175905bbb": "Committa, pusha och skapa {shortLabel}",
   "8360d689ebc7f829": "Pusha och skapa {shortLabel} från standardgrenen?",
   "daa408bb99d21d18": "{kind, select, pr {Den här åtgärden pushar lokala commits och skapar en PR på ”{branch}”. Du kan fortsätta på den här grenen eller skapa en funktionsgren och köra samma åtgärd där.} mr {Den här åtgärden pushar lokala commits och skapar en MR på ”{branch}”. Du kan fortsätta på den här grenen eller skapa en funktionsgren och köra samma åtgärd där.} generic {Den här åtgärden pushar lokala commits och skapar en ändringsbegäran på ”{branch}”. Du kan fortsätta på den här grenen eller skapa en funktionsgren och köra samma åtgärd där.} other {Den här åtgärden pushar lokala commits och skapar {changeRequest} på ”{branch}”. Du kan fortsätta på den här grenen eller skapa en funktionsgren och köra samma åtgärd där.}}",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "Det går inte att bläddra bland ärenden för den här värden än.",
   "2f4a47129f89fe22": "Inte ansluten. Lägg till en personlig API-nyckel för att lista dess ärenden.",
   "024baab60525a419": "Den sparade autentiseringsuppgiften avvisades.",
@@ -1736,6 +1739,8 @@
   "264d9bfa6806e746": "Bläddra till en mapp på disken",
   "91a9b3a0e9de0821": "Nytt projekt",
   "39f5441d281288ae": "Starta ett nytt Git-repo från ett namn",
+  "2360ad0503c2a0a8": "Choose repositories",
+  "de627bd002dfeaa2": "Pick one or several repositories on this machine",
   "298a89c7f047146f": "{source}-repo",
   "31ee8679b5c7b22b": "Klona från en fjärr-URL",
   "7d16bbddb4ffae49": "Klona {source} {hint}",
@@ -1752,6 +1757,8 @@
   "3f581e98c86df72a": "Ny tråd utan projekt",
   "e510d9a7b684fbfe": "Triagera ett ärende",
   "cce3d80a2ddf1125": "En agent undersöker ett problem i T3 Code och hjälper till att skapa ett ärende",
+  "e42e93b205979d43": "Keep this {product} awake",
+  "5f78ad1f76e0b76a": "Let this {product} sleep",
   "44e13c9deb30e03c": "Sök i aktuell tråd",
   "2a5cc71a171eca12": "Sök på sidan i webbläsaren",
   "f496ce44f0581269": "Kopiera promptlänk",
@@ -1781,7 +1788,6 @@
   "0c659f9a193255dd": "Det gick inte att lägga till projektet",
   "4b3fc098d5a08a66": "Sökvägar i Windows-stil stöds bara i Windows.",
   "2c2637dc1e236fb4": "Relativa sökvägar kräver ett aktivt projekt.",
-  "87f84b811a6aa0d1": "Det gick inte att avarkivera projektet",
   "e823121dffeff02d": "Det gick inte att öppna projektet",
   "d235610ec49f6c81": "Kan inte lägga till projekt",
   "110790fd779efb2e": "Den här anslutningen kan inte lägga till projekt.",
@@ -1891,6 +1897,35 @@
   "af63f05ed2f5eeb3": "Neka",
   "b735bab216b27041": "Kunde inte neka enheten",
   "4672f332c89dbcd9": "Granska",
+  "b6328139d1a74290": "Search repositories",
+  "fbe0baad806d20dd": "Search repositories…",
+  "78f82fef9e0c8661": "Repon",
+  "2ccc25027e4514d4": "Create project from repositories",
+  "05025c6ff0322c66": "Selected",
+  "3bfb60e70a436a55": "Repos",
+  "f77f96288bff35f1": "Looking for repositories…",
+  "74612f29140bd882": "Could not read your repositories folder.",
+  "46a40c006b683968": [
+    "No git repositories found in ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "."
+  ],
+  "14a7f0c2c44e0c83": "No other repositories match.",
+  "031d9bdae1628c2f": "No repositories match.",
+  "831dc75421758cf6": "Pick one repository, or several to work across them.",
+  "22677711c1725aa9": [
+    "Opens ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ca8291e195a9d40d": "Save",
   "913fc23f62321556": "Välj ett giltigt datum och en giltig tid i framtiden.",
   "9485a52216cfc0d5": "Ange en positiv varaktighet.",
   "9bc551235d78e133": "Schematyp",
@@ -2616,6 +2651,9 @@
   "b4daab4983e50891": "Öppna {kind} {label}: {title}",
   "c5d4a1b01d27c81d": "Bildbilaga, {name}, {size}",
   "baa023ab89b1e31f": "Otillgänglig kontext, {label}",
+  "8381d91a6f32c485": "Up to {count} repositories can share a project.",
+  "ae27096d86ce264d": "{name} can't be combined with other repositories: its folder name has characters that aren't allowed.",
+  "63b3795342909720": "A repository named {name} is already selected; both would use the same folder.",
   "52a44f36200620d5": "Den här installationen använder rätt arkitektur.",
   "007ab0ba4a0318eb": "Den här Macen har Apple Silicon, men T3 Code kör fortfarande Intel-versionen under Rosetta. Ladda ned den tillgängliga uppdateringen för att byta till den inbyggda Apple Silicon-versionen.",
   "0fe3e0e043327f70": "Den här Macen har Apple Silicon, men T3 Code kör fortfarande Intel-versionen under Rosetta. Starta om för att installera den nedladdade Apple Silicon-versionen.",
@@ -2793,15 +2831,34 @@
   "8f109e64ea66ebaf": "Kunde inte kopiera text till urklipp.",
   "3444fc0e046baae6": "Urklipps-API:t är inte tillgängligt vid läsning av text.",
   "ec2160de6dd9c8d3": "Kunde inte läsa text från urklipp.",
+  "051aa49cc467ab54": "This connection cannot change settings, which a multi-repository project needs.",
+  "3a732730d719d7be": "Kunde inte skapa projektet",
+  "67f5329a73abedf5": "Project created without its repositories",
+  "b22bd3ee9a8cef4a": "{error} Add them in Settings → Projects → Repositories. The project is in {path}.",
+  "ea9d3702a5a5a656": "Could not start the agent",
+  "146f0cbfefe5de6c": "Could not read the project's branches",
+  "a0292984d4944524": "Cannot dispatch",
+  "2fe96a4db827dd2c": "{project} is not a git repository.",
+  "679de589ae618ead": "{project} has no default, {main} or {master} branch.",
+  "7c657f65894a1551": "No model is available.",
+  "571d6d900f877b96": "The agent started, but the issue is not linked to it",
+  "ac8926ba1f2bc251": "Could not dispatch the issue",
+  "d7cfc82db1a3e989": "Could not move {issue} to {state}",
+  "d76590a3cd539556": "Moved {issue} to {state}",
+  "5252c56656816d8f": "This connection cannot check out pull requests or start threads.",
+  "714c5e26d6937154": "Cannot start the review",
+  "0575f480be141b75": "Could not check out the pull request",
+  "65290c3d43702628": "The review started, but the pull request is not linked to it",
+  "310f2ad52b5cfb74": "Could not start the review",
   "433bd7a75c28a858": "Kunde inte skapa {label}-repot",
   "181a251357eeca66": "{error} Använd Publicera repo i Git-menyn för att försöka igen.",
   "fc6379bdbd00c0a3": "Publicerat till {label}",
-  "3a732730d719d7be": "Kunde inte skapa projektet",
   "3ca310078cbcad3a": "Skapade {name}",
   "4d914be9dfe6b924": "Skapade {name} utan en första commit",
   "01c37ddc7489a372": "{error} Projektet finns i {path}.",
   "22beed0f82b431e3": "{error} Det visas i sidofältet när den här klienten har kommit ikapp.",
   "ee8d5e90fd58f838": "T3 Code kunde inte lägga till projektet.",
+  "87f84b811a6aa0d1": "Det gick inte att avarkivera projektet",
   "138dd2315e3b4853": "Anslut den valda miljön och försök igen.",
   "dc8fdfd5ac8c8080": "Anslut {environment} och försök igen.",
   "6c2742bb85832341": "{title} i den aktuella miljön",
@@ -2991,6 +3048,8 @@
   "c646366e142ba05f": "Skrivbordsappens WSL-status är inte tillgänglig.",
   "228dcd284ea651b3": "Det gick inte att läsa in WSL-statusen.",
   "b08d105dd2553f8d": "Projektet visades inte i skrivbordsappen.",
+  "299ba3cc40f25d34": "Could not change keep awake",
+  "f75e52884e1c6016": "{command} failed.",
   "7a4b3f3b83e121d7": "{organization} har stängt av anonym användningsdata.",
   "d85822b18e9475df": "Hanteras av {organization}.",
   "a6dd531d58080010": "Anslut till den här servern för att söka efter versioner.",
@@ -5781,14 +5840,13 @@
   "b6a29fff7c7c0808": "Ingen",
   "54420465784bb1bd": "Läs in äldre kommentarer",
   "9d82ebf35bfb4043": "Inget har hänt här än.",
-  "1cf216566c1ee064": "Projektet är inte tillgängligt",
   "b5ddadeb0810688c": "Status",
   "93c1fc19d9bf1db0": "Inblandning",
   "d5a8b335d88b65bc": "{hidden} dolda",
   "2160067266a61dd8": "Alla",
   "cd4ec4acf33c65b9": "{count, plural, one {{count} etikett} other {{count} etiketter}}",
   "bfd20acb8b7dee6b": "Vem som helst",
-  "ad208e3e32c85029": "Dölj alla",
+  "aead644e2cf1233f": "Visa alla",
   "77ce79d865716719": "Inga matchande projekt.",
   "af7eb4f9c7f0f575": "Filter",
   "08247dd39b0c85ff": "Tilldelad",
@@ -5798,6 +5856,8 @@
   "309a68dc21af399d": "Vem som helst",
   "4dc86e84bb5ece63": "Personerna kunde inte läsas",
   "4103b6b8e0ff3f46": "Det finns fler personer än som listas här.",
+  "20b4665c78f801c3": "Öppna på {host}",
+  "b1de8d7f3882be82": "Open {key} on {host}",
   "4a9e547eda5a1d3b": "Kunde inte ta bort länken till ärendet",
   "6672a18b56815053": "Kunde inte länka ärendet",
   "a0295b5f63009ecf": "Servern nekade.",
@@ -5816,6 +5876,8 @@
   "5a9ffea109fc6990": "Som nämner mig",
   "844f6c8d82ecce5d": "Nyligen uppdaterade",
   "f77af0fd4c6acea1": "Nyaste",
+  "de29c86c63983762": "My projects",
+  "04ea9e0e663983fd": "All repositories",
   "fc18975e50af8dca": "Nästa sida misslyckades.",
   "283ada62d3847554": "{count, plural, one {{count} projekt} other {{count} projekt}}",
   "7cae1b414ae74c6b": "Den här ärendehanteraren kan inte läsas just nu.",
@@ -5824,6 +5886,7 @@
   "86798f07ba2d7f4d": "Sök ärenden",
   "6a96bfc102d57501": "Sortera ärenden",
   "297613ddcf68d031": "Sortera",
+  "76534fcb3e32b593": "Which repositories",
   "4aa8190ec693085e": "Filtrera efter ärendehanterare",
   "d44aed6ee67982dd": "Uppdatera ärenden",
   "df23678c28c56593": "Alla projekt är dolda",
@@ -5842,6 +5905,12 @@
   "c9cae7bac5f42342": "Läs in fler",
   "54f59582f641cbaf": "Ärenden",
   "01e7836447bcad93": "Ärenden tilldelade till mig",
+  "f4644f34c9822a58": "Project",
+  "a1125f8d6ad830ba": "A thread is already working on this issue",
+  "a4c77017c7f2b5b0": "Dispatch agent",
+  "190ba8a8e1d660c1": "Choose a project to dispatch into",
+  "df991a5fdcd9de7f": "Start an agent on this issue",
+  "48b67132109c59ec": "Dispatched",
   "3a883fbaed8d7561": "App",
   "3cc7159b902f36ec": "Åtkomst",
   "a6615c82020deb59": "Anslut",
@@ -6365,6 +6434,15 @@
   "4bc1f12855e979de": "Genererat",
   "01656e6237ddc437": "Dokumentation",
   "a5af81c2c8ccf1ad": "Totalt",
+  "5ba620ae7c2d50e1": [
+    "Open ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " repository"
+  ],
   "95e8b588059f0557": "Kunde inte länka pull requesten.",
   "ea2c2ff6c1eb88e2": "Klistra in en pull request-URL eller ange 123 / #123.",
   "9a1333523444138c": "Använd en pull request-URL, 123 eller #123.",
@@ -6469,7 +6547,6 @@
   "64d0189be492147c": "Det gick inte att öppna kontrolldetaljer",
   "600347ca50400a54": "Läser in kontroller…",
   "1b381201aba745c2": "Inga kontroller rapporterade",
-  "aead644e2cf1233f": "Visa alla",
   "a6d75a4380173c60": "Öppna kontroller: {summary}",
   "be3d1766bad18693": "Kontroller: {summary}",
   "425e4a3d6c5c2867": "{count, plural, one {{count} misslyckades} other {{count} misslyckades}}",
@@ -6613,7 +6690,6 @@
   "981704551d2ae102": "Bekräfta godkännande?",
   "2ce7f63137d8f7f8": "Tillbaka till trådens pull requests",
   "ca287eb07dcd839a": "Öppna {term, select, mr {merge request} cr {ändringsbegäran} other {pull request}} #{number} på värden",
-  "9e895407c233789c": "Öppna repot {repository}",
   "2b55951478b71805": "Tillbaka till pull requests",
   "efe5701992b34dfd": "tar emot ändringar från",
   "26c22a87e8064697": "Flikar för pull request",
@@ -6832,6 +6908,15 @@
   "aa9c37471f4c56f8": "Granskningssammanfattning",
   "5f08d5ed8c452a12": "Granskningsbeslut",
   "34be90d6d04cd895": "Skicka granskning",
+  "ee17be1338cdc0da": "Choose a project to review this pull request in",
+  "33a6b00aab266ce3": "Start a read-only review agent on this pull request",
+  "05cf59d40e17ba63": "Granskning begärd",
+  "df4e5cc71a4a389f": "Open #{number} on {host}",
+  "bf50c841aab5ee9b": "A review thread is already open for this pull request",
+  "07b8b9085965789b": "Start review",
+  "a9520f80d1d3df14": "Dispatched",
+  "4ef6e63f23d596d0": "Showing the most recently updated review requests.",
+  "d8755a58428606c2": "Review",
   "d8bf788c6eeda3f8": "Fler personer har åtkomst till det här repot än som listas här. Be om resten på värden.",
   "2ba475e878f12c1d": "Fler personer har åtkomst till det här repot än som listas här. Sök för att hitta dem.",
   "8ac0e36a3cc81224": "Bara de personer som redan listas matchas: sökningen på värden misslyckades. {error}",
@@ -7117,10 +7202,8 @@
   "56ec35afa660d970": "Stängd",
   "8007555939f933ca": "Mergad",
   "82abea3aaac37338": "Öppna på värden",
-  "20b4665c78f801c3": "Öppna på {host}",
   "258d16c1554b734c": "Kopiera länk",
   "c3d96c942dc3125d": "Kunde inte kopiera länken",
-  "05cf59d40e17ba63": "Granskning begärd",
   "e369d7ce5ff36689": "Skapade av mig",
   "87d943aa8f91b9a2": "Andra",
   "e8c320d314d151e9": "Granskar",
@@ -8484,7 +8567,7 @@
   "58e0e226493150e7": "Kunde inte läsa in ärendehanterare",
   "77cfcbde543df32d": "Visa/dölj detaljer för {tracker}",
   "0083f65885c60156": "Koppla från {tracker}",
-  "15ad0159a826b290": "Välj den {scope} i {tracker} vars ärenden varje projekt listar bredvid repots egna.",
+  "afcceb67b2fb0e78": "Pick the {tracker} {scope} whose issues each project lists beside its repository's own, or all of them.",
   "19c2d5e81ff8f89a": "{scope} i {tracker} för {project}",
   "68e061510b765772": "Inte kopplad",
   "a2d95d39d3398bda": "Autentiseringsuppgiften avvisades",
@@ -8839,7 +8922,6 @@
   "d0eb21be71904f84": "Reservmodell",
   "ebcfd96d4b112b4e": "Ingen",
   "9db5fe9e87e35e10": "Reservmodellen sparades inte",
-  "78f82fef9e0c8661": "Repon",
   "b0c77717b7d7b4a3": "Nya trådar",
   "3dee662c2b837a30": "Behörigheter för nya trådar i det här projektet.",
   "b886096e397a9d88": "Standardbehörigheter för nya trådar. Projekt kan åsidosätta dem.",
@@ -8893,6 +8975,50 @@
   "cd2acbace965052d": "En eller två bokstäver eller siffror.",
   "fc10b8da35c8560e": "Eller klistra in valfri emoji",
   "4051af9bdf152942": "Spara ikon",
+  "b776c726218f207a": "Use letters, numbers, dots, dashes or underscores for the folder name.",
+  "574ac3158d582204": "Enter the path of the repository's clone.",
+  "9e855ee00c29c3fe": "A repository with that folder name is already listed.",
+  "685ed573591d62f9": "At most {count} repositories.",
+  "66d75342c0ae3440": "Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine.",
+  "4530ce3527c51027": "Folder name",
+  "ae6222def282042d": "Repository folder name",
+  "5cf326b79ab97f90": "Repository path",
+  "60a0b5a50cecac53": "default branch",
+  "13809f9ebc667814": "Repository base branch",
+  "4ac5cd2b0195bc92": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repository"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repositories"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "587ea3963f450915": "Add",
   "d79d3cfdd7864be5": "Kunde inte spara grupperingsregeln",
   "b76e857a764ea02a": "Grupperingsregel för {path} på {environment}",
   "e6e55f343639ae71": "Standard ({mode})",
@@ -9752,6 +9878,7 @@
   "51497bd401292062": "Håll ned",
   "9d6cc6ac23312071": "Dubbeltryck",
   "f001fa7b329c8fbf": "Dölj lyckade",
+  "ad208e3e32c85029": "Dölj alla",
   "c80e4bb3201efd71": "Zen",
   "0cb9ffcd1fb46b0c": "Endast status",
   "cf0f7fc3df26fa75": "Status och meddelanden",
@@ -9961,6 +10088,7 @@
   "573ea5fdf293a9d6": "Alla utcheckningar",
   "470ad8c54049d1e1": "Sök utcheckningar",
   "7e2dfdd9f97fc027": "Projektomfång",
+  "1cf216566c1ee064": "Projektet är inte tillgängligt",
   "c1b8c351aa90f319": [
     {
       "t": "span",
@@ -11154,6 +11282,10 @@
     },
     " på"
   ],
+  "989778b3baacd22c": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
+  "95840464ec4de5da": "Reset prompt to run on settle",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
   "42d843f45e1de53b": "Läggs till i prompten för nya och omgenererade trådtitlar.",
   "169d0ed4364b4644": "Återställ instruktioner för trådtitlar till standard",
   "f307391eb1c5c9d7": "Håll titlarna till några ord. Börja med huvudämnet.",
@@ -11552,6 +11684,7 @@
   "4820900255bdc17b": "testa röst tal modell transkribering igenkänning",
   "582c604a40a4548a": "sidofält inaktivitet dagar ingen aktivitet automatiskt",
   "a5ff7e3accfdebf2": "claude kontext komprimering inaktiv cache token användning sammanfattning återuppta",
+  "842b7531971d172e": "prompt instructions message skill settle cleanup",
   "cb147525a3215d7c": "pull request merge stängd automatiskt sidofält",
   "6fee244945243134": "pull request inaktivitet markera som klar automatiskt merge stäng sidofält",
   "f1122dcb3209f91b": "tråd tidsgräns aktivitet sidofält",
@@ -11717,6 +11850,81 @@
   "27727bda79d97ffa": "Endast mappar kan läggas till som projekt",
   "eb9f51eb8bd8a43c": "Släpp filer på en tråd för att bifoga dem.",
   "671a8b8ab44e83e2": "Släpp mappar för att lägga till projekt",
+  "c3de2207ecbc8402": [
+    "Keeping this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake. Click to let it sleep."
+  ],
+  "cd5c435f0fb5e437": [
+    "Keep this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake"
+  ],
+  "7c9a2f64affedc8f": "Could not restart {product}",
+  "2277915b6002c7b4": "Restart failed.",
+  "1ebd12f79d4c7f51": "New code pulled · Restart",
+  "e2ca7c0bbd920d9c": "No threads are running.",
+  "da5e7f678540b5f3": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "singular": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "This running thread will be interrupted. ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " tries to resume it after the restart."
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "These ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " running threads will be interrupted.",
+            " ",
+            {
+              "i": 4,
+              "k": "_gt_value_4",
+              "v": "v"
+            },
+            " tries to resume them after the restart."
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "c434b7d2266cc277": [
+    "Restart ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to apply pulled code?"
+  ],
+  "b588530db06f58ad": "Later",
+  "4c0fe26a3113568e": "Restart now",
   "3134603052b8f460": ", behöver dig",
   "18fc8976ddb6783d": ", misslyckades",
   "10ae251c9435642b": ", klar",

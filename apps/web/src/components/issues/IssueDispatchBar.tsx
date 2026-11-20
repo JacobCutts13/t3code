@@ -7,6 +7,7 @@ import {
   threadIssueKeysEqual,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { T, useGT } from "gt-react";
 import { PlayIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -36,6 +37,7 @@ export function IssueDispatchBar({
   environmentId: EnvironmentId;
   detail: IssueDetail;
 }) {
+  const gt = useGT();
   const [dispatching, setDispatching] = useState(false);
   // The model picked in this session; each dispatch uses it where the project offers it.
   const [picked, setPicked] = useState<ModelSelection | null>(null);
@@ -81,10 +83,15 @@ export function IssueDispatchBar({
             setPickedProjects((current) => ({ ...current, [pickKey]: value }));
           }}
         >
-          <SelectTrigger size="sm" className="min-w-0" aria-label="Project">
+          <SelectTrigger
+            size="sm"
+            className="min-w-0"
+            aria-label={gt("Project", { $context: "noun, project selection" })}
+          >
             <SelectValue>
               {(value: string | null) =>
-                projects.find((candidate) => candidate.id === value)?.title ?? "Choose a project"
+                projects.find((candidate) => candidate.id === value)?.title ??
+                gt("Choose a project")
               }
             </SelectValue>
           </SelectTrigger>
@@ -116,20 +123,20 @@ export function IssueDispatchBar({
               params={buildThreadRouteParams(scopeThreadRef(environmentId, existingThreadId))}
             />
           }
-          title="A thread is already working on this issue"
+          title={gt("A thread is already working on this issue")}
         >
-          Dispatched
+          <T context="status of an issue assigned to an agent">Dispatched</T>
         </Badge>
       )}
       <Button
         type="button"
         size="icon"
-        aria-label="Dispatch agent"
+        aria-label={gt("Dispatch agent", { $context: "verb, start an agent on an issue" })}
         disabled={dispatching || project === undefined}
         title={
           project === undefined
-            ? "Choose a project to dispatch into"
-            : "Start an agent on this issue"
+            ? gt("Choose a project to dispatch into")
+            : gt("Start an agent on this issue")
         }
         onClick={() => void start()}
       >

@@ -23,6 +23,7 @@ const WORKTREE_SETUP_STAGE_LABELS: Readonly<Record<string, string>> = {
   "Fetch base branch": msg("Fetch base branch"),
   "Check out files": msg("Check out files"),
   "Init submodules": msg("Init submodules"),
+  "Add repo worktrees": msg("Add repo worktrees"),
   "Run setup script": msg("Run setup script"),
   "Start agent": msg("Start agent"),
 };

@@ -119,7 +119,7 @@ export function useUnarchiveProject() {
     void updateProject({
       environmentId: project.environmentId,
       input: { projectId: project.id, archived: false },
-    }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+    }).then((result) => reportProjectFailure(m(msg("Failed to unarchive project")), result));
   };
 }
 

@@ -251,6 +251,7 @@ function ProjectBindings({
   readonly bindings: IssueTrackerConnectionList["bindings"];
 }) {
   const gt = useGT();
+  const messages = useMessages();
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
   const bind = useAtomCommand(issueTrackerEnvironment.bindProject, {
     label: `bind project to ${tracker.displayName}`,
@@ -308,7 +309,7 @@ function ProjectBindings({
                     {value === UNBOUND
                       ? gt("Not bound")
                       : value === ALL_ISSUE_SCOPES
-                        ? issueTrackerAllScopesLabel(tracker)
+                        ? issueTrackerAllScopesLabel(tracker, messages)
                         : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)}
                   </SelectValue>
                 </SelectTrigger>
@@ -317,7 +318,7 @@ function ProjectBindings({
                     <T>Not bound</T>
                   </SelectItem>
                   <SelectItem value={ALL_ISSUE_SCOPES}>
-                    {issueTrackerAllScopesLabel(tracker)}
+                    {issueTrackerAllScopesLabel(tracker, messages)}
                   </SelectItem>
                   {tracker.scopes.map((scope) => (
                     <SelectItem key={scope.key} value={scope.key}>

@@ -6,6 +6,7 @@
   "422ced5cda40580e": "Получение базовой ветки",
   "47e6147265a28164": "Извлечение файлов",
   "4735345a111c1581": "Инициализация подмодулей",
+  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "Запуск скрипта настройки",
   "cbbdd0430fbe5fea": "Запуск агента",
   "2a918ed2e51ab64a": "Подключение",
@@ -680,6 +681,8 @@
   "f0ab079175905bbb": "Коммит, пуш и создать {shortLabel}",
   "8360d689ebc7f829": "Пуш и создать {shortLabel} из ветки по умолчанию?",
   "daa408bb99d21d18": "{kind, select, pr {Будет выполнен пуш локальных коммитов и создан PR в «{branch}». Можно продолжить в этой ветке или создать feature-ветку и выполнить то же действие там.} mr {Будет выполнен пуш локальных коммитов и создан MR в «{branch}». Можно продолжить в этой ветке или создать feature-ветку и выполнить то же действие там.} generic {Будет выполнен пуш локальных коммитов и создан запрос на изменение в «{branch}». Можно продолжить в этой ветке или создать feature-ветку и выполнить то же действие там.} other {Будет выполнен пуш локальных коммитов и создан {changeRequest} в «{branch}». Можно продолжить в этой ветке или создать feature-ветку и выполнить то же действие там.}}",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "Просмотр issue для этого хоста пока недоступен.",
   "2f4a47129f89fe22": "Не подключено. Добавьте персональный API-ключ, чтобы видеть его issue.",
   "024baab60525a419": "Сохранённые учётные данные отклонены.",
@@ -1736,6 +1739,8 @@
   "264d9bfa6806e746": "Выбрать папку на диске",
   "91a9b3a0e9de0821": "Новый проект",
   "39f5441d281288ae": "Создать новый Git-репозиторий по имени",
+  "2360ad0503c2a0a8": "Choose repositories",
+  "de627bd002dfeaa2": "Pick one or several repositories on this machine",
   "298a89c7f047146f": "Репозиторий {source}",
   "31ee8679b5c7b22b": "Клонировать по удалённому URL",
   "7d16bbddb4ffae49": "Клонировать {source} {hint}",
@@ -1752,6 +1757,8 @@
   "3f581e98c86df72a": "Новый тред без проекта",
   "e510d9a7b684fbfe": "Разобрать проблему",
   "cce3d80a2ddf1125": "Агент изучит проблему с T3 Code и поможет создать issue",
+  "e42e93b205979d43": "Keep this {product} awake",
+  "5f78ad1f76e0b76a": "Let this {product} sleep",
   "44e13c9deb30e03c": "Найти в текущем треде",
   "2a5cc71a171eca12": "Найти на странице в браузере",
   "f496ce44f0581269": "Копировать ссылку на промпт",
@@ -1781,7 +1788,6 @@
   "0c659f9a193255dd": "Не удалось добавить проект",
   "4b3fc098d5a08a66": "Пути в стиле Windows поддерживаются только в Windows.",
   "2c2637dc1e236fb4": "Для относительных путей нужен активный проект.",
-  "87f84b811a6aa0d1": "Не удалось разархивировать проект",
   "e823121dffeff02d": "Не удалось открыть проект",
   "d235610ec49f6c81": "Не удаётся добавить проект",
   "110790fd779efb2e": "Это подключение не может добавлять проекты.",
@@ -1891,6 +1897,35 @@
   "af63f05ed2f5eeb3": "Отклонить",
   "b735bab216b27041": "Не удалось отклонить устройство",
   "4672f332c89dbcd9": "Проверить",
+  "b6328139d1a74290": "Search repositories",
+  "fbe0baad806d20dd": "Search repositories…",
+  "78f82fef9e0c8661": "Репозитории",
+  "2ccc25027e4514d4": "Create project from repositories",
+  "05025c6ff0322c66": "Selected",
+  "3bfb60e70a436a55": "Repos",
+  "f77f96288bff35f1": "Looking for repositories…",
+  "74612f29140bd882": "Could not read your repositories folder.",
+  "46a40c006b683968": [
+    "No git repositories found in ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "."
+  ],
+  "14a7f0c2c44e0c83": "No other repositories match.",
+  "031d9bdae1628c2f": "No repositories match.",
+  "831dc75421758cf6": "Pick one repository, or several to work across them.",
+  "22677711c1725aa9": [
+    "Opens ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ca8291e195a9d40d": "Save",
   "913fc23f62321556": "Выберите корректные дату и время в будущем.",
   "9485a52216cfc0d5": "Введите положительную длительность.",
   "9bc551235d78e133": "Тип расписания",
@@ -2616,6 +2651,9 @@
   "b4daab4983e50891": "Открыть {kind} {label}: {title}",
   "c5d4a1b01d27c81d": "Изображение, {name}, {size}",
   "baa023ab89b1e31f": "Недоступный контекст, {label}",
+  "8381d91a6f32c485": "Up to {count} repositories can share a project.",
+  "ae27096d86ce264d": "{name} can't be combined with other repositories: its folder name has characters that aren't allowed.",
+  "63b3795342909720": "A repository named {name} is already selected; both would use the same folder.",
   "52a44f36200620d5": "Эта установка использует правильную архитектуру.",
   "007ab0ba4a0318eb": "На этом Mac процессор Apple Silicon, но T3 Code всё ещё работает в сборке для Intel через Rosetta. Скачайте доступное обновление, чтобы перейти на нативную сборку для Apple Silicon.",
   "0fe3e0e043327f70": "На этом Mac процессор Apple Silicon, но T3 Code всё ещё работает в сборке для Intel через Rosetta. Перезапустите приложение, чтобы установить скачанную сборку для Apple Silicon.",
@@ -2793,15 +2831,34 @@
   "8f109e64ea66ebaf": "Не удалось скопировать текст в буфер обмена.",
   "3444fc0e046baae6": "API буфера обмена недоступен при чтении текста.",
   "ec2160de6dd9c8d3": "Не удалось прочитать текст из буфера обмена.",
+  "051aa49cc467ab54": "This connection cannot change settings, which a multi-repository project needs.",
+  "3a732730d719d7be": "Не удалось создать проект",
+  "67f5329a73abedf5": "Project created without its repositories",
+  "b22bd3ee9a8cef4a": "{error} Add them in Settings → Projects → Repositories. The project is in {path}.",
+  "ea9d3702a5a5a656": "Could not start the agent",
+  "146f0cbfefe5de6c": "Could not read the project's branches",
+  "a0292984d4944524": "Cannot dispatch",
+  "2fe96a4db827dd2c": "{project} is not a git repository.",
+  "679de589ae618ead": "{project} has no default, {main} or {master} branch.",
+  "7c657f65894a1551": "No model is available.",
+  "571d6d900f877b96": "The agent started, but the issue is not linked to it",
+  "ac8926ba1f2bc251": "Could not dispatch the issue",
+  "d7cfc82db1a3e989": "Could not move {issue} to {state}",
+  "d76590a3cd539556": "Moved {issue} to {state}",
+  "5252c56656816d8f": "This connection cannot check out pull requests or start threads.",
+  "714c5e26d6937154": "Cannot start the review",
+  "0575f480be141b75": "Could not check out the pull request",
+  "65290c3d43702628": "The review started, but the pull request is not linked to it",
+  "310f2ad52b5cfb74": "Could not start the review",
   "433bd7a75c28a858": "Не удалось создать репозиторий {label}",
   "181a251357eeca66": "{error} Повторите через «Опубликовать репозиторий» в меню Git.",
   "fc6379bdbd00c0a3": "Опубликовано на {label}",
-  "3a732730d719d7be": "Не удалось создать проект",
   "3ca310078cbcad3a": "Создан {name}",
   "4d914be9dfe6b924": "{name} создан без первого коммита",
   "01c37ddc7489a372": "{error} Проект находится в {path}.",
   "22beed0f82b431e3": "{error} Он появится на боковой панели, когда клиент синхронизируется.",
   "ee8d5e90fd58f838": "T3 Code не удалось добавить проект.",
+  "87f84b811a6aa0d1": "Не удалось разархивировать проект",
   "138dd2315e3b4853": "Подключите выбранное окружение и повторите попытку.",
   "dc8fdfd5ac8c8080": "Подключите {environment} и повторите попытку.",
   "6c2742bb85832341": "{title} в текущем окружении",
@@ -2991,6 +3048,8 @@
   "c646366e142ba05f": "Состояние WSL в десктопе недоступно.",
   "228dcd284ea651b3": "Не удалось загрузить состояние WSL.",
   "b08d105dd2553f8d": "Проект не появился в десктопном приложении.",
+  "299ba3cc40f25d34": "Could not change keep awake",
+  "f75e52884e1c6016": "{command} failed.",
   "7a4b3f3b83e121d7": "{organization} отключила анонимные данные об использовании.",
   "d85822b18e9475df": "Управляется {organization}.",
   "a6dd531d58080010": "Подключитесь к этому серверу, чтобы проверить выпуски.",
@@ -5780,14 +5839,13 @@
   "b6a29fff7c7c0808": "Нет",
   "54420465784bb1bd": "Загрузить старые комментарии",
   "9d82ebf35bfb4043": "Здесь пока ничего не происходило.",
-  "1cf216566c1ee064": "Проект недоступен",
   "b5ddadeb0810688c": "Состояние",
   "93c1fc19d9bf1db0": "Участие",
   "d5a8b335d88b65bc": "Скрыто: {hidden}",
   "2160067266a61dd8": "Любая",
   "cd4ec4acf33c65b9": "{count, plural, one {{count} метка} few {{count} метки} many {{count} меток} other {{count} метки}}",
   "bfd20acb8b7dee6b": "Любой",
-  "ad208e3e32c85029": "Скрывать все",
+  "aead644e2cf1233f": "Показать все",
   "77ce79d865716719": "Нет подходящих проектов.",
   "af7eb4f9c7f0f575": "Фильтры",
   "08247dd39b0c85ff": "Исполнитель",
@@ -5797,6 +5855,8 @@
   "309a68dc21af399d": "Любой",
   "4dc86e84bb5ece63": "Не удалось прочитать список людей",
   "4103b6b8e0ff3f46": "Людей больше, чем показано здесь.",
+  "20b4665c78f801c3": "Открыть на {host}",
+  "b1de8d7f3882be82": "Open {key} on {host}",
   "4a9e547eda5a1d3b": "Не удалось отвязать issue",
   "6672a18b56815053": "Не удалось привязать issue",
   "a0295b5f63009ecf": "Сервер отклонил запрос.",
@@ -5815,6 +5875,8 @@
   "5a9ffea109fc6990": "С упоминанием меня",
   "844f6c8d82ecce5d": "Недавно обновлённые",
   "f77af0fd4c6acea1": "Сначала новые",
+  "de29c86c63983762": "My projects",
+  "04ea9e0e663983fd": "All repositories",
   "fc18975e50af8dca": "Не удалось загрузить следующую страницу.",
   "283ada62d3847554": "{count, plural, one {{count} проект} few {{count} проекта} many {{count} проектов} other {{count} проекта}}",
   "7cae1b414ae74c6b": "Сейчас не удаётся прочитать этот трекер.",
@@ -5823,6 +5885,7 @@
   "86798f07ba2d7f4d": "Поиск issue",
   "6a96bfc102d57501": "Сортировка issue",
   "297613ddcf68d031": "Сортировать",
+  "76534fcb3e32b593": "Which repositories",
   "4aa8190ec693085e": "Фильтр по трекеру",
   "d44aed6ee67982dd": "Обновить issue",
   "df23678c28c56593": "Все проекты скрыты",
@@ -5841,6 +5904,12 @@
   "c9cae7bac5f42342": "Загрузить ещё",
   "54f59582f641cbaf": "Issues",
   "01e7836447bcad93": "Issues, назначенные мне",
+  "f4644f34c9822a58": "Project",
+  "a1125f8d6ad830ba": "A thread is already working on this issue",
+  "a4c77017c7f2b5b0": "Dispatch agent",
+  "190ba8a8e1d660c1": "Choose a project to dispatch into",
+  "df991a5fdcd9de7f": "Start an agent on this issue",
+  "48b67132109c59ec": "Dispatched",
   "3a883fbaed8d7561": "Приложение",
   "3cc7159b902f36ec": "Доступ",
   "a6615c82020deb59": "Подключение",
@@ -6363,6 +6432,15 @@
   "4bc1f12855e979de": "Сгенерированные",
   "01656e6237ddc437": "Документация",
   "a5af81c2c8ccf1ad": "Всего",
+  "5ba620ae7c2d50e1": [
+    "Open ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " repository"
+  ],
   "95e8b588059f0557": "Не удалось привязать пул-реквест.",
   "ea2c2ff6c1eb88e2": "Вставьте URL пул-реквеста или введите 123 / #123.",
   "9a1333523444138c": "Укажите URL пул-реквеста, 123 или #123.",
@@ -6463,7 +6541,6 @@
   "64d0189be492147c": "Не удалось открыть подробности проверки",
   "600347ca50400a54": "Загрузка проверок…",
   "1b381201aba745c2": "Нет проверок",
-  "aead644e2cf1233f": "Показать все",
   "a6d75a4380173c60": "Открыть проверки: {summary}",
   "be3d1766bad18693": "Проверки: {summary}",
   "425e4a3d6c5c2867": "{count, plural, one {Ошибок: {count}} few {Ошибок: {count}} many {Ошибок: {count}} other {Ошибок: {count}}}",
@@ -6607,7 +6684,6 @@
   "981704551d2ae102": "Подтвердить?",
   "2ce7f63137d8f7f8": "Назад к пул-реквестам этого треда",
   "ca287eb07dcd839a": "{term, select, mr {Открыть мерж-реквест #{number} на хостинге} cr {Открыть запрос на изменение #{number} на хостинге} other {Открыть пул-реквест #{number} на хостинге}}",
-  "9e895407c233789c": "Открыть репозиторий {repository}",
   "2b55951478b71805": "Назад к пул-реквестам",
   "efe5701992b34dfd": "получает изменения из",
   "26c22a87e8064697": "Вкладки пул-реквеста",
@@ -6826,6 +6902,15 @@
   "aa9c37471f4c56f8": "Итог ревью",
   "5f08d5ed8c452a12": "Вердикт ревью",
   "34be90d6d04cd895": "Отправить ревью",
+  "ee17be1338cdc0da": "Choose a project to review this pull request in",
+  "33a6b00aab266ce3": "Start a read-only review agent on this pull request",
+  "05cf59d40e17ba63": "Запрошено ревью",
+  "df4e5cc71a4a389f": "Open #{number} on {host}",
+  "bf50c841aab5ee9b": "A review thread is already open for this pull request",
+  "07b8b9085965789b": "Start review",
+  "a9520f80d1d3df14": "Dispatched",
+  "4ef6e63f23d596d0": "Showing the most recently updated review requests.",
+  "d8755a58428606c2": "Review",
   "d8bf788c6eeda3f8": "В этом репозитории больше людей с доступом, чем показано здесь. Остальных можно запросить на хосте.",
   "2ba475e878f12c1d": "В этом репозитории больше людей с доступом, чем показано здесь. Найдите их поиском.",
   "8ac0e36a3cc81224": "Совпадения только среди уже показанных людей: поиск на хосте не удался. {error}",
@@ -7111,10 +7196,8 @@
   "56ec35afa660d970": "Закрыт",
   "8007555939f933ca": "Слит",
   "82abea3aaac37338": "Открыть на хосте",
-  "20b4665c78f801c3": "Открыть на {host}",
   "258d16c1554b734c": "Копировать ссылку",
   "c3d96c942dc3125d": "Не удалось скопировать ссылку",
-  "05cf59d40e17ba63": "Запрошено ревью",
   "e369d7ce5ff36689": "Мои",
   "87d943aa8f91b9a2": "Другие",
   "e8c320d314d151e9": "На ревью",
@@ -8478,7 +8561,7 @@
   "58e0e226493150e7": "Не удалось загрузить issue-трекеры",
   "77cfcbde543df32d": "Показать или скрыть подробности {tracker}",
   "0083f65885c60156": "Отключить {tracker}",
-  "15ad0159a826b290": "Выберите {scope} в {tracker}, issue которого каждый проект показывает рядом с issue своего репозитория.",
+  "afcceb67b2fb0e78": "Pick the {tracker} {scope} whose issues each project lists beside its repository's own, or all of them.",
   "19c2d5e81ff8f89a": "{tracker} {scope} для {project}",
   "68e061510b765772": "Не привязано",
   "a2d95d39d3398bda": "Учётные данные отклонены",
@@ -8833,7 +8916,6 @@
   "d0eb21be71904f84": "Резервная модель",
   "ebcfd96d4b112b4e": "Нет",
   "9db5fe9e87e35e10": "Резервная модель не сохранена",
-  "78f82fef9e0c8661": "Репозитории",
   "b0c77717b7d7b4a3": "Новые треды",
   "3dee662c2b837a30": "Разрешения для новых тредов в этом проекте.",
   "b886096e397a9d88": "Разрешения по умолчанию для новых тредов. Проекты могут их переопределить.",
@@ -8887,6 +8969,50 @@
   "cd2acbace965052d": "Одна или две буквы или цифры.",
   "fc10b8da35c8560e": "Или вставьте любой эмодзи",
   "4051af9bdf152942": "Сохранить значок",
+  "b776c726218f207a": "Use letters, numbers, dots, dashes or underscores for the folder name.",
+  "574ac3158d582204": "Enter the path of the repository's clone.",
+  "9e855ee00c29c3fe": "A repository with that folder name is already listed.",
+  "685ed573591d62f9": "At most {count} repositories.",
+  "66d75342c0ae3440": "Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine.",
+  "4530ce3527c51027": "Folder name",
+  "ae6222def282042d": "Repository folder name",
+  "5cf326b79ab97f90": "Repository path",
+  "60a0b5a50cecac53": "default branch",
+  "13809f9ebc667814": "Repository base branch",
+  "4ac5cd2b0195bc92": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repository"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repositories"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "587ea3963f450915": "Add",
   "d79d3cfdd7864be5": "Не удалось сохранить правило группировки",
   "b76e857a764ea02a": "Правило группировки для {path} в {environment}",
   "e6e55f343639ae71": "По умолчанию ({mode})",
@@ -9746,6 +9872,7 @@
   "51497bd401292062": "Удержание",
   "9d6cc6ac23312071": "Двойное нажатие",
   "f001fa7b329c8fbf": "Скрывать успешные",
+  "ad208e3e32c85029": "Скрывать все",
   "c80e4bb3201efd71": "Дзен",
   "0cb9ffcd1fb46b0c": "Только статус",
   "cf0f7fc3df26fa75": "Статус и сообщения",
@@ -9955,6 +10082,7 @@
   "573ea5fdf293a9d6": "Все копии",
   "470ad8c54049d1e1": "Поиск копий",
   "7e2dfdd9f97fc027": "Область проектов",
+  "1cf216566c1ee064": "Проект недоступен",
   "c1b8c351aa90f319": [
     {
       "t": "span",
@@ -11146,6 +11274,10 @@
       "v": "v"
     }
   ],
+  "989778b3baacd22c": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
+  "95840464ec4de5da": "Reset prompt to run on settle",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
   "42d843f45e1de53b": "Добавляется к промпту для новых и перегенерированных заголовков тредов.",
   "169d0ed4364b4644": "Сбросить инструкции для заголовков тредов к значению по умолчанию",
   "f307391eb1c5c9d7": "Заголовки в несколько слов. Начинай с главной темы.",
@@ -11544,6 +11676,7 @@
   "4820900255bdc17b": "проверка голос речь модель расшифровка распознавание",
   "582c604a40a4548a": "боковая панель бездействие дни нет активности автоматически",
   "a5ff7e3accfdebf2": "claude контекст сжатие простой кеш токены использование сводка возобновить",
+  "842b7531971d172e": "prompt instructions message skill settle cleanup",
   "cb147525a3215d7c": "пул-реквест слияние закрыт автоматически боковая панель",
   "6fee244945243134": "пул-реквест бездействие авторазбор слияние закрытие боковая панель",
   "f1122dcb3209f91b": "тред тайм-аут активность боковая панель",
@@ -11709,6 +11842,81 @@
   "27727bda79d97ffa": "Проектами могут быть только папки",
   "eb9f51eb8bd8a43c": "Перетащите файлы на тред, чтобы прикрепить их.",
   "671a8b8ab44e83e2": "Перетащите папки, чтобы добавить проекты",
+  "c3de2207ecbc8402": [
+    "Keeping this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake. Click to let it sleep."
+  ],
+  "cd5c435f0fb5e437": [
+    "Keep this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake"
+  ],
+  "7c9a2f64affedc8f": "Could not restart {product}",
+  "2277915b6002c7b4": "Restart failed.",
+  "1ebd12f79d4c7f51": "New code pulled · Restart",
+  "e2ca7c0bbd920d9c": "No threads are running.",
+  "da5e7f678540b5f3": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "singular": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "This running thread will be interrupted. ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " tries to resume it after the restart."
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "These ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " running threads will be interrupted.",
+            " ",
+            {
+              "i": 4,
+              "k": "_gt_value_4",
+              "v": "v"
+            },
+            " tries to resume them after the restart."
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "c434b7d2266cc277": [
+    "Restart ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to apply pulled code?"
+  ],
+  "b588530db06f58ad": "Later",
+  "4c0fe26a3113568e": "Restart now",
   "3134603052b8f460": ", ждёт вас",
   "18fc8976ddb6783d": ", ошибка",
   "10ae251c9435642b": ", готово",

@@ -8,6 +8,7 @@ import {
   type WorktreeSetupSnapshot,
   type WorktreeSetupStage,
 } from "@t3tools/contracts";
+import { worktreeSetupStageLabel } from "@t3tools/client-runtime/contract-labels";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
 import { Platform, Pressable, ScrollView, View } from "react-native";
@@ -39,14 +40,6 @@ const statusLabels = {
   failed: msg("failed", { $context: "setup stage status" }),
   warning: msg("warning", { $context: "setup stage status" }),
 } as const satisfies Record<WorktreeSetupStage["status"], string>;
-
-const stageLabels = {
-  fetch: msg("Fetch base branch"),
-  checkout: msg("Check out files"),
-  submodules: msg("Init submodules"),
-  "setup-script": msg("Run setup script"),
-  agent: msg("Start agent"),
-} as const satisfies Record<WorktreeSetupStage["id"], string>;
 
 const icons: Record<WorktreeSetupStage["status"], AppSymbolName> = {
   pending: "circle",
@@ -376,9 +369,7 @@ function StageRow({
   const gt = useGT();
   const m = useMessages();
   const label =
-    stage.id === "setup-script"
-      ? (scriptName ?? m(stageLabels[stage.id]))
-      : m(stageLabels[stage.id]);
+    (stage.id === "setup-script" ? scriptName : null) ?? worktreeSetupStageLabel(stage.id, m);
   const detail =
     stage.status === "pending"
       ? null

@@ -6,6 +6,7 @@
   "422ced5cda40580e": "获取基准分支",
   "47e6147265a28164": "检出文件",
   "4735345a111c1581": "初始化子模块",
+  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "运行设置脚本",
   "cbbdd0430fbe5fea": "启动智能体",
   "2a918ed2e51ab64a": "正在连接",
@@ -680,6 +681,8 @@
   "f0ab079175905bbb": "提交、推送并创建 {shortLabel}",
   "8360d689ebc7f829": "从默认分支推送并创建 {shortLabel}？",
   "daa408bb99d21d18": "{kind, select, pr {此操作将推送本地提交并在“{branch}”上创建 PR。你可以继续使用此分支，或创建功能分支并在其上运行相同操作。} mr {此操作将推送本地提交并在“{branch}”上创建 MR。你可以继续使用此分支，或创建功能分支并在其上运行相同操作。} generic {此操作将推送本地提交并在“{branch}”上创建 change request。你可以继续使用此分支，或创建功能分支并在其上运行相同操作。} other {此操作将推送本地提交并在“{branch}”上创建 {changeRequest}。你可以继续使用此分支，或创建功能分支并在其上运行相同操作。}}",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "暂时无法浏览此托管平台的 issue。",
   "2f4a47129f89fe22": "未连接。添加个人 API 密钥即可列出其 issue。",
   "024baab60525a419": "保存的凭据被拒绝。",
@@ -1736,6 +1739,8 @@
   "264d9bfa6806e746": "浏览磁盘上的文件夹",
   "91a9b3a0e9de0821": "新建项目",
   "39f5441d281288ae": "按名称新建 Git 仓库",
+  "2360ad0503c2a0a8": "Choose repositories",
+  "de627bd002dfeaa2": "Pick one or several repositories on this machine",
   "298a89c7f047146f": "{source} 仓库",
   "31ee8679b5c7b22b": "从远程 URL 克隆",
   "7d16bbddb4ffae49": "克隆 {source} {hint}",
@@ -1752,6 +1757,8 @@
   "3f581e98c86df72a": "不关联项目新建会话",
   "e510d9a7b684fbfe": "排查 issue",
   "cce3d80a2ddf1125": "由智能体排查 T3 Code 的问题并协助提交 issue",
+  "e42e93b205979d43": "Keep this {product} awake",
+  "5f78ad1f76e0b76a": "Let this {product} sleep",
   "44e13c9deb30e03c": "在当前会话中查找",
   "2a5cc71a171eca12": "在浏览器页面中查找",
   "f496ce44f0581269": "复制提示词链接",
@@ -1781,7 +1788,6 @@
   "0c659f9a193255dd": "添加项目失败",
   "4b3fc098d5a08a66": "仅 Windows 支持 Windows 风格路径。",
   "2c2637dc1e236fb4": "相对路径需要先有活动项目。",
-  "87f84b811a6aa0d1": "无法取消归档项目",
   "e823121dffeff02d": "打开项目失败",
   "d235610ec49f6c81": "无法添加项目",
   "110790fd779efb2e": "此连接无法添加项目。",
@@ -1892,6 +1898,35 @@
   "af63f05ed2f5eeb3": "拒绝",
   "b735bab216b27041": "无法拒绝设备",
   "4672f332c89dbcd9": "查看",
+  "b6328139d1a74290": "Search repositories",
+  "fbe0baad806d20dd": "Search repositories…",
+  "78f82fef9e0c8661": "仓库",
+  "2ccc25027e4514d4": "Create project from repositories",
+  "05025c6ff0322c66": "Selected",
+  "3bfb60e70a436a55": "Repos",
+  "f77f96288bff35f1": "Looking for repositories…",
+  "74612f29140bd882": "Could not read your repositories folder.",
+  "46a40c006b683968": [
+    "No git repositories found in ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "."
+  ],
+  "14a7f0c2c44e0c83": "No other repositories match.",
+  "031d9bdae1628c2f": "No repositories match.",
+  "831dc75421758cf6": "Pick one repository, or several to work across them.",
+  "22677711c1725aa9": [
+    "Opens ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ca8291e195a9d40d": "Save",
   "913fc23f62321556": "请选择将来的有效日期和时间。",
   "9485a52216cfc0d5": "请输入大于零的时长。",
   "9bc551235d78e133": "定时方式",
@@ -2620,6 +2655,9 @@
   "b4daab4983e50891": "打开 {kind} {label}：{title}",
   "c5d4a1b01d27c81d": "图片附件，{name}，{size}",
   "baa023ab89b1e31f": "不可用的上下文：{label}",
+  "8381d91a6f32c485": "Up to {count} repositories can share a project.",
+  "ae27096d86ce264d": "{name} can't be combined with other repositories: its folder name has characters that aren't allowed.",
+  "63b3795342909720": "A repository named {name} is already selected; both would use the same folder.",
   "52a44f36200620d5": "当前安装使用了正确的架构。",
   "007ab0ba4a0318eb": "这台 Mac 使用 Apple Silicon，但 T3 Code 仍以 Rosetta 运行 Intel 版本。下载可用更新即可切换到原生的 Apple Silicon 版本。",
   "0fe3e0e043327f70": "这台 Mac 使用 Apple Silicon，但 T3 Code 仍以 Rosetta 运行 Intel 版本。重启即可安装已下载的 Apple Silicon 版本。",
@@ -2797,15 +2835,34 @@
   "8f109e64ea66ebaf": "无法将文本复制到剪贴板。",
   "3444fc0e046baae6": "读取文本时剪贴板 API 不可用。",
   "ec2160de6dd9c8d3": "无法从剪贴板读取文本。",
+  "051aa49cc467ab54": "This connection cannot change settings, which a multi-repository project needs.",
+  "3a732730d719d7be": "无法创建项目",
+  "67f5329a73abedf5": "Project created without its repositories",
+  "b22bd3ee9a8cef4a": "{error} Add them in Settings → Projects → Repositories. The project is in {path}.",
+  "ea9d3702a5a5a656": "Could not start the agent",
+  "146f0cbfefe5de6c": "Could not read the project's branches",
+  "a0292984d4944524": "Cannot dispatch",
+  "2fe96a4db827dd2c": "{project} is not a git repository.",
+  "679de589ae618ead": "{project} has no default, {main} or {master} branch.",
+  "7c657f65894a1551": "No model is available.",
+  "571d6d900f877b96": "The agent started, but the issue is not linked to it",
+  "ac8926ba1f2bc251": "Could not dispatch the issue",
+  "d7cfc82db1a3e989": "Could not move {issue} to {state}",
+  "d76590a3cd539556": "Moved {issue} to {state}",
+  "5252c56656816d8f": "This connection cannot check out pull requests or start threads.",
+  "714c5e26d6937154": "Cannot start the review",
+  "0575f480be141b75": "Could not check out the pull request",
+  "65290c3d43702628": "The review started, but the pull request is not linked to it",
+  "310f2ad52b5cfb74": "Could not start the review",
   "433bd7a75c28a858": "无法创建 {label} 仓库",
   "181a251357eeca66": "{error} 请使用 Git 菜单中的“发布仓库”重试。",
   "fc6379bdbd00c0a3": "已发布到 {label}",
-  "3a732730d719d7be": "无法创建项目",
   "3ca310078cbcad3a": "已创建 {name}",
   "4d914be9dfe6b924": "已创建 {name}，但还没有首个提交",
   "01c37ddc7489a372": "{error} 项目位于 {path}。",
   "22beed0f82b431e3": "{error} 此客户端同步后，它会出现在侧边栏中。",
   "ee8d5e90fd58f838": "T3 Code 无法添加该项目。",
+  "87f84b811a6aa0d1": "无法取消归档项目",
   "138dd2315e3b4853": "请连接所选环境后重试。",
   "dc8fdfd5ac8c8080": "请先连接 {environment} 再重试。",
   "6c2742bb85832341": "当前环境上的 {title}",
@@ -2995,6 +3052,8 @@
   "c646366e142ba05f": "桌面 WSL 状态不可用。",
   "228dcd284ea651b3": "无法加载 WSL 状态。",
   "b08d105dd2553f8d": "该项目未出现在桌面应用中。",
+  "299ba3cc40f25d34": "Could not change keep awake",
+  "f75e52884e1c6016": "{command} failed.",
   "7a4b3f3b83e121d7": "{organization} 已关闭匿名使用数据。",
   "d85822b18e9475df": "由 {organization} 管理。",
   "a6dd531d58080010": "连接此服务器以检查版本。",
@@ -5787,14 +5846,13 @@
   "b6a29fff7c7c0808": "无",
   "54420465784bb1bd": "加载较早的评论",
   "9d82ebf35bfb4043": "这里还没有任何动态。",
-  "1cf216566c1ee064": "不可用的项目",
   "b5ddadeb0810688c": "状态",
   "93c1fc19d9bf1db0": "参与方式",
   "d5a8b335d88b65bc": "已隐藏 {hidden} 个",
   "2160067266a61dd8": "任意",
   "cd4ec4acf33c65b9": "{count, plural, other {{count} 个标签}}",
   "bfd20acb8b7dee6b": "任何人",
-  "ad208e3e32c85029": "全部隐藏",
+  "aead644e2cf1233f": "全部显示",
   "77ce79d865716719": "没有匹配的项目。",
   "af7eb4f9c7f0f575": "筛选条件",
   "08247dd39b0c85ff": "受理人",
@@ -5804,6 +5862,8 @@
   "309a68dc21af399d": "任何人",
   "4dc86e84bb5ece63": "无法读取人员列表",
   "4103b6b8e0ff3f46": "还有更多人员未在此列出。",
+  "20b4665c78f801c3": "在 {host} 上打开",
+  "b1de8d7f3882be82": "Open {key} on {host}",
   "4a9e547eda5a1d3b": "无法取消关联 issue",
   "6672a18b56815053": "无法关联 issue",
   "a0295b5f63009ecf": "服务器拒绝了操作。",
@@ -5822,6 +5882,8 @@
   "5a9ffea109fc6990": "提及我",
   "844f6c8d82ecce5d": "最近更新",
   "f77af0fd4c6acea1": "最新",
+  "de29c86c63983762": "My projects",
+  "04ea9e0e663983fd": "All repositories",
   "fc18975e50af8dca": "下一页加载失败。",
   "283ada62d3847554": "{count, plural, other {{count} 个项目}}",
   "7cae1b414ae74c6b": "暂时无法读取此跟踪器。",
@@ -5830,6 +5892,7 @@
   "86798f07ba2d7f4d": "搜索 issue",
   "6a96bfc102d57501": "排序 issue",
   "297613ddcf68d031": "排序",
+  "76534fcb3e32b593": "Which repositories",
   "4aa8190ec693085e": "按跟踪器筛选",
   "d44aed6ee67982dd": "刷新 issue",
   "df23678c28c56593": "所有项目均已隐藏",
@@ -5848,6 +5911,12 @@
   "c9cae7bac5f42342": "加载更多",
   "54f59582f641cbaf": "issue",
   "01e7836447bcad93": "分配给我的 issue",
+  "f4644f34c9822a58": "Project",
+  "a1125f8d6ad830ba": "A thread is already working on this issue",
+  "a4c77017c7f2b5b0": "Dispatch agent",
+  "190ba8a8e1d660c1": "Choose a project to dispatch into",
+  "df991a5fdcd9de7f": "Start an agent on this issue",
+  "48b67132109c59ec": "Dispatched",
   "3a883fbaed8d7561": "应用",
   "3cc7159b902f36ec": "访问权限",
   "a6615c82020deb59": "连接",
@@ -6371,6 +6440,15 @@
   "4bc1f12855e979de": "生成文件",
   "01656e6237ddc437": "文档",
   "a5af81c2c8ccf1ad": "总计",
+  "5ba620ae7c2d50e1": [
+    "Open ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " repository"
+  ],
   "95e8b588059f0557": "无法关联该 pull request。",
   "ea2c2ff6c1eb88e2": "粘贴 pull request URL，或输入 123 / #123。",
   "9a1333523444138c": "请使用 pull request URL、123 或 #123。",
@@ -6475,7 +6553,6 @@
   "64d0189be492147c": "无法打开检查详情",
   "600347ca50400a54": "正在加载检查…",
   "1b381201aba745c2": "未报告任何检查",
-  "aead644e2cf1233f": "全部显示",
   "a6d75a4380173c60": "打开检查：{summary}",
   "be3d1766bad18693": "检查：{summary}",
   "425e4a3d6c5c2867": "{count, plural, other {{count} 个失败}}",
@@ -6620,7 +6697,6 @@
   "981704551d2ae102": "确认批准？",
   "2ce7f63137d8f7f8": "返回到此会话的 PR",
   "ca287eb07dcd839a": "在托管平台上打开 {term, select, mr {MR} cr {change request} other {PR}} #{number}",
-  "9e895407c233789c": "打开 {repository} 仓库",
   "2b55951478b71805": "返回到 PR",
   "efe5701992b34dfd": "接收来自以下分支的更改",
   "26c22a87e8064697": "PR 标签页",
@@ -6840,6 +6916,15 @@
   "aa9c37471f4c56f8": "审查总结",
   "5f08d5ed8c452a12": "审查结论",
   "34be90d6d04cd895": "提交审查",
+  "ee17be1338cdc0da": "Choose a project to review this pull request in",
+  "33a6b00aab266ce3": "Start a read-only review agent on this pull request",
+  "05cf59d40e17ba63": "已请求我审查",
+  "df4e5cc71a4a389f": "Open #{number} on {host}",
+  "bf50c841aab5ee9b": "A review thread is already open for this pull request",
+  "07b8b9085965789b": "Start review",
+  "a9520f80d1d3df14": "Dispatched",
+  "4ef6e63f23d596d0": "Showing the most recently updated review requests.",
+  "d8755a58428606c2": "Review",
   "d8bf788c6eeda3f8": "此仓库有访问权限的人数多于此处列出的数量。其余人员请在托管平台上查询。",
   "2ba475e878f12c1d": "此仓库有访问权限的人数多于此处列出的数量。请搜索以找到他们。",
   "8ac0e36a3cc81224": "仅在已列出的人员中匹配：托管平台搜索失败。{error}",
@@ -7126,10 +7211,8 @@
   "56ec35afa660d970": "已关闭",
   "8007555939f933ca": "已合并",
   "82abea3aaac37338": "在托管平台上打开",
-  "20b4665c78f801c3": "在 {host} 上打开",
   "258d16c1554b734c": "复制链接",
   "c3d96c942dc3125d": "无法复制链接",
-  "05cf59d40e17ba63": "已请求我审查",
   "e369d7ce5ff36689": "我创建的",
   "87d943aa8f91b9a2": "其他",
   "e8c320d314d151e9": "我审查的",
@@ -8494,7 +8577,7 @@
   "58e0e226493150e7": "无法加载 issue 跟踪器",
   "77cfcbde543df32d": "切换 {tracker} 详情",
   "0083f65885c60156": "断开 {tracker} 连接",
-  "15ad0159a826b290": "选择 {tracker} {scope}，每个项目会在其仓库自身的 issue 旁列出它的 issue。",
+  "afcceb67b2fb0e78": "Pick the {tracker} {scope} whose issues each project lists beside its repository's own, or all of them.",
   "19c2d5e81ff8f89a": "{project} 的 {tracker} {scope}",
   "68e061510b765772": "未绑定",
   "a2d95d39d3398bda": "凭据被拒绝",
@@ -8849,7 +8932,6 @@
   "d0eb21be71904f84": "备用模型",
   "ebcfd96d4b112b4e": "无",
   "9db5fe9e87e35e10": "未保存备用模型",
-  "78f82fef9e0c8661": "仓库",
   "b0c77717b7d7b4a3": "新会话",
   "3dee662c2b837a30": "此项目新会话的权限。",
   "b886096e397a9d88": "新会话的默认权限。项目可以覆盖此设置。",
@@ -8903,6 +8985,50 @@
   "cd2acbace965052d": "一个或两个字母或数字。",
   "fc10b8da35c8560e": "或粘贴任意表情",
   "4051af9bdf152942": "保存图标",
+  "b776c726218f207a": "Use letters, numbers, dots, dashes or underscores for the folder name.",
+  "574ac3158d582204": "Enter the path of the repository's clone.",
+  "9e855ee00c29c3fe": "A repository with that folder name is already listed.",
+  "685ed573591d62f9": "At most {count} repositories.",
+  "66d75342c0ae3440": "Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine.",
+  "4530ce3527c51027": "Folder name",
+  "ae6222def282042d": "Repository folder name",
+  "5cf326b79ab97f90": "Repository path",
+  "60a0b5a50cecac53": "default branch",
+  "13809f9ebc667814": "Repository base branch",
+  "4ac5cd2b0195bc92": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repository"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repositories"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "587ea3963f450915": "Add",
   "d79d3cfdd7864be5": "无法保存分组规则",
   "b76e857a764ea02a": "{environment} 上 {path} 的分组规则",
   "e6e55f343639ae71": "默认（{mode}）",
@@ -9759,6 +9885,7 @@
   "51497bd401292062": "长按",
   "9d6cc6ac23312071": "连按两次",
   "f001fa7b329c8fbf": "隐藏成功的调用",
+  "ad208e3e32c85029": "全部隐藏",
   "c80e4bb3201efd71": "专注模式",
   "0cb9ffcd1fb46b0c": "仅状态",
   "cf0f7fc3df26fa75": "状态和消息",
@@ -9968,6 +10095,7 @@
   "573ea5fdf293a9d6": "所有工作副本",
   "470ad8c54049d1e1": "搜索工作副本",
   "7e2dfdd9f97fc027": "项目范围",
+  "1cf216566c1ee064": "不可用的项目",
   "c1b8c351aa90f319": [
     {
       "t": "span",
@@ -11168,6 +11296,10 @@
     },
     " 项"
   ],
+  "989778b3baacd22c": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
+  "95840464ec4de5da": "Reset prompt to run on settle",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
   "42d843f45e1de53b": "追加到新建或重新生成会话标题的提示词中。",
   "169d0ed4364b4644": "重置会话标题说明为默认值",
   "f307391eb1c5c9d7": "标题保持简短，开头点明主题。",
@@ -11568,6 +11700,7 @@
   "4820900255bdc17b": "测试 语音 模型 转写 识别",
   "582c604a40a4548a": "侧边栏 不活跃 天数 无活动 自动",
   "a5ff7e3accfdebf2": "claude 上下文 压缩 空闲 缓存 token 用量 摘要 恢复",
+  "842b7531971d172e": "prompt instructions message skill settle cleanup",
   "cb147525a3215d7c": "PR 合并 关闭 自动 侧边栏",
   "6fee244945243134": "PR 不活跃 自动收尾 合并 关闭 侧边栏",
   "f1122dcb3209f91b": "会话 超时 活动 侧边栏",
@@ -11733,6 +11866,81 @@
   "27727bda79d97ffa": "只能将文件夹添加为项目",
   "eb9f51eb8bd8a43c": "将文件拖入会话即可添加附件。",
   "671a8b8ab44e83e2": "拖入文件夹以添加项目",
+  "c3de2207ecbc8402": [
+    "Keeping this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake. Click to let it sleep."
+  ],
+  "cd5c435f0fb5e437": [
+    "Keep this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake"
+  ],
+  "7c9a2f64affedc8f": "Could not restart {product}",
+  "2277915b6002c7b4": "Restart failed.",
+  "1ebd12f79d4c7f51": "New code pulled · Restart",
+  "e2ca7c0bbd920d9c": "No threads are running.",
+  "da5e7f678540b5f3": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "singular": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "This running thread will be interrupted. ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " tries to resume it after the restart."
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "These ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " running threads will be interrupted.",
+            " ",
+            {
+              "i": 4,
+              "k": "_gt_value_4",
+              "v": "v"
+            },
+            " tries to resume them after the restart."
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "c434b7d2266cc277": [
+    "Restart ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to apply pulled code?"
+  ],
+  "b588530db06f58ad": "Later",
+  "4c0fe26a3113568e": "Restart now",
   "3134603052b8f460": "，需要你处理",
   "18fc8976ddb6783d": "，失败",
   "10ae251c9435642b": "，已完成",

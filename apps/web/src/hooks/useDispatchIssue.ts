@@ -17,6 +17,7 @@ import {
 } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { msg } from "gt-react";
 
 import { offHeadPullRequestCheckoutToast } from "~/components/pullRequest/pullRequestCheckoutToast";
 import { checkoutFailureDescription } from "~/components/pullRequest/pullRequestDetail.logic";
@@ -29,6 +30,7 @@ import {
   worktreeBase,
 } from "~/components/issues/issueDispatch.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { m } from "~/i18n/messages";
 import { newMessageId, newThreadId } from "~/lib/utils";
 import {
   providerInstanceEntriesFor,
@@ -50,7 +52,9 @@ import { usePullRequestLinking } from "./usePullRequestLinking";
 import { useEnvironmentSettings } from "./useSettings";
 
 const errorMessage = (error: unknown) =>
-  error instanceof Error && error.message.trim().length > 0 ? error.message : "An error occurred.";
+  error instanceof Error && error.message.trim().length > 0
+    ? error.message
+    : m(msg("An error occurred."));
 
 function fail(title: string, description: string): false {
   toastManager.add(stackedThreadToast({ type: "error", title, description }));
@@ -192,7 +196,8 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         createdAt,
       },
     });
-    if (started._tag === "Failure") return reportFailure(started, "Could not start the agent");
+    if (started._tag === "Failure")
+      return reportFailure(started, m(msg("Could not start the agent")));
     const threadRef = scopeThreadRef(environmentId, threadId);
     await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(threadRef) });
     return threadRef;
@@ -206,14 +211,26 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       input: { cwd: project.workspaceRoot, limit: 100, includeMatchingRemoteRefs: true },
     });
     if (refs._tag === "Failure")
-      return reportFailure(refs, "Could not read the project's branches");
+      return reportFailure(refs, m(msg("Could not read the project's branches")));
     if (!refs.value.isRepo) {
-      return fail("Cannot dispatch", `${project.title} is not a git repository.`);
+      return fail(
+        m(msg("Cannot dispatch")),
+        m(msg("{project} is not a git repository.", { project: project.title })),
+      );
     }
     // Branching from a guessed base could start the work on the wrong history.
     return (
       worktreeBase(refs.value.refs) ??
-      fail("Cannot dispatch", `${project.title} has no default, main or master branch.`)
+      fail(
+        m(msg("Cannot dispatch")),
+        m(
+          msg("{project} has no default, {main} or {master} branch.", {
+            project: project.title,
+            main: "main",
+            master: "master",
+          }),
+        ),
+      )
     );
   };
 
@@ -227,7 +244,8 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
     const modelSelection = modelFor(project, picked);
-    if (modelSelection === null) return fail("Cannot dispatch", "No model is available.");
+    if (modelSelection === null)
+      return fail(m(msg("Cannot dispatch")), m(msg("No model is available.")));
     try {
       const base = await baseFromRefs(project);
       if (base === false) return false;
@@ -259,12 +277,16 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         moveToStarted(detail),
       ]);
       if (linked._tag === "Failure") {
-        reportFailure(linked, "The agent started, but the issue is not linked to it", "warning");
+        reportFailure(
+          linked,
+          m(msg("The agent started, but the issue is not linked to it")),
+          "warning",
+        );
       }
       if (moved) refreshIssueLists(environmentId);
       return true;
     } catch (error) {
-      return fail("Could not dispatch the issue", errorMessage(error));
+      return fail(m(msg("Could not dispatch the issue")), errorMessage(error));
     }
   };
 
@@ -284,13 +306,22 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       },
     });
     if (moved._tag === "Failure") {
-      reportFailure(moved, `Could not move ${detail.displayKey} to ${target.name}`, "warning");
+      reportFailure(
+        moved,
+        m(
+          msg("Could not move {issue} to {state}", {
+            issue: detail.displayKey,
+            state: target.name,
+          }),
+        ),
+        "warning",
+      );
       return false;
     }
     toastManager.add(
       stackedThreadToast({
         type: "success",
-        title: `Moved ${detail.displayKey} to ${target.name}`,
+        title: m(msg("Moved {issue} to {state}", { issue: detail.displayKey, state: target.name })),
       }),
     );
     return true;
@@ -301,7 +332,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     readEnvironmentScope(environmentId, AuthSourceControlWriteScope) &&
     readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)
       ? null
-      : "This connection cannot check out pull requests or start threads.";
+      : msg("This connection cannot check out pull requests or start threads.");
 
   /**
    * Starts a read-only review agent on a pull request: checks out its head in a worktree of
@@ -313,9 +344,10 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
     picked: ModelSelection | null = null,
   ): Promise<boolean> => {
     const blocked = reviewBlockedReason();
-    if (blocked !== null) return fail("Cannot start the review", blocked);
+    if (blocked !== null) return fail(m(msg("Cannot start the review")), m(blocked));
     const modelSelection = modelFor(project, picked);
-    if (modelSelection === null) return fail("Cannot start the review", "No model is available.");
+    if (modelSelection === null)
+      return fail(m(msg("Cannot start the review")), m(msg("No model is available.")));
     try {
       const prepared = await preparePullRequestThread({
         environmentId,
@@ -323,7 +355,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       });
       if (prepared._tag === "Failure") {
         return fail(
-          "Could not check out the pull request",
+          m(msg("Could not check out the pull request")),
           checkoutFailureDescription(
             isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
           ),
@@ -342,6 +374,7 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
       const threadRef = await launch({
         project,
         modelSelection,
+        // oxlint-disable-next-line t3code/no-untranslated-copy -- The thread title is also sent as the agent turn title seed.
         title: `Review #${pr.number} ${pr.title}`,
         text: buildReviewPrompt(pr),
         worktree: { kind: "existing", branch, worktreePath },
@@ -351,14 +384,14 @@ export function useDispatchIssue(environmentId: EnvironmentId) {
         toastManager.add(
           stackedThreadToast({
             type: "warning",
-            title: "The review started, but the pull request is not linked to it",
+            title: m(msg("The review started, but the pull request is not linked to it")),
             description: errorMessage(error),
           }),
         );
       });
       return true;
     } catch (error) {
-      return fail("Could not start the review", errorMessage(error));
+      return fail(m(msg("Could not start the review")), errorMessage(error));
     }
   };
 

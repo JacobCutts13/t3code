@@ -60,8 +60,13 @@ export function createIssueTrackerEnvironmentAtoms<R, E>(
 }
 
 /** The binding choice that gives a project every one of the tracker's scopes. */
-export function issueTrackerAllScopesLabel(tracker: IssueTrackerConnection): string {
-  return `All ${tracker.scopeNoun}s`;
+export function issueTrackerAllScopesLabel(
+  tracker: IssueTrackerConnection,
+  resolve: MFunctionType = mFallback,
+): string {
+  return tracker.scopeNoun === "team"
+    ? resolve(msg("All teams"))
+    : resolve(msg("All {scopes}", { scopes: `${tracker.scopeNoun}s` }));
 }
 
 // Tracker packages name their credential and scope in English, so a sentence is translated only

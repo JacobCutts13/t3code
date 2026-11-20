@@ -135,8 +135,8 @@ const SORT_OPTIONS = [
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<IssueListSort>>;
 
 const REACH_OPTIONS = [
-  { value: "projects", label: "My projects", Icon: FolderIcon },
-  { value: "everywhere", label: "All repositories", Icon: GlobeIcon },
+  { value: "projects", label: msg("My projects"), Icon: FolderIcon },
+  { value: "everywhere", label: msg("All repositories"), Icon: GlobeIcon },
 ] as const satisfies ReadonlyArray<PullRequestFilterOption<"projects" | "everywhere">>;
 
 const PAGE_SIZE = 50;
@@ -735,7 +735,7 @@ export function IssuesPage() {
                   }
                 />
                 <PullRequestCompactFilterMenu
-                  label="Which repositories"
+                  label={gt("Which repositories")}
                   triggerIcon={
                     search.everywhere ? (
                       <GlobeIcon aria-hidden className="size-4" />
@@ -743,10 +743,10 @@ export function IssuesPage() {
                       <FolderIcon aria-hidden className="size-4" />
                     )
                   }
-                  triggerLabel={search.everywhere ? "All repositories" : "My projects"}
+                  triggerLabel={resolve(REACH_OPTIONS[search.everywhere ? 1 : 0].label)}
                   outlined
                   value={search.everywhere ? "everywhere" : "projects"}
-                  options={REACH_OPTIONS}
+                  options={resolveFilterOptions(REACH_OPTIONS, resolve)}
                   onChange={(reach) =>
                     updateSearch({ everywhere: reach === "everywhere" ? true : undefined })
                   }

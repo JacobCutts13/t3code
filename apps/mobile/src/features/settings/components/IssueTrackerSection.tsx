@@ -216,6 +216,7 @@ export function IssueTrackerProjectRows(props: {
   readonly disabled: boolean;
 }) {
   const gt = useGT();
+  const messages = useMessages();
   const { environmentId, tracker } = props;
   const bind = useAtomCommand(issueTrackerEnvironment.bindProject, {
     label: `bind project to ${tracker.displayName}`,
@@ -256,7 +257,7 @@ export function IssueTrackerProjectRows(props: {
           },
           {
             id: ALL_ISSUE_SCOPES,
-            title: issueTrackerAllScopesLabel(tracker),
+            title: issueTrackerAllScopesLabel(tracker, messages),
             state: value === ALL_ISSUE_SCOPES ? "on" : "off",
             attributes: { disabled: locked },
           },
@@ -277,7 +278,7 @@ export function IssueTrackerProjectRows(props: {
             value === UNBOUND
               ? gt("Not bound")
               : value === ALL_ISSUE_SCOPES
-                ? issueTrackerAllScopesLabel(tracker)
+                ? issueTrackerAllScopesLabel(tracker, messages)
                 : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)
           }
           disabled={locked}

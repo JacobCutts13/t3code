@@ -9,6 +9,7 @@ import type {
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { visibleThreadPullRequests } from "@t3tools/client-runtime/thread-pull-requests";
 import * as Schema from "effect/Schema";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { PlayIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -41,9 +42,8 @@ import {
 import type { PullRequestRowTarget } from "./PullRequestRow";
 import { reviewRequestKey } from "./pullRequestList.logic";
 
-const CHOOSE_PROJECT = "Choose a project to review this pull request in";
-const START_REVIEW = "Start a read-only review agent on this pull request";
-const OPEN_ON_GITHUB = openOnHostLabel(sourceControlClients.get("github"));
+const CHOOSE_PROJECT = msg("Choose a project to review this pull request in");
+const START_REVIEW = msg("Start a read-only review agent on this pull request");
 
 // Per environment: the project each repository's review requests were last dispatched into.
 const PickedProjectsSchema = Schema.Record(Schema.String, Schema.String);
@@ -137,6 +137,9 @@ export function PullRequestReviewRequests(props: {
   } | null;
   readonly onOpen: (target: PullRequestRowTarget) => void;
 }) {
+  const gt = useGT();
+  const resolve = useMessages();
+  const openOnGitHub = openOnHostLabel(sourceControlClients.get("github"), resolve);
   const { environmentId, state } = props;
   const { readProjectOf } = useReviewDispatch(environmentId, state);
   // The thread each pull request is linked to; a review dispatch links its PR to the new thread.
@@ -170,7 +173,7 @@ export function PullRequestReviewRequests(props: {
   return (
     <div className="space-y-0.5">
       <PullRequestGroupHeader
-        group={{ key: "reviewRequested", label: "Review requested" }}
+        group={{ key: "reviewRequested", label: gt("Review requested") }}
         count={entries.length}
       />
       {props.error === null ? null : (
@@ -213,8 +216,11 @@ export function PullRequestReviewRequests(props: {
                       inRow
                       url={pr.url}
                       label={`#${pr.number}`}
-                      openLabel={OPEN_ON_GITHUB}
-                      ariaLabel={`Open #${pr.number} on GitHub`}
+                      openLabel={openOnGitHub}
+                      ariaLabel={gt("Open #{number} on {host}", {
+                        number: pr.number,
+                        host: "GitHub",
+                      })}
                       className={PULL_REQUEST_ROW_NUMBER_CLASS}
                     />
                   }
@@ -251,7 +257,7 @@ export function PullRequestReviewRequests(props: {
                   <Badge
                     variant="info"
                     size="sm"
-                    title="A review thread is already open for this pull request"
+                    title={gt("A review thread is already open for this pull request")}
                     render={
                       <Link
                         to="/$environmentId/$threadId"
@@ -259,7 +265,7 @@ export function PullRequestReviewRequests(props: {
                       />
                     }
                   >
-                    Dispatched
+                    <T context="status of a review assigned to an agent">Dispatched</T>
                   </Badge>
                 )}
                 <PullRequestReviewButton
@@ -275,7 +281,7 @@ export function PullRequestReviewRequests(props: {
       </ul>
       {props.truncated ? (
         <p className="px-3 pt-1 text-muted-foreground text-xs">
-          Showing the most recently updated review requests.
+          <T>Showing the most recently updated review requests.</T>
         </p>
       ) : null}
     </div>
@@ -290,6 +296,7 @@ export function PullRequestReviewButton(props: {
   /** Opens the pull request's dispatch bar, where a project is chosen when none matches. */
   readonly onChooseProject: () => void;
 }) {
+  const resolve = useMessages();
   const { projectOf, readProjectOf, reviewBlockedReason, blockedReason, review } =
     useReviewDispatch(props.environmentId, props.state);
   const dispatching = props.state.dispatchingKeys.has(reviewRequestKey(props.pr));
@@ -304,11 +311,11 @@ export function PullRequestReviewButton(props: {
       size="compact"
       variant="outline"
       disabled={dispatching || blocked !== null}
-      title={blocked ?? (chooseProject ? CHOOSE_PROJECT : START_REVIEW)}
+      title={resolve(blocked ?? (chooseProject ? CHOOSE_PROJECT : START_REVIEW))}
       onClick={chooseProject ?? (() => void review(props.pr))}
     >
       {dispatching ? <Spinner /> : <PlayIcon />}
-      Review
+      <T context="verb, start a pull request review">Review</T>
     </Button>
   );
 }
@@ -319,6 +326,8 @@ export function PullRequestReviewDispatchBar(props: {
   readonly state: ReviewDispatchState;
   readonly pr: ReviewRequestSummary;
 }) {
+  const gt = useGT();
+  const resolve = useMessages();
   const { environmentId, state, pr } = props;
   const { projects, projectOf, modelFor, blockedReason, review, chooseProject } = useReviewDispatch(
     environmentId,
@@ -337,10 +346,15 @@ export function PullRequestReviewDispatchBar(props: {
             if (typeof value === "string") chooseProject(pr, value);
           }}
         >
-          <SelectTrigger size="sm" className="min-w-0" aria-label="Project">
+          <SelectTrigger
+            size="sm"
+            className="min-w-0"
+            aria-label={gt("Project", { $context: "noun, project selection" })}
+          >
             <SelectValue>
               {(value: string | null) =>
-                projects.find((candidate) => candidate.id === value)?.title ?? "Choose a project"
+                projects.find((candidate) => candidate.id === value)?.title ??
+                gt("Choose a project")
               }
             </SelectValue>
           </SelectTrigger>
@@ -365,9 +379,9 @@ export function PullRequestReviewDispatchBar(props: {
       <Button
         type="button"
         size="icon"
-        aria-label="Start review"
+        aria-label={gt("Start review")}
         disabled={dispatching || blocked !== null}
-        title={blocked ?? START_REVIEW}
+        title={resolve(blocked ?? START_REVIEW)}
         onClick={() => void review(pr)}
       >
         {dispatching ? <Spinner /> : <PlayIcon />}

@@ -6,6 +6,7 @@
   "422ced5cda40580e": "기준 브랜치 가져오기",
   "47e6147265a28164": "파일 체크아웃",
   "4735345a111c1581": "하위 모듈 초기화",
+  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "설정 스크립트 실행",
   "cbbdd0430fbe5fea": "에이전트 시작",
   "2a918ed2e51ab64a": "연결 중",
@@ -680,6 +681,8 @@
   "f0ab079175905bbb": "커밋, 푸시 및 {shortLabel} 만들기",
   "8360d689ebc7f829": "기본 브랜치에서 푸시하고 {shortLabel}을(를) 만들까요?",
   "daa408bb99d21d18": "{kind, select, pr {이 작업은 \"{branch}\"에서 로컬 커밋을 푸시하고 PR을 만듭니다. 이 브랜치에서 계속하거나 기능 브랜치를 만들어 거기서 같은 작업을 실행할 수 있습니다.} mr {이 작업은 \"{branch}\"에서 로컬 커밋을 푸시하고 MR을 만듭니다. 이 브랜치에서 계속하거나 기능 브랜치를 만들어 거기서 같은 작업을 실행할 수 있습니다.} generic {이 작업은 \"{branch}\"에서 로컬 커밋을 푸시하고 변경 요청을 만듭니다. 이 브랜치에서 계속하거나 기능 브랜치를 만들어 거기서 같은 작업을 실행할 수 있습니다.} other {이 작업은 \"{branch}\"에서 로컬 커밋을 푸시하고 {changeRequest}을(를) 만듭니다. 이 브랜치에서 계속하거나 기능 브랜치를 만들어 거기서 같은 작업을 실행할 수 있습니다.}}",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "이 호스트의 이슈는 아직 탐색할 수 없습니다.",
   "2f4a47129f89fe22": "연결되지 않았습니다. 이슈 목록을 보려면 개인 API 키를 추가하세요.",
   "024baab60525a419": "저장된 자격 증명이 거부되었습니다.",
@@ -1735,6 +1738,8 @@
   "264d9bfa6806e746": "디스크의 폴더 탐색",
   "91a9b3a0e9de0821": "새 프로젝트",
   "39f5441d281288ae": "이름으로 새 Git 저장소 시작",
+  "2360ad0503c2a0a8": "Choose repositories",
+  "de627bd002dfeaa2": "Pick one or several repositories on this machine",
   "298a89c7f047146f": "{source} 저장소",
   "31ee8679b5c7b22b": "원격 URL에서 복제",
   "7d16bbddb4ffae49": "{source} {hint} 복제",
@@ -1751,6 +1756,8 @@
   "3f581e98c86df72a": "프로젝트 없이 새 스레드",
   "e510d9a7b684fbfe": "이슈 분류",
   "cce3d80a2ddf1125": "에이전트가 T3 Code 문제를 조사하고 이슈 작성을 돕습니다",
+  "e42e93b205979d43": "Keep this {product} awake",
+  "5f78ad1f76e0b76a": "Let this {product} sleep",
   "44e13c9deb30e03c": "현재 스레드에서 찾기",
   "2a5cc71a171eca12": "브라우저 페이지에서 찾기",
   "f496ce44f0581269": "프롬프트 링크 복사",
@@ -1780,7 +1787,6 @@
   "0c659f9a193255dd": "프로젝트를 추가하지 못했습니다",
   "4b3fc098d5a08a66": "Windows 형식 경로는 Windows에서만 지원됩니다.",
   "2c2637dc1e236fb4": "상대 경로를 사용하려면 활성 프로젝트가 필요합니다.",
-  "87f84b811a6aa0d1": "프로젝트 보관을 해제하지 못했습니다",
   "e823121dffeff02d": "프로젝트를 열지 못했습니다",
   "d235610ec49f6c81": "프로젝트를 추가할 수 없음",
   "110790fd779efb2e": "이 연결로는 프로젝트를 추가할 수 없습니다.",
@@ -1891,6 +1897,35 @@
   "af63f05ed2f5eeb3": "거부",
   "b735bab216b27041": "기기를 거부할 수 없습니다",
   "4672f332c89dbcd9": "검토",
+  "b6328139d1a74290": "Search repositories",
+  "fbe0baad806d20dd": "Search repositories…",
+  "78f82fef9e0c8661": "저장소",
+  "2ccc25027e4514d4": "Create project from repositories",
+  "05025c6ff0322c66": "Selected",
+  "3bfb60e70a436a55": "Repos",
+  "f77f96288bff35f1": "Looking for repositories…",
+  "74612f29140bd882": "Could not read your repositories folder.",
+  "46a40c006b683968": [
+    "No git repositories found in ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "."
+  ],
+  "14a7f0c2c44e0c83": "No other repositories match.",
+  "031d9bdae1628c2f": "No repositories match.",
+  "831dc75421758cf6": "Pick one repository, or several to work across them.",
+  "22677711c1725aa9": [
+    "Opens ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ca8291e195a9d40d": "Save",
   "913fc23f62321556": "미래의 유효한 날짜와 시간을 선택하세요.",
   "9485a52216cfc0d5": "양수 기간을 입력하세요.",
   "9bc551235d78e133": "예약 유형",
@@ -2615,6 +2650,9 @@
   "b4daab4983e50891": "{kind} {label} 열기: {title}",
   "c5d4a1b01d27c81d": "이미지 첨부 파일, {name}, {size}",
   "baa023ab89b1e31f": "사용할 수 없는 컨텍스트, {label}",
+  "8381d91a6f32c485": "Up to {count} repositories can share a project.",
+  "ae27096d86ce264d": "{name} can't be combined with other repositories: its folder name has characters that aren't allowed.",
+  "63b3795342909720": "A repository named {name} is already selected; both would use the same folder.",
   "52a44f36200620d5": "이 설치는 올바른 아키텍처를 사용하고 있습니다.",
   "007ab0ba4a0318eb": "이 Mac은 Apple Silicon을 사용하지만 T3 Code는 아직 Rosetta에서 Intel 빌드로 실행 중입니다. 사용 가능한 업데이트를 다운로드하여 네이티브 Apple Silicon 빌드로 전환하세요.",
   "0fe3e0e043327f70": "이 Mac은 Apple Silicon을 사용하지만 T3 Code는 아직 Rosetta에서 Intel 빌드로 실행 중입니다. 다운로드한 Apple Silicon 빌드를 설치하려면 다시 시작하세요.",
@@ -2792,15 +2830,34 @@
   "8f109e64ea66ebaf": "텍스트를 클립보드에 복사하지 못했습니다.",
   "3444fc0e046baae6": "텍스트를 읽는 중 클립보드 API를 사용할 수 없습니다.",
   "ec2160de6dd9c8d3": "클립보드에서 텍스트를 읽지 못했습니다.",
+  "051aa49cc467ab54": "This connection cannot change settings, which a multi-repository project needs.",
+  "3a732730d719d7be": "프로젝트를 만들 수 없습니다",
+  "67f5329a73abedf5": "Project created without its repositories",
+  "b22bd3ee9a8cef4a": "{error} Add them in Settings → Projects → Repositories. The project is in {path}.",
+  "ea9d3702a5a5a656": "Could not start the agent",
+  "146f0cbfefe5de6c": "Could not read the project's branches",
+  "a0292984d4944524": "Cannot dispatch",
+  "2fe96a4db827dd2c": "{project} is not a git repository.",
+  "679de589ae618ead": "{project} has no default, {main} or {master} branch.",
+  "7c657f65894a1551": "No model is available.",
+  "571d6d900f877b96": "The agent started, but the issue is not linked to it",
+  "ac8926ba1f2bc251": "Could not dispatch the issue",
+  "d7cfc82db1a3e989": "Could not move {issue} to {state}",
+  "d76590a3cd539556": "Moved {issue} to {state}",
+  "5252c56656816d8f": "This connection cannot check out pull requests or start threads.",
+  "714c5e26d6937154": "Cannot start the review",
+  "0575f480be141b75": "Could not check out the pull request",
+  "65290c3d43702628": "The review started, but the pull request is not linked to it",
+  "310f2ad52b5cfb74": "Could not start the review",
   "433bd7a75c28a858": "{label} 저장소를 만들 수 없습니다",
   "181a251357eeca66": "{error} 다시 시도하려면 Git 메뉴에서 저장소 게시를 사용하세요.",
   "fc6379bdbd00c0a3": "{label}에 게시됨",
-  "3a732730d719d7be": "프로젝트를 만들 수 없습니다",
   "3ca310078cbcad3a": "{name} 생성됨",
   "4d914be9dfe6b924": "첫 커밋 없이 {name} 생성됨",
   "01c37ddc7489a372": "{error} 프로젝트는 {path}에 있습니다.",
   "22beed0f82b431e3": "{error} 이 클라이언트가 동기화되면 사이드바에 표시됩니다.",
   "ee8d5e90fd58f838": "T3 Code에서 프로젝트를 추가할 수 없습니다.",
+  "87f84b811a6aa0d1": "프로젝트 보관을 해제하지 못했습니다",
   "138dd2315e3b4853": "선택한 환경에 연결한 후 다시 시도하세요.",
   "dc8fdfd5ac8c8080": "{environment}을(를) 연결한 후 다시 시도하세요.",
   "6c2742bb85832341": "현재 환경의 {title}",
@@ -2990,6 +3047,8 @@
   "c646366e142ba05f": "데스크톱 WSL 상태를 사용할 수 없습니다.",
   "228dcd284ea651b3": "WSL 상태를 불러오지 못했습니다.",
   "b08d105dd2553f8d": "데스크톱 앱에 프로젝트가 나타나지 않았습니다.",
+  "299ba3cc40f25d34": "Could not change keep awake",
+  "f75e52884e1c6016": "{command} failed.",
   "7a4b3f3b83e121d7": "{organization}에서 익명 사용 데이터를 껐습니다.",
   "d85822b18e9475df": "{organization}에서 관리합니다.",
   "a6dd531d58080010": "릴리스를 확인하려면 이 서버에 연결하세요.",
@@ -5761,14 +5820,13 @@
   "b6a29fff7c7c0808": "없음",
   "54420465784bb1bd": "이전 댓글 불러오기",
   "9d82ebf35bfb4043": "아직 활동이 없습니다.",
-  "1cf216566c1ee064": "사용할 수 없는 프로젝트",
   "b5ddadeb0810688c": "상태",
   "93c1fc19d9bf1db0": "참여",
   "d5a8b335d88b65bc": "{hidden}개 숨김",
   "2160067266a61dd8": "전체",
   "cd4ec4acf33c65b9": "{count, plural, other {레이블 {count}개}}",
   "bfd20acb8b7dee6b": "모든 사람",
-  "ad208e3e32c85029": "모두 숨기기",
+  "aead644e2cf1233f": "모두 표시",
   "77ce79d865716719": "일치하는 프로젝트가 없습니다.",
   "af7eb4f9c7f0f575": "필터",
   "08247dd39b0c85ff": "담당자",
@@ -5778,6 +5836,8 @@
   "309a68dc21af399d": "모든 사람",
   "4dc86e84bb5ece63": "사용자 목록을 읽을 수 없습니다",
   "4103b6b8e0ff3f46": "여기에 표시된 것보다 사용자가 더 있습니다.",
+  "20b4665c78f801c3": "{host}에서 열기",
+  "b1de8d7f3882be82": "Open {key} on {host}",
   "4a9e547eda5a1d3b": "이슈 연결을 해제할 수 없습니다",
   "6672a18b56815053": "이슈를 연결할 수 없습니다",
   "a0295b5f63009ecf": "서버가 거부했습니다.",
@@ -5796,6 +5856,8 @@
   "5a9ffea109fc6990": "나를 멘션함",
   "844f6c8d82ecce5d": "최근 업데이트순",
   "f77af0fd4c6acea1": "최신순",
+  "de29c86c63983762": "My projects",
+  "04ea9e0e663983fd": "All repositories",
   "fc18975e50af8dca": "다음 페이지를 불러오지 못했습니다.",
   "283ada62d3847554": "{count, plural, other {프로젝트 {count}개}}",
   "7cae1b414ae74c6b": "지금은 이 트래커를 읽을 수 없습니다.",
@@ -5804,6 +5866,7 @@
   "86798f07ba2d7f4d": "이슈 검색",
   "6a96bfc102d57501": "이슈 정렬",
   "297613ddcf68d031": "정렬",
+  "76534fcb3e32b593": "Which repositories",
   "4aa8190ec693085e": "트래커별 필터",
   "d44aed6ee67982dd": "이슈 새로 고침",
   "df23678c28c56593": "모든 프로젝트가 숨겨져 있습니다",
@@ -5822,6 +5885,12 @@
   "c9cae7bac5f42342": "더 불러오기",
   "54f59582f641cbaf": "이슈",
   "01e7836447bcad93": "나에게 할당된 이슈",
+  "f4644f34c9822a58": "Project",
+  "a1125f8d6ad830ba": "A thread is already working on this issue",
+  "a4c77017c7f2b5b0": "Dispatch agent",
+  "190ba8a8e1d660c1": "Choose a project to dispatch into",
+  "df991a5fdcd9de7f": "Start an agent on this issue",
+  "48b67132109c59ec": "Dispatched",
   "3a883fbaed8d7561": "앱",
   "3cc7159b902f36ec": "액세스",
   "a6615c82020deb59": "연결",
@@ -6335,6 +6404,15 @@
   "4bc1f12855e979de": "생성됨",
   "01656e6237ddc437": "문서",
   "a5af81c2c8ccf1ad": "합계",
+  "5ba620ae7c2d50e1": [
+    "Open ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " repository"
+  ],
   "95e8b588059f0557": "풀 리퀘스트를 연결할 수 없습니다.",
   "ea2c2ff6c1eb88e2": "풀 리퀘스트 URL을 붙여 넣거나 123 / #123을 입력하세요.",
   "9a1333523444138c": "풀 리퀘스트 URL, 123 또는 #123을 사용하세요.",
@@ -6435,7 +6513,6 @@
   "64d0189be492147c": "검사 세부 정보를 열 수 없습니다",
   "600347ca50400a54": "검사를 불러오는 중…",
   "1b381201aba745c2": "보고된 검사 없음",
-  "aead644e2cf1233f": "모두 표시",
   "a6d75a4380173c60": "검사 열기: {summary}",
   "be3d1766bad18693": "검사: {summary}",
   "425e4a3d6c5c2867": "{count, plural, other {{count}개 실패}}",
@@ -6581,7 +6658,6 @@
   "981704551d2ae102": "승인할까요?",
   "2ce7f63137d8f7f8": "이 스레드의 풀 리퀘스트로 돌아가기",
   "ca287eb07dcd839a": "호스트에서 {term, select, mr {병합 요청} cr {변경 요청} other {풀 리퀘스트}} #{number} 열기",
-  "9e895407c233789c": "{repository} 저장소 열기",
   "2b55951478b71805": "풀 리퀘스트로 돌아가기",
   "efe5701992b34dfd": "다음 브랜치의 변경 사항을 받음",
   "26c22a87e8064697": "풀 리퀘스트 탭",
@@ -6799,6 +6875,15 @@
   "aa9c37471f4c56f8": "검토 요약",
   "5f08d5ed8c452a12": "검토 결과",
   "34be90d6d04cd895": "검토 제출",
+  "ee17be1338cdc0da": "Choose a project to review this pull request in",
+  "33a6b00aab266ce3": "Start a read-only review agent on this pull request",
+  "05cf59d40e17ba63": "검토 요청됨",
+  "df4e5cc71a4a389f": "Open #{number} on {host}",
+  "bf50c841aab5ee9b": "A review thread is already open for this pull request",
+  "07b8b9085965789b": "Start review",
+  "a9520f80d1d3df14": "Dispatched",
+  "4ef6e63f23d596d0": "Showing the most recently updated review requests.",
+  "d8755a58428606c2": "Review",
   "d8bf788c6eeda3f8": "이 저장소에는 여기에 표시된 것보다 많은 사람이 액세스할 수 있습니다. 나머지는 호스트에서 요청하세요.",
   "2ba475e878f12c1d": "이 저장소에는 여기에 표시된 것보다 많은 사람이 액세스할 수 있습니다. 검색하여 찾으세요.",
   "8ac0e36a3cc81224": "호스트 검색에 실패하여 이미 표시된 사람만 일치합니다. {error}",
@@ -7081,10 +7166,8 @@
   "56ec35afa660d970": "닫힘",
   "8007555939f933ca": "병합됨",
   "82abea3aaac37338": "호스트에서 열기",
-  "20b4665c78f801c3": "{host}에서 열기",
   "258d16c1554b734c": "링크 복사",
   "c3d96c942dc3125d": "링크를 복사할 수 없습니다",
-  "05cf59d40e17ba63": "검토 요청됨",
   "e369d7ce5ff36689": "작성함",
   "87d943aa8f91b9a2": "기타",
   "e8c320d314d151e9": "검토 중",
@@ -8437,7 +8520,7 @@
   "58e0e226493150e7": "이슈 트래커를 불러올 수 없습니다",
   "77cfcbde543df32d": "{tracker} 세부 정보 전환",
   "0083f65885c60156": "{tracker} 연결 끊기",
-  "15ad0159a826b290": "각 프로젝트가 저장소 자체 이슈와 함께 표시할 이슈의 {tracker} {scope}을(를) 선택하세요.",
+  "afcceb67b2fb0e78": "Pick the {tracker} {scope} whose issues each project lists beside its repository's own, or all of them.",
   "19c2d5e81ff8f89a": "{project}의 {tracker} {scope}",
   "68e061510b765772": "바인딩되지 않음",
   "a2d95d39d3398bda": "자격 증명 거부됨",
@@ -8792,7 +8875,6 @@
   "d0eb21be71904f84": "대체 모델",
   "ebcfd96d4b112b4e": "없음",
   "9db5fe9e87e35e10": "대체 모델이 저장되지 않았습니다",
-  "78f82fef9e0c8661": "저장소",
   "b0c77717b7d7b4a3": "새 스레드",
   "3dee662c2b837a30": "이 프로젝트의 새 스레드 권한입니다.",
   "b886096e397a9d88": "새 스레드의 기본 권한입니다. 프로젝트별로 재정의할 수 있습니다.",
@@ -8846,6 +8928,50 @@
   "cd2acbace965052d": "문자 또는 숫자 한두 개.",
   "fc10b8da35c8560e": "또는 이모지 붙여넣기",
   "4051af9bdf152942": "아이콘 저장",
+  "b776c726218f207a": "Use letters, numbers, dots, dashes or underscores for the folder name.",
+  "574ac3158d582204": "Enter the path of the repository's clone.",
+  "9e855ee00c29c3fe": "A repository with that folder name is already listed.",
+  "685ed573591d62f9": "At most {count} repositories.",
+  "66d75342c0ae3440": "Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine.",
+  "4530ce3527c51027": "Folder name",
+  "ae6222def282042d": "Repository folder name",
+  "5cf326b79ab97f90": "Repository path",
+  "60a0b5a50cecac53": "default branch",
+  "13809f9ebc667814": "Repository base branch",
+  "4ac5cd2b0195bc92": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repository"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repositories"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "587ea3963f450915": "Add",
   "d79d3cfdd7864be5": "그룹화 규칙을 저장할 수 없습니다",
   "b76e857a764ea02a": "{environment}의 {path} 그룹화 규칙",
   "e6e55f343639ae71": "기본값({mode})",
@@ -9699,6 +9825,7 @@
   "51497bd401292062": "길게 누르기",
   "9d6cc6ac23312071": "두 번 누르기",
   "f001fa7b329c8fbf": "성공한 항목 숨기기",
+  "ad208e3e32c85029": "모두 숨기기",
   "c80e4bb3201efd71": "Zen",
   "0cb9ffcd1fb46b0c": "상태만",
   "cf0f7fc3df26fa75": "상태 및 메시지",
@@ -9908,6 +10035,7 @@
   "573ea5fdf293a9d6": "모든 체크아웃",
   "470ad8c54049d1e1": "체크아웃 검색",
   "7e2dfdd9f97fc027": "프로젝트 범위",
+  "1cf216566c1ee064": "사용할 수 없는 프로젝트",
   "c1b8c351aa90f319": [
     {
       "t": "span",
@@ -11093,6 +11221,10 @@
     },
     "개 켜짐"
   ],
+  "989778b3baacd22c": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
+  "95840464ec4de5da": "Reset prompt to run on settle",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
   "42d843f45e1de53b": "새로 만들거나 다시 생성하는 스레드 제목의 프롬프트에 추가됩니다.",
   "169d0ed4364b4644": "스레드 제목 지침 기본값으로 재설정",
   "f307391eb1c5c9d7": "제목은 몇 단어로 작성하세요. 주요 주제로 시작하세요.",
@@ -11491,6 +11623,7 @@
   "4820900255bdc17b": "음성 모델 테스트 받아쓰기 인식",
   "582c604a40a4548a": "사이드바 비활성 일 활동 없음 자동",
   "a5ff7e3accfdebf2": "Claude 컨텍스트 압축 유휴 캐시 토큰 사용량 요약 재개",
+  "842b7531971d172e": "prompt instructions message skill settle cleanup",
   "cb147525a3215d7c": "풀 리퀘스트 병합 닫힘 자동 사이드바",
   "6fee244945243134": "풀 리퀘스트 비활성 자동 정리 병합 닫기 사이드바",
   "f1122dcb3209f91b": "스레드 시간 제한 활동 사이드바",
@@ -11656,6 +11789,81 @@
   "27727bda79d97ffa": "폴더만 프로젝트로 추가할 수 있습니다",
   "eb9f51eb8bd8a43c": "파일을 첨부하려면 스레드에 끌어다 놓으세요.",
   "671a8b8ab44e83e2": "프로젝트를 추가하려면 폴더를 끌어다 놓으세요",
+  "c3de2207ecbc8402": [
+    "Keeping this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake. Click to let it sleep."
+  ],
+  "cd5c435f0fb5e437": [
+    "Keep this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake"
+  ],
+  "7c9a2f64affedc8f": "Could not restart {product}",
+  "2277915b6002c7b4": "Restart failed.",
+  "1ebd12f79d4c7f51": "New code pulled · Restart",
+  "e2ca7c0bbd920d9c": "No threads are running.",
+  "da5e7f678540b5f3": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "singular": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "This running thread will be interrupted. ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " tries to resume it after the restart."
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "These ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " running threads will be interrupted.",
+            " ",
+            {
+              "i": 4,
+              "k": "_gt_value_4",
+              "v": "v"
+            },
+            " tries to resume them after the restart."
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "c434b7d2266cc277": [
+    "Restart ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to apply pulled code?"
+  ],
+  "b588530db06f58ad": "Later",
+  "4c0fe26a3113568e": "Restart now",
   "3134603052b8f460": ", 응답 필요",
   "18fc8976ddb6783d": ", 실패",
   "10ae251c9435642b": ", 완료",

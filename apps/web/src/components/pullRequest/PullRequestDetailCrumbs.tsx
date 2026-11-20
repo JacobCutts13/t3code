@@ -94,7 +94,6 @@ export function PullRequestDetailCrumbs({
   openOnHostText: string;
   onBack: (() => void) | undefined;
 }) {
-  const gt = useGT();
   const ready = detail !== null && toneClassName !== null;
   return (
     <div className="pl-4 grid h-7 min-w-0 items-center overflow-hidden">

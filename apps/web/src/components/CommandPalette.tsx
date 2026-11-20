@@ -1128,8 +1128,8 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: `action:add-project:${environmentId}:repos`,
       searchTerms: ["repositories", "repos", "multiple", "clone", "existing", "workspace"],
-      title: "Choose repositories",
-      description: "Pick one or several repositories on this machine",
+      title: gt("Choose repositories"),
+      description: gt("Pick one or several repositories on this machine"),
       icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
       run: async () => {
         setOpen(false);
@@ -1427,7 +1427,9 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:keep-awake",
       searchTerms: ["keep awake", "sleep", "caffeinate"],
-      title: turnOn ? "Keep this Mac awake" : "Let this Mac sleep",
+      title: turnOn
+        ? gt("Keep this {product} awake", { product: "Mac" })
+        : gt("Let this {product} sleep", { product: "Mac" }),
       icon: <CoffeeIcon className={ITEM_ICON_CLASS} />,
       run: () => setKeepAwake(turnOn),
     });

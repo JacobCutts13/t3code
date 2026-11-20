@@ -6,6 +6,7 @@
   "422ced5cda40580e": "Obtener la rama base",
   "47e6147265a28164": "Hacer checkout de archivos",
   "4735345a111c1581": "Inicializar submódulos",
+  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "Ejecutar script de configuración",
   "cbbdd0430fbe5fea": "Iniciar agente",
   "2a918ed2e51ab64a": "Conectando",
@@ -680,6 +681,8 @@
   "f0ab079175905bbb": "Commit, push y crear {shortLabel}",
   "8360d689ebc7f829": "¿Hacer push y crear {shortLabel} desde la rama predeterminada?",
   "daa408bb99d21d18": "{kind, select, pr {Esta acción hará push de los commits locales y creará una PR en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.} mr {Esta acción hará push de los commits locales y creará una MR en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.} generic {Esta acción hará push de los commits locales y creará una solicitud de cambios en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.} other {Esta acción hará push de los commits locales y creará {changeRequest} en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.}}",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "Todavía no se pueden explorar las issues de este host.",
   "2f4a47129f89fe22": "Sin conexión. Añade una clave de API personal para listar sus issues.",
   "024baab60525a419": "Se rechazó la credencial guardada.",
@@ -1736,6 +1739,8 @@
   "264d9bfa6806e746": "Explorar una carpeta del disco",
   "91a9b3a0e9de0821": "Nuevo proyecto",
   "39f5441d281288ae": "Crear un repositorio Git nuevo a partir de un nombre",
+  "2360ad0503c2a0a8": "Choose repositories",
+  "de627bd002dfeaa2": "Pick one or several repositories on this machine",
   "298a89c7f047146f": "Repositorio de {source}",
   "31ee8679b5c7b22b": "Clonar desde una URL remota",
   "7d16bbddb4ffae49": "Clonar {source} {hint}",
@@ -1752,6 +1757,8 @@
   "3f581e98c86df72a": "Nuevo hilo sin proyecto",
   "e510d9a7b684fbfe": "Analizar un problema",
   "cce3d80a2ddf1125": "Un agente investiga un problema de T3 Code y te ayuda a abrir una issue",
+  "e42e93b205979d43": "Keep this {product} awake",
+  "5f78ad1f76e0b76a": "Let this {product} sleep",
   "44e13c9deb30e03c": "Buscar en el hilo actual",
   "2a5cc71a171eca12": "Buscar en la página del navegador",
   "f496ce44f0581269": "Copiar enlace del prompt",
@@ -1781,7 +1788,6 @@
   "0c659f9a193255dd": "No se pudo añadir el proyecto",
   "4b3fc098d5a08a66": "Las rutas de estilo Windows solo son compatibles en Windows.",
   "2c2637dc1e236fb4": "Las rutas relativas requieren un proyecto activo.",
-  "87f84b811a6aa0d1": "No se pudo desarchivar el proyecto",
   "e823121dffeff02d": "No se pudo abrir el proyecto",
   "d235610ec49f6c81": "No se puede añadir el proyecto",
   "110790fd779efb2e": "Esta conexión no puede añadir proyectos.",
@@ -1891,6 +1897,35 @@
   "af63f05ed2f5eeb3": "Denegar",
   "b735bab216b27041": "No se pudo denegar el dispositivo",
   "4672f332c89dbcd9": "Revisar",
+  "b6328139d1a74290": "Search repositories",
+  "fbe0baad806d20dd": "Search repositories…",
+  "78f82fef9e0c8661": "Repositorios",
+  "2ccc25027e4514d4": "Create project from repositories",
+  "05025c6ff0322c66": "Selected",
+  "3bfb60e70a436a55": "Repos",
+  "f77f96288bff35f1": "Looking for repositories…",
+  "74612f29140bd882": "Could not read your repositories folder.",
+  "46a40c006b683968": [
+    "No git repositories found in ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "."
+  ],
+  "14a7f0c2c44e0c83": "No other repositories match.",
+  "031d9bdae1628c2f": "No repositories match.",
+  "831dc75421758cf6": "Pick one repository, or several to work across them.",
+  "22677711c1725aa9": [
+    "Opens ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ca8291e195a9d40d": "Save",
   "913fc23f62321556": "Elige una fecha y hora válidas en el futuro.",
   "9485a52216cfc0d5": "Introduce una duración positiva.",
   "9bc551235d78e133": "Tipo de programación",
@@ -2616,6 +2651,9 @@
   "b4daab4983e50891": "Abrir {kind} {label}: {title}",
   "c5d4a1b01d27c81d": "Imagen adjunta, {name}, {size}",
   "baa023ab89b1e31f": "Contexto no disponible, {label}",
+  "8381d91a6f32c485": "Up to {count} repositories can share a project.",
+  "ae27096d86ce264d": "{name} can't be combined with other repositories: its folder name has characters that aren't allowed.",
+  "63b3795342909720": "A repository named {name} is already selected; both would use the same folder.",
   "52a44f36200620d5": "Esta instalación usa la arquitectura correcta.",
   "007ab0ba4a0318eb": "Este Mac tiene Apple Silicon, pero T3 Code sigue ejecutando la versión para Intel con Rosetta. Descarga la actualización disponible para cambiar a la versión nativa para Apple Silicon.",
   "0fe3e0e043327f70": "Este Mac tiene Apple Silicon, pero T3 Code sigue ejecutando la versión para Intel con Rosetta. Reinicia para instalar la versión para Apple Silicon descargada.",
@@ -2793,15 +2831,34 @@
   "8f109e64ea66ebaf": "No se pudo copiar el texto al portapapeles.",
   "3444fc0e046baae6": "La API del portapapeles no está disponible al leer texto.",
   "ec2160de6dd9c8d3": "No se pudo leer el texto del portapapeles.",
+  "051aa49cc467ab54": "This connection cannot change settings, which a multi-repository project needs.",
+  "3a732730d719d7be": "No se pudo crear el proyecto",
+  "67f5329a73abedf5": "Project created without its repositories",
+  "b22bd3ee9a8cef4a": "{error} Add them in Settings → Projects → Repositories. The project is in {path}.",
+  "ea9d3702a5a5a656": "Could not start the agent",
+  "146f0cbfefe5de6c": "Could not read the project's branches",
+  "a0292984d4944524": "Cannot dispatch",
+  "2fe96a4db827dd2c": "{project} is not a git repository.",
+  "679de589ae618ead": "{project} has no default, {main} or {master} branch.",
+  "7c657f65894a1551": "No model is available.",
+  "571d6d900f877b96": "The agent started, but the issue is not linked to it",
+  "ac8926ba1f2bc251": "Could not dispatch the issue",
+  "d7cfc82db1a3e989": "Could not move {issue} to {state}",
+  "d76590a3cd539556": "Moved {issue} to {state}",
+  "5252c56656816d8f": "This connection cannot check out pull requests or start threads.",
+  "714c5e26d6937154": "Cannot start the review",
+  "0575f480be141b75": "Could not check out the pull request",
+  "65290c3d43702628": "The review started, but the pull request is not linked to it",
+  "310f2ad52b5cfb74": "Could not start the review",
   "433bd7a75c28a858": "No se pudo crear el repositorio de {label}",
   "181a251357eeca66": "{error} Usa Publicar repositorio en el menú de Git para volver a intentarlo.",
   "fc6379bdbd00c0a3": "Publicado en {label}",
-  "3a732730d719d7be": "No se pudo crear el proyecto",
   "3ca310078cbcad3a": "Se creó {name}",
   "4d914be9dfe6b924": "Se creó {name} sin un primer commit",
   "01c37ddc7489a372": "{error} El proyecto está en {path}.",
   "22beed0f82b431e3": "{error} Aparecerá en la barra lateral cuando este cliente se ponga al día.",
   "ee8d5e90fd58f838": "T3 Code no pudo añadir el proyecto.",
+  "87f84b811a6aa0d1": "No se pudo desarchivar el proyecto",
   "138dd2315e3b4853": "Conecta el entorno seleccionado y vuelve a intentarlo.",
   "dc8fdfd5ac8c8080": "Conecta {environment} y vuelve a intentarlo.",
   "6c2742bb85832341": "{title} en el entorno actual",
@@ -2991,6 +3048,8 @@
   "c646366e142ba05f": "El estado de WSL del escritorio no está disponible.",
   "228dcd284ea651b3": "No se pudo cargar el estado de WSL.",
   "b08d105dd2553f8d": "El proyecto no apareció en la app de escritorio.",
+  "299ba3cc40f25d34": "Could not change keep awake",
+  "f75e52884e1c6016": "{command} failed.",
   "7a4b3f3b83e121d7": "{organization} desactivó los datos de uso anónimos.",
   "d85822b18e9475df": "Gestionado por {organization}.",
   "a6dd531d58080010": "Conéctate a este servidor para comprobar las versiones.",
@@ -5780,14 +5839,13 @@
   "b6a29fff7c7c0808": "Nadie",
   "54420465784bb1bd": "Cargar comentarios anteriores",
   "9d82ebf35bfb4043": "Aquí no ha pasado nada todavía.",
-  "1cf216566c1ee064": "Proyecto no disponible",
   "b5ddadeb0810688c": "Estado",
   "93c1fc19d9bf1db0": "Participación",
   "d5a8b335d88b65bc": "{hidden} ocultos",
   "2160067266a61dd8": "Cualquiera",
   "cd4ec4acf33c65b9": "{count, plural, one {{count} etiqueta} other {{count} etiquetas}}",
   "bfd20acb8b7dee6b": "Cualquiera",
-  "ad208e3e32c85029": "Ocultar todo",
+  "aead644e2cf1233f": "Mostrar todo",
   "77ce79d865716719": "No hay proyectos que coincidan.",
   "af7eb4f9c7f0f575": "Filtros",
   "08247dd39b0c85ff": "Asignado",
@@ -5797,6 +5855,8 @@
   "309a68dc21af399d": "Cualquiera",
   "4dc86e84bb5ece63": "No se pudieron leer las personas",
   "4103b6b8e0ff3f46": "Hay más personas de las que se muestran aquí.",
+  "20b4665c78f801c3": "Abrir en {host}",
+  "b1de8d7f3882be82": "Open {key} on {host}",
   "4a9e547eda5a1d3b": "No se pudo desvincular la issue",
   "6672a18b56815053": "No se pudo vincular la issue",
   "a0295b5f63009ecf": "El servidor lo rechazó.",
@@ -5815,6 +5875,8 @@
   "5a9ffea109fc6990": "Que me mencionan",
   "844f6c8d82ecce5d": "Actualizadas recientemente",
   "f77af0fd4c6acea1": "Más recientes",
+  "de29c86c63983762": "My projects",
+  "04ea9e0e663983fd": "All repositories",
   "fc18975e50af8dca": "No se pudo cargar la página siguiente.",
   "283ada62d3847554": "{count, plural, one {{count} proyecto} other {{count} proyectos}}",
   "7cae1b414ae74c6b": "Ahora mismo no se puede leer este gestor de issues.",
@@ -5823,6 +5885,7 @@
   "86798f07ba2d7f4d": "Buscar issues",
   "6a96bfc102d57501": "Ordenar issues",
   "297613ddcf68d031": "Ordenar",
+  "76534fcb3e32b593": "Which repositories",
   "4aa8190ec693085e": "Filtrar por gestor de issues",
   "d44aed6ee67982dd": "Actualizar issues",
   "df23678c28c56593": "Todos los proyectos están ocultos",
@@ -5841,6 +5904,12 @@
   "c9cae7bac5f42342": "Cargar más",
   "54f59582f641cbaf": "Issues",
   "01e7836447bcad93": "Issues asignadas a mí",
+  "f4644f34c9822a58": "Project",
+  "a1125f8d6ad830ba": "A thread is already working on this issue",
+  "a4c77017c7f2b5b0": "Dispatch agent",
+  "190ba8a8e1d660c1": "Choose a project to dispatch into",
+  "df991a5fdcd9de7f": "Start an agent on this issue",
+  "48b67132109c59ec": "Dispatched",
   "3a883fbaed8d7561": "App",
   "3cc7159b902f36ec": "Acceso",
   "a6615c82020deb59": "Conectar",
@@ -6363,6 +6432,15 @@
   "4bc1f12855e979de": "Generados",
   "01656e6237ddc437": "Documentación",
   "a5af81c2c8ccf1ad": "Total",
+  "5ba620ae7c2d50e1": [
+    "Open ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " repository"
+  ],
   "95e8b588059f0557": "No se pudo vincular la pull request.",
   "ea2c2ff6c1eb88e2": "Pega la URL de una pull request o introduce 123 / #123.",
   "9a1333523444138c": "Usa una URL de pull request, 123 o #123.",
@@ -6463,7 +6541,6 @@
   "64d0189be492147c": "No se pueden abrir los detalles de la comprobación",
   "600347ca50400a54": "Cargando comprobaciones…",
   "1b381201aba745c2": "No se informó de ninguna comprobación",
-  "aead644e2cf1233f": "Mostrar todo",
   "a6d75a4380173c60": "Abrir comprobaciones: {summary}",
   "be3d1766bad18693": "Comprobaciones: {summary}",
   "425e4a3d6c5c2867": "{count, plural, one {{count} con errores} other {{count} con errores}}",
@@ -6607,7 +6684,6 @@
   "981704551d2ae102": "¿Confirmar la aprobación?",
   "2ce7f63137d8f7f8": "Volver a las pull requests de este hilo",
   "ca287eb07dcd839a": "Abrir la {term, select, mr {merge request} cr {solicitud de cambios} other {pull request}} #{number} en el host",
-  "9e895407c233789c": "Abrir el repositorio {repository}",
   "2b55951478b71805": "Volver a las pull requests",
   "efe5701992b34dfd": "recibe cambios de",
   "26c22a87e8064697": "Pestañas de la pull request",
@@ -6826,6 +6902,15 @@
   "aa9c37471f4c56f8": "Resumen de la revisión",
   "5f08d5ed8c452a12": "Veredicto de la revisión",
   "34be90d6d04cd895": "Enviar revisión",
+  "ee17be1338cdc0da": "Choose a project to review this pull request in",
+  "33a6b00aab266ce3": "Start a read-only review agent on this pull request",
+  "05cf59d40e17ba63": "Revisión solicitada",
+  "df4e5cc71a4a389f": "Open #{number} on {host}",
+  "bf50c841aab5ee9b": "A review thread is already open for this pull request",
+  "07b8b9085965789b": "Start review",
+  "a9520f80d1d3df14": "Dispatched",
+  "4ef6e63f23d596d0": "Showing the most recently updated review requests.",
+  "d8755a58428606c2": "Review",
   "d8bf788c6eeda3f8": "Este repositorio tiene más personas con acceso de las que aparecen aquí. Solicita al resto en el host.",
   "2ba475e878f12c1d": "Este repositorio tiene más personas con acceso de las que aparecen aquí. Busca para encontrarlas.",
   "8ac0e36a3cc81224": "Solo se buscan coincidencias entre las personas ya listadas: falló la búsqueda en el host. {error}",
@@ -7111,10 +7196,8 @@
   "56ec35afa660d970": "Cerrada",
   "8007555939f933ca": "Fusionada",
   "82abea3aaac37338": "Abrir en el host",
-  "20b4665c78f801c3": "Abrir en {host}",
   "258d16c1554b734c": "Copiar enlace",
   "c3d96c942dc3125d": "No se pudo copiar el enlace",
-  "05cf59d40e17ba63": "Revisión solicitada",
   "e369d7ce5ff36689": "Creadas por mí",
   "87d943aa8f91b9a2": "Otras",
   "e8c320d314d151e9": "Revisando",
@@ -8476,7 +8559,7 @@
   "58e0e226493150e7": "No se pudieron cargar los gestores de issues",
   "77cfcbde543df32d": "Mostrar u ocultar detalles de {tracker}",
   "0083f65885c60156": "Desconectar {tracker}",
-  "15ad0159a826b290": "Elige el {scope} de {tracker} cuyas issues lista cada proyecto junto a las de su propio repositorio.",
+  "afcceb67b2fb0e78": "Pick the {tracker} {scope} whose issues each project lists beside its repository's own, or all of them.",
   "19c2d5e81ff8f89a": "{scope} de {tracker} para {project}",
   "68e061510b765772": "Sin vincular",
   "a2d95d39d3398bda": "Credencial rechazada",
@@ -8831,7 +8914,6 @@
   "d0eb21be71904f84": "Modelo de respaldo",
   "ebcfd96d4b112b4e": "Ninguno",
   "9db5fe9e87e35e10": "No se guardó el modelo de respaldo",
-  "78f82fef9e0c8661": "Repositorios",
   "b0c77717b7d7b4a3": "Nuevos hilos",
   "3dee662c2b837a30": "Permisos para los nuevos hilos de este proyecto.",
   "b886096e397a9d88": "Permisos predeterminados para los nuevos hilos. Los proyectos pueden anularlos.",
@@ -8885,6 +8967,50 @@
   "cd2acbace965052d": "Una o dos letras o números.",
   "fc10b8da35c8560e": "O pega cualquier emoji",
   "4051af9bdf152942": "Guardar icono",
+  "b776c726218f207a": "Use letters, numbers, dots, dashes or underscores for the folder name.",
+  "574ac3158d582204": "Enter the path of the repository's clone.",
+  "9e855ee00c29c3fe": "A repository with that folder name is already listed.",
+  "685ed573591d62f9": "At most {count} repositories.",
+  "66d75342c0ae3440": "Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine.",
+  "4530ce3527c51027": "Folder name",
+  "ae6222def282042d": "Repository folder name",
+  "5cf326b79ab97f90": "Repository path",
+  "60a0b5a50cecac53": "default branch",
+  "13809f9ebc667814": "Repository base branch",
+  "4ac5cd2b0195bc92": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "one": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repository"
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " repositories"
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "587ea3963f450915": "Add",
   "d79d3cfdd7864be5": "No se pudo guardar la regla de agrupación",
   "b76e857a764ea02a": "Regla de agrupación de {path} en {environment}",
   "e6e55f343639ae71": "Predeterminado ({mode})",
@@ -9742,6 +9868,7 @@
   "51497bd401292062": "Mantener pulsado",
   "9d6cc6ac23312071": "Doble pulsación",
   "f001fa7b329c8fbf": "Ocultar las correctas",
+  "ad208e3e32c85029": "Ocultar todo",
   "c80e4bb3201efd71": "Zen",
   "0cb9ffcd1fb46b0c": "Solo el estado",
   "cf0f7fc3df26fa75": "Estado y mensajes",
@@ -9951,6 +10078,7 @@
   "573ea5fdf293a9d6": "Todos los checkouts",
   "470ad8c54049d1e1": "Buscar checkouts",
   "7e2dfdd9f97fc027": "Ámbito de proyectos",
+  "1cf216566c1ee064": "Proyecto no disponible",
   "c1b8c351aa90f319": [
     {
       "t": "span",
@@ -11141,6 +11269,10 @@
     },
     " activados"
   ],
+  "989778b3baacd22c": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
+  "95840464ec4de5da": "Reset prompt to run on settle",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
   "42d843f45e1de53b": "Se añade al prompt de los títulos de hilos nuevos y regenerados.",
   "169d0ed4364b4644": "Restablecer las instrucciones de títulos de hilos al valor predeterminado",
   "f307391eb1c5c9d7": "Limita los títulos a unas pocas palabras. Empieza por el tema principal.",
@@ -11539,6 +11671,7 @@
   "4820900255bdc17b": "probar voz habla modelo transcripción reconocimiento",
   "582c604a40a4548a": "barra lateral inactividad días sin actividad automáticamente",
   "a5ff7e3accfdebf2": "claude contexto compactación inactivo caché tokens uso resumen reanudar",
+  "842b7531971d172e": "prompt instructions message skill settle cleanup",
   "cb147525a3215d7c": "pull request fusionar cerrada automáticamente barra lateral",
   "6fee244945243134": "pull request inactividad resolución automática fusionar cerrar barra lateral",
   "f1122dcb3209f91b": "hilo tiempo de espera actividad barra lateral",
@@ -11704,6 +11837,81 @@
   "27727bda79d97ffa": "Solo se pueden añadir carpetas como proyectos",
   "eb9f51eb8bd8a43c": "Suelta archivos en un hilo para adjuntarlos.",
   "671a8b8ab44e83e2": "Suelta carpetas para añadir proyectos",
+  "c3de2207ecbc8402": [
+    "Keeping this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake. Click to let it sleep."
+  ],
+  "cd5c435f0fb5e437": [
+    "Keep this ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " awake"
+  ],
+  "7c9a2f64affedc8f": "Could not restart {product}",
+  "2277915b6002c7b4": "Restart failed.",
+  "1ebd12f79d4c7f51": "New code pulled · Restart",
+  "e2ca7c0bbd920d9c": "No threads are running.",
+  "da5e7f678540b5f3": {
+    "t": "Plural",
+    "i": 1,
+    "d": {
+      "b": {
+        "singular": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "This running thread will be interrupted. ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " tries to resume it after the restart."
+          ]
+        },
+        "other": {
+          "t": "C2",
+          "i": 2,
+          "c": [
+            "These ",
+            {
+              "i": 3,
+              "k": "_gt_value_3",
+              "v": "v"
+            },
+            " running threads will be interrupted.",
+            " ",
+            {
+              "i": 4,
+              "k": "_gt_value_4",
+              "v": "v"
+            },
+            " tries to resume them after the restart."
+          ]
+        }
+      },
+      "t": "p"
+    }
+  },
+  "c434b7d2266cc277": [
+    "Restart ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to apply pulled code?"
+  ],
+  "b588530db06f58ad": "Later",
+  "4c0fe26a3113568e": "Restart now",
   "3134603052b8f460": ", te necesita",
   "18fc8976ddb6783d": ", con errores",
   "10ae251c9435642b": ", terminado",
