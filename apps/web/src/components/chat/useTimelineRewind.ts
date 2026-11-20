@@ -12,7 +12,6 @@ import {
   type RunId,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { useNavigate } from "@tanstack/react-router";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -21,10 +20,9 @@ import { readLocalApi } from "../../localApi";
 import { findRevertCheckpoint } from "../../session-logic";
 import { type ChatMessage } from "../../types";
 import { newThreadId } from "~/lib/utils";
-import { buildThreadRouteParams } from "../../threadRoutes";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { threadEnvironment } from "../../state/threads";
-import { waitForThreadShell } from "../../state/entities";
+import { useOpenForkedThread } from "../../hooks/useForkThread";
 import { openRevertConfirm } from "./ChatOverlayHosts";
 import { assetEnvironment } from "../../state/assets";
 import { readEnvironmentScope } from "../../state/session";
@@ -77,7 +75,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     composerDraftTarget,
     setThreadError,
   } = input;
-  const navigate = useNavigate();
+  const openForkedThread = useOpenForkedThread();
   const createAttachmentAssetUrl = useAtomQueryRunner(assetEnvironment.createUrl, {
     reportFailure: false,
     refresh: true,
@@ -197,18 +195,8 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       }
       return;
     }
-    const targetThreadReady = await waitForThreadShell(targetThreadRef);
-    if (!targetThreadReady) {
-      setThreadError(
-        activeThread.id,
-        "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
-      );
-      return;
-    }
-    await navigate({
-      to: "/$environmentId/$threadId",
-      params: buildThreadRouteParams(targetThreadRef),
-    });
+    const openError = await openForkedThread(targetThreadRef);
+    if (openError !== null) setThreadError(activeThread.id, openError);
   };
   const onForkFromRunStable = useStableCallback(onForkFromRun);
   const onRevertTimelineTurn = (targetTurnCount: number, messageId: MessageId) => {

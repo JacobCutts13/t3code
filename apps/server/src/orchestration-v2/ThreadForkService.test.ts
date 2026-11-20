@@ -112,7 +112,10 @@ function makeSourceProjection(sourceRun: OrchestrationV2Run): OrchestrationV2Thr
 const planFork = (
   sourceRun: OrchestrationV2Run,
   sourceProjection = makeSourceProjection(sourceRun),
-  options: { readonly sideChat?: boolean } = {},
+  options: {
+    readonly sideChat?: boolean;
+    readonly workspace?: { readonly worktreePath: string; readonly branch: string };
+  } = {},
 ) =>
   Effect.gen(function* () {
     const service = yield* ThreadForkService.ThreadForkServiceV2;
@@ -188,6 +191,17 @@ it.effect("resets a fork's pin, snooze, settle and delegation state but keeps it
       threadId: sourceThreadId,
       runId: sourceRunId,
     });
+  }),
+);
+
+it.effect("puts a fork in the worktree the server prepared for it", () =>
+  Effect.gen(function* () {
+    const result = yield* planFork(makeSourceRun("completed"), undefined, {
+      workspace: { worktreePath: "/tmp/fork-worktree", branch: "feature/source-fork-1" },
+    });
+
+    assert.equal(result.targetThread.worktreePath, "/tmp/fork-worktree");
+    assert.equal(result.targetThread.branch, "feature/source-fork-1");
   }),
 );
 

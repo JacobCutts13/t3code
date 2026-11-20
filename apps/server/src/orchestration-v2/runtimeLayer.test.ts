@@ -7565,6 +7565,228 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
     }),
   );
 
+  it.effect("archives a parent's nested forks and delegated children and restores them", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const sink = yield* EventSink.EventSinkV2;
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const maintenance = yield* ProjectionReplay.ProjectionReplay;
+      const rootId = ThreadId.make("archive-cascade-root");
+      const projectId = ProjectId.make("archive-cascade-project");
+      yield* seedProject({
+        projectId,
+        title: "Archive cascade",
+        workspaceRoot: "/workspace/archive-cascade",
+        defaultModelSelection: null,
+        createdAt: "2026-09-07T00:00:00.000Z",
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        createdBy: "user",
+        creationSource: "web",
+        commandId: CommandId.make("archive-cascade-create"),
+        threadId: rootId,
+        projectId,
+        title: "Root",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+      });
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        createdBy: "user",
+        creationSource: "web",
+        commandId: CommandId.make("archive-cascade-message"),
+        threadId: rootId,
+        messageId: MessageId.make("archive-cascade-message"),
+        text: "Delegate the work.",
+        attachments: [],
+        modelSelection,
+        dispatchMode: { type: "start_immediately" },
+      });
+      const rootRun = (yield* orchestrator.getThreadProjection(rootId)).runs[0]!;
+      yield* orchestrator.dispatch({
+        type: "delegated_task.request",
+        createdBy: "agent",
+        creationSource: "mcp",
+        commandId: CommandId.make("archive-cascade-delegate"),
+        parentThreadId: rootId,
+        parentRunId: rootRun.id,
+        parentNodeId: rootRun.rootNodeId!,
+        task: "Child work.",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        completionWake: "always",
+      });
+      const now = yield* DateTime.now;
+      const delegated = yield* orchestrator.getThreadProjection(rootId);
+      const task = delegated.subagents[0]!;
+      const childId = task.childThreadId!;
+      const childRun = (yield* orchestrator.getThreadProjection(childId)).runs[0]!;
+      const nativeId = ThreadId.make("archive-cascade-native");
+      yield* sink.write({
+        events: [
+          {
+            id: EventId.make("archive-cascade-root-run-completed"),
+            type: "run.updated",
+            threadId: rootId,
+            runId: rootRun.id,
+            occurredAt: now,
+            payload: { ...delegated.runs[0]!, status: "completed", completedAt: now },
+          },
+          {
+            id: EventId.make("archive-cascade-child-run-completed"),
+            type: "run.updated",
+            threadId: childId,
+            runId: childRun.id,
+            occurredAt: now,
+            payload: { ...childRun, status: "completed", completedAt: now },
+          },
+          {
+            id: EventId.make("archive-cascade-task-completed"),
+            type: "subagent.updated",
+            threadId: rootId,
+            nodeId: task.id,
+            occurredAt: now,
+            payload: { ...task, status: "completed", result: "Done", completedAt: now },
+          },
+          {
+            id: EventId.make("archive-cascade-native-thread"),
+            type: "thread.created",
+            threadId: nativeId,
+            occurredAt: now,
+            payload: {
+              ...delegated.thread,
+              id: nativeId,
+              creationSource: "provider",
+              lineage: {
+                parentThreadId: rootId,
+                rootThreadId: rootId,
+                relationshipToParent: "subagent",
+              },
+            },
+          },
+        ],
+      });
+      const fork = (sourceThreadId: ThreadId, runId: RunId, name: string, sideChat = false) =>
+        orchestrator.dispatch({
+          type: "thread.fork",
+          commandId: CommandId.make(`archive-cascade-fork:${name}`),
+          sourceThreadId,
+          targetThreadId: ThreadId.make(`archive-cascade-${name}`),
+          sourcePoint: { type: "run", runId },
+          ...(sideChat ? { sideChat: true } : {}),
+          createdBy: "user",
+          creationSource: "web",
+        });
+      const forkId = ThreadId.make("archive-cascade-fork");
+      const grandchildId = ThreadId.make("archive-cascade-grandchild");
+      const ownArchiveId = ThreadId.make("archive-cascade-own-archive");
+      const sideChatId = ThreadId.make("archive-cascade-side-chat");
+      yield* fork(rootId, rootRun.id, "fork");
+      const forkRun = RunId.make("archive-cascade-fork-run");
+      yield* sink.write({
+        events: [
+          {
+            id: EventId.make("archive-cascade-fork-run"),
+            type: "run.created",
+            threadId: forkId,
+            runId: forkRun,
+            occurredAt: now,
+            payload: { ...childRun, id: forkRun, threadId: forkId, status: "completed" },
+          },
+        ],
+      });
+      yield* fork(forkId, forkRun, "grandchild");
+      yield* fork(rootId, rootRun.id, "own-archive");
+      yield* fork(rootId, rootRun.id, "side-chat", true);
+      yield* orchestrator.dispatch({
+        type: "thread.archive",
+        commandId: CommandId.make("archive-cascade-own-archive"),
+        threadId: ownArchiveId,
+      });
+
+      const grandchildRun = RunId.make("archive-cascade-grandchild-run");
+      const writeGrandchildRun = (status: "running" | "completed") =>
+        sink.write({
+          events: [
+            {
+              id: EventId.make(`archive-cascade-grandchild-run:${status}`),
+              type: status === "running" ? "run.created" : "run.updated",
+              threadId: grandchildId,
+              runId: grandchildRun,
+              occurredAt: now,
+              payload: {
+                ...childRun,
+                id: grandchildRun,
+                threadId: grandchildId,
+                status,
+                completedAt: status === "completed" ? now : null,
+              },
+            },
+          ],
+        });
+      yield* writeGrandchildRun("running");
+      const blocked = yield* orchestrator
+        .dispatch({
+          type: "thread.archive",
+          commandId: CommandId.make("archive-cascade-blocked"),
+          threadId: rootId,
+        })
+        .pipe(Effect.flip);
+      assert.instanceOf(blocked, Orchestrator.OrchestratorDispatchError);
+      assert.equal(
+        blocked.cause,
+        `Thread ${grandchildId} is still running. Stop it before archiving thread ${rootId}.`,
+      );
+      assert.isNull((yield* orchestrator.getThreadProjection(rootId)).thread.archivedAt);
+      assert.isNull((yield* orchestrator.getThreadProjection(forkId)).thread.archivedAt);
+
+      yield* writeGrandchildRun("completed");
+      yield* orchestrator.dispatch({
+        type: "thread.archive",
+        commandId: CommandId.make("archive-cascade-archive"),
+        threadId: rootId,
+      });
+      yield* worker.drain();
+      assert.isTrue((yield* maintenance.rebuild).valid);
+      const archiveState = (threadId: ThreadId) =>
+        orchestrator.getThreadProjection(threadId).pipe(
+          Effect.map(({ thread }) => ({
+            archived: thread.archivedAt !== null,
+            withParent: thread.archivedWithParent ?? null,
+          })),
+        );
+      assert.deepEqual(yield* archiveState(rootId), { archived: true, withParent: null });
+      for (const id of [childId, forkId, grandchildId]) {
+        assert.deepEqual(yield* archiveState(id), { archived: true, withParent: rootId });
+      }
+      assert.deepEqual(yield* archiveState(ownArchiveId), { archived: true, withParent: null });
+      assert.equal((yield* archiveState(sideChatId)).withParent, null);
+      assert.deepEqual(yield* archiveState(nativeId), { archived: false, withParent: null });
+
+      // Unarchiving a child alone clears its marker; the parent's unarchive still finds the rest.
+      yield* orchestrator.dispatch({
+        type: "thread.unarchive",
+        commandId: CommandId.make("archive-cascade-unarchive-child"),
+        threadId: childId,
+      });
+      assert.deepEqual(yield* archiveState(childId), { archived: false, withParent: null });
+      yield* orchestrator.dispatch({
+        type: "thread.unarchive",
+        commandId: CommandId.make("archive-cascade-unarchive"),
+        threadId: rootId,
+      });
+      for (const id of [rootId, childId, forkId, grandchildId]) {
+        assert.deepEqual(yield* archiveState(id), { archived: false, withParent: null });
+      }
+      assert.deepEqual(yield* archiveState(ownArchiveId), { archived: true, withParent: null });
+    }),
+  );
+
   it.effect("cancels preparing work on archive and keeps it cancelled through replay", () =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;

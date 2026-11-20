@@ -223,6 +223,8 @@ export interface CommandPolicyV2Shape {
       readonly fromSpecificTurn: boolean;
       /** Later source runs are still active; providers cannot fork a thread mid-turn. */
       readonly sourceBusy: boolean;
+      /** The fork runs in a different folder than its source. */
+      readonly movesWorkspace: boolean;
     },
   ) => Effect.Effect<ForkExecutionPolicyV2, CommandPolicyV2Error>;
   readonly ensureRollback: (
@@ -391,7 +393,9 @@ const decideForkExecution: CommandPolicyV2Shape["decideForkExecution"] = (input)
     (!input.sourceBusy || input.capabilities.threads.canForkWhileSourceRunning === true) &&
     input.capabilities.threads.canForkThread &&
     (!input.fromSpecificTurn || input.capabilities.threads.canForkFromTurn) &&
-    input.capabilities.identity.nativeThreadIds === "strong";
+    input.capabilities.identity.nativeThreadIds === "strong" &&
+    // Claude stores a native fork under the source folder, so a fork in another folder cannot resume it.
+    !input.movesWorkspace;
 
   if (canForkNatively) {
     return Effect.succeed("native_fork");

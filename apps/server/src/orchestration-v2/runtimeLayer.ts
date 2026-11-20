@@ -56,6 +56,7 @@ import * as RuntimeRequestService from "./RuntimeRequestService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ThreadLaunchService from "./ThreadLaunchService.ts";
 import * as ThreadForkService from "./ThreadForkService.ts";
+import * as ThreadForkWorkspaceService from "./ThreadForkWorkspaceService.ts";
 import * as TurnItemPositionStore from "./TurnItemPositionStore.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
@@ -292,6 +293,13 @@ const layerThreadLaunchProvided = ThreadLaunchService.layer.pipe(
     ).pipe(Layer.provideMerge(layerProjectService)),
   ),
 );
+const layerThreadForkWorkspaceProvided = ThreadForkWorkspaceService.layer.pipe(
+  Layer.provide(
+    Layer.mergeAll(layerProjectSetupScriptRunner, layerThreadManagementProvided).pipe(
+      Layer.provideMerge(layerProjectService),
+    ),
+  ),
+);
 const layerSecretRequestsProvided = SecretRequests.layer.pipe(
   Layer.provide(layerThreadManagementProvided),
 );
@@ -393,6 +401,7 @@ export const layerProduction = Layer.mergeAll(
   layer,
   layerManagedProjectFoldersProvided,
   layerThreadLaunchProvided,
+  layerThreadForkWorkspaceProvided,
   layerScheduledTaskProvided,
   layerScratchThreadPromotionProvided,
   layerSecretRequestsProvided,

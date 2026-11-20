@@ -22,6 +22,7 @@ function makeUiState(overrides: Partial<UiState> = {}): UiState {
     sidebarProjectScopeKeys: [],
     threadLastVisitedAtById: {},
     threadChangedFilesExpandedById: {},
+    threadChildrenCollapsedById: {},
     defaultAdvertisedEndpointKey: null,
     pullRequestMergeMethod: "merge",
     ...overrides,
@@ -114,6 +115,7 @@ describe("parsePersistedState", () => {
           "turn-2": true,
         },
       },
+      threadChildrenCollapsedById: { "environment:parent": true, bad: "yes" as unknown as boolean },
     });
 
     expect(parsed).toEqual({
@@ -127,6 +129,7 @@ describe("parsePersistedState", () => {
       defaultAdvertisedEndpointKey: "desktop-core:lan:http",
       sidebarProjectScopeKeys: [],
       pullRequestMergeMethod: "merge",
+      threadChildrenCollapsedById: { "environment:parent": true },
       threadChangedFilesExpandedById: {
         "environment:thread-1": {
           "turn-1": false,
@@ -206,6 +209,7 @@ describe("uiStateStore persistence", () => {
 
   it("persists raw UI preferences including thread visit markers", () => {
     const state = makeUiState({
+      threadChildrenCollapsedById: { "environment:parent": true },
       projectExpandedById: {
         logical: false,
       },
@@ -245,6 +249,7 @@ describe("uiStateStore persistence", () => {
           "turn-2": true,
         },
       },
+      threadChildrenCollapsedById: { "environment:parent": true },
       pullRequestMergeMethod: "merge",
     });
     expect(parsePersistedState(persisted)).toEqual({

@@ -315,6 +315,7 @@ layer("CommandPolicyV2", (it) => {
         sourceRunStatus: "completed",
         fromSpecificTurn: true,
         sourceBusy: false,
+        movesWorkspace: false,
       });
 
       assert.equal(result, "portable_context");
@@ -328,6 +329,7 @@ layer("CommandPolicyV2", (it) => {
         provider: "codex" | "claudeAgent",
         capabilities: OrchestrationV2ProviderCapabilities,
         sourceBusy: boolean,
+        movesWorkspace = false,
       ) =>
         policy.decideForkExecution({
           commandId,
@@ -339,11 +341,16 @@ layer("CommandPolicyV2", (it) => {
           sourceRunStatus: "completed",
           fromSpecificTurn: true,
           sourceBusy,
+          movesWorkspace,
         });
 
       assert.equal(yield* decide("codex", CodexProviderCapabilitiesV2, false), "native_fork");
       assert.equal(yield* decide("codex", CodexProviderCapabilitiesV2, true), "portable_context");
       assert.equal(yield* decide("claudeAgent", ClaudeProviderCapabilitiesV2, true), "native_fork");
+      assert.equal(
+        yield* decide("claudeAgent", ClaudeProviderCapabilitiesV2, false, true),
+        "portable_context",
+      );
     }),
   );
 });
