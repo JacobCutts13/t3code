@@ -547,9 +547,9 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
     it.effect("expands a home-relative T3 home the way the server does", () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
-        const homeFor = (t3Home: string) =>
+        const homeFor = (t3Home: string, mode: "dev" | "live" = "dev") =>
           createDevRunnerEnv({
-            mode: "dev",
+            mode,
             baseEnv: {},
             serverOffset: 0,
             webOffset: 0,
@@ -572,6 +572,11 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.equal(yield* homeFor("~someone/t3-dev"), path.resolve("~someone/t3-dev"));
         assert.equal(yield* homeFor("relative/t3-dev"), path.resolve("relative/t3-dev"));
         assert.equal(yield* homeFor("/tmp/t3-dev"), path.resolve("/tmp/t3-dev"));
+        // An explicit ~/.t3 would put state in the live userdata; leaving it implicit selects ~/.t3/dev.
+        assert.equal(yield* homeFor("~/.t3"), undefined);
+        assert.equal(yield* homeFor("/home/dev/.t3/"), undefined);
+        // `live` runs the live install, so it keeps ~/.t3.
+        assert.equal(yield* homeFor("~/.t3", "live"), path.join("/home/dev", ".t3"));
       }),
     );
 
@@ -818,7 +823,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
             Effect.provideService(HostProcess.Platform, "linux"),
             Effect.provideService(HostProcess.WorkingDirectory, input.cwd),
             // No ~/.t3 here, so these runs never seed from this machine's install.
-            Effect.provideService(HostProcess.HomeDirectory, input.cwd),
+            Effect.provideService(HostProcess.HomeDirectory, NodePath.join(input.cwd, "home")),
             Effect.provideService(
               HostProcess.Environment,
               input.ambientHome === undefined ? {} : { T3CODE_HOME: input.ambientHome },

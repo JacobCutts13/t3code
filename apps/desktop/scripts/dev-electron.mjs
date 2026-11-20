@@ -337,11 +337,20 @@ const launcherLock = acquireLauncherLock({
   ),
   pid: process.pid,
   claim: liveMode,
-  isLauncher: (pid) => {
+  // A launcher whose app has quit is stale: Electron's in-app relaunch detaches the new app from
+  // its launcher, so the launcher never sees the quit and would otherwise block every restart.
+  // A launcher younger than a minute may not have started its app yet.
+  isLauncher: (pid, ageMs) => {
     const result = NodeChildProcess.spawnSync("ps", ["-o", "command=", "-p", String(pid)], {
       encoding: "utf8",
     });
-    return result.status === 0 && result.stdout.includes("dev-electron.mjs");
+    if (result.status !== 0 || !result.stdout.includes("dev-electron.mjs")) return false;
+    const app = NodeChildProcess.spawnSync(
+      "pgrep",
+      ["-f", "--", `(^| )--t3code-dev-root=${desktopDir}( |$)`],
+      { stdio: "ignore" },
+    );
+    return app.status === 0 || ageMs < 60_000;
   },
 });
 if (!launcherLock.acquired) {

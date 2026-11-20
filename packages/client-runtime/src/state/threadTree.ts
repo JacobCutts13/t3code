@@ -1,5 +1,7 @@
 import type { OrchestrationV2ThreadShell, ScopedThreadRef } from "@t3tools/contracts";
 import { isProviderNativeSubagentThread } from "@t3tools/contracts";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 import { threadKey } from "./entities.ts";
 import type { EnvironmentThreadShell } from "./models.ts";
@@ -204,11 +206,15 @@ export function resolveThreadTreeRowRef<
 }
 
 /** Why Fork is unavailable, or null. The server forks at the latest completed run and stays authoritative. */
-export function threadForkBlockedReason(thread: {
-  readonly lineage: { readonly sideChat?: boolean | undefined };
-  readonly latestRun: { readonly completedAt: string | null } | null;
-}): string | null {
-  if (thread.lineage.sideChat === true) return "Side chats can't be forked";
-  if (thread.latestRun?.completedAt == null) return "Available after a completed turn";
+export function threadForkBlockedReason(
+  thread: {
+    readonly lineage: { readonly sideChat?: boolean | undefined };
+    readonly latestRun: { readonly completedAt: string | null } | null;
+  },
+  resolve: MFunctionType = mFallback,
+): string | null {
+  if (thread.lineage.sideChat === true) return resolve(msg("Side chats can't be forked"));
+  if (thread.latestRun?.completedAt == null)
+    return resolve(msg("Available after a completed turn"));
   return null;
 }

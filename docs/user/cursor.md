@@ -11,9 +11,26 @@ TypeScript package. It does not use Cursor's ACP transport for V2 execution.
 - A paid Cursor plan on the account used for browser sign-in or `CURSOR_API_KEY`.
 - A model accepted by the Cursor SDK. `auto` is sent to the SDK as its `default` model selection.
 
-The adapter currently uses the SDK's local-agent runtime so runs operate in the selected T3 Code
-workspace. Cursor cloud agents need repository and cloud-environment configuration that T3 Code does
-not expose yet.
+By default, runs operate in the selected T3 Code workspace through the SDK's local-agent runtime.
+
+## Cursor Cloud agents
+
+Turn on **Cursor Cloud** in **Settings > Providers > Cursor**. It uses the instance's existing
+sign-in. Each new Cursor thread then starts a cloud agent on a Cursor-hosted VM that clones the
+project's `origin` remote at its current branch and opens a pull request when it finishes.
+Follow-up messages continue the same cloud agent.
+
+- Push the branch first. The VM clones from the remote, so local commits and uncommitted changes
+  are not included.
+- The remote must be a repository your Cursor account can access, such as a GitHub repository
+  connected in Cursor's dashboard.
+- Work happens on the VM, so the thread's diff and checkpoints show no local changes. Review the
+  pull request instead.
+- T3 Code's MCP tools and your machine's MCP servers are not available to cloud agents; the VM uses
+  the repository's own Cursor configuration.
+- Compaction, rewinding with **Edit from here**, and conversation snapshots are local-agent
+  features. Cloud agents summarize on their own.
+- The switch only affects new threads. Existing threads keep running where they started.
 
 Custom Cursor MCP servers and plugins are not configured in T3 Code. They load from the environment
 machine's Cursor config when the agent opens: project `.cursor/mcp.json`, user `~/.cursor/mcp.json`,
@@ -54,14 +71,17 @@ The adapter supports:
 - Cursor `task` subagents, projected as read-only child app threads with their tool activity and
   final result.
 
-The public SDK does not currently expose native agent fork, conversation rollback, or interactive
-approval callbacks. A text-only steer reaches the current run without restarting it.
+The public SDK does not currently expose native agent fork or interactive approval callbacks. A
+text-only steer reaches the current run without restarting it.
 When Cursor cannot deliver the steer, the same message is queued for the next turn after
 this run finishes. If you press Stop, that follow-up stays held until you resume the queue. Steers
 with attachments and provider or runtime changes that must apply immediately interrupt and restart
 the run.
 Same-provider Cursor forks use the orchestrator's portable full-thread context handoff into a fresh
-Cursor agent. The SDK has in-process custom callback tools, but the V2 adapter intentionally uses the
+Cursor agent. **Edit from here** and checkpoint rollback rewind the same Cursor agent to just before
+the selected message, as `cursor-agent`'s `/rewind` does, so it keeps its exact earlier history.
+Rewinding to the thread's first message starts a fresh Cursor agent instead.
+The SDK has in-process custom callback tools, but the V2 adapter intentionally uses the
 authenticated, thread-scoped MCP server instead.
 
 Portable handoffs summarize eligible timeline items and can omit the end of long messages. Read

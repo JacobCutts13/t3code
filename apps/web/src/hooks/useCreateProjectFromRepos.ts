@@ -9,9 +9,11 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AuthOrchestrationOperateScope, AuthSettingsWriteScope } from "@t3tools/contracts";
 import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import { msg } from "gt-react";
 
 import type { RepoCandidate } from "~/components/createProjectFromRepos.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { m } from "~/i18n/messages";
 import { newProjectId } from "~/lib/utils";
 import { useProjects, waitForProject } from "~/state/entities";
 import { projectEnvironment } from "~/state/projects";
@@ -24,7 +26,7 @@ import { useNewThreadHandler } from "./useHandleNewThread";
 function errorMessage(error: unknown): string {
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
-    : "An error occurred.";
+    : m(msg("An error occurred."));
 }
 
 function fail(title: string, description: string): false {
@@ -61,7 +63,7 @@ export function useCreateProjectFromRepos() {
     const { environmentId, repos } = input;
     if (repos.length === 0) return false;
     if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
-      return fail("Cannot add project", "This connection cannot add projects.");
+      return fail(m(msg("Cannot add project")), m(msg("This connection cannot add projects.")));
     }
 
     try {
@@ -90,7 +92,7 @@ export function useCreateProjectFromRepos() {
         });
         if (created._tag === "Failure") {
           if (!isAtomCommandInterrupted(created))
-            fail("Failed to add project", errorMessage(squashAtomCommandFailure(created)));
+            fail(m(msg("Failed to add project")), errorMessage(squashAtomCommandFailure(created)));
           return false;
         }
         await openProject(environmentId, projectId);
@@ -99,14 +101,17 @@ export function useCreateProjectFromRepos() {
 
       if (!readEnvironmentScope(environmentId, AuthSettingsWriteScope)) {
         return fail(
-          "Cannot add project",
-          "This connection cannot change settings, which a multi-repository project needs.",
+          m(msg("Cannot add project")),
+          m(msg("This connection cannot change settings, which a multi-repository project needs.")),
         );
       }
       const host = await createHostProject({ environmentId, input: { name: input.name } });
       if (host._tag === "Failure") {
         if (!isAtomCommandInterrupted(host))
-          fail("Could not create the project", errorMessage(squashAtomCommandFailure(host)));
+          fail(
+            m(msg("Could not create the project")),
+            errorMessage(squashAtomCommandFailure(host)),
+          );
         return false;
       }
       const { projectId, workspaceRoot } = host.value;
@@ -127,15 +132,20 @@ export function useCreateProjectFromRepos() {
       if (saved._tag === "Failure") {
         if (!isAtomCommandInterrupted(saved))
           fail(
-            "Project created without its repositories",
-            `${errorMessage(squashAtomCommandFailure(saved))} Add them in Settings → Projects → Repositories. The project is in ${workspaceRoot}.`,
+            m(msg("Project created without its repositories")),
+            m(
+              msg(
+                "{error} Add them in Settings → Projects → Repositories. The project is in {path}.",
+                { error: errorMessage(squashAtomCommandFailure(saved)), path: workspaceRoot },
+              ),
+            ),
           );
         return false;
       }
       await openProject(environmentId, projectId);
       return true;
     } catch (error) {
-      return fail("Failed to open project", errorMessage(error));
+      return fail(m(msg("Failed to open project")), errorMessage(error));
     }
   };
 }

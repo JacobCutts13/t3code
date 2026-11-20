@@ -1,4 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { FolderGit2Icon, FolderIcon, SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -58,6 +59,8 @@ function RepoRow(props: {
 }
 
 function CreateProjectFromReposBody(props: { readonly environmentId: EnvironmentId }) {
+  const gt = useGT();
+  const resolve = useMessages();
   const { environmentId } = props;
   const browse = useAtomQueryRunner(filesystemEnvironment.browse, {
     reportFailure: false,
@@ -120,16 +123,16 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    try {
-      const created = await createFromRepos({
-        environmentId,
-        repos: selected,
-        name: projectName.trim(),
-      });
-      if (created) closeCreateProjectFromRepos();
-    } finally {
-      setSaving(false);
-    }
+    // `.finally` rather than `try`/`finally`, which React Compiler cannot compile.
+    await createFromRepos({
+      environmentId,
+      repos: selected,
+      name: projectName.trim(),
+    })
+      .then((created) => {
+        if (created) closeCreateProjectFromRepos();
+      })
+      .finally(() => setSaving(false));
   };
 
   const saveStable = useStableCallback(save);
@@ -146,24 +149,26 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
 
   return (
     <div className="flex max-h-[min(34rem,80vh)] flex-col">
-      <DialogTitle className="sr-only">Create project from repositories</DialogTitle>
+      <DialogTitle className="sr-only">
+        <T>Create project from repositories</T>
+      </DialogTitle>
       <div className="flex items-center gap-2 border-b px-3.5 py-2.5">
         <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
         <Input
           autoFocus
           unstyled
           value={query}
-          aria-label="Search repositories"
-          placeholder="Search repositories…"
+          aria-label={gt("Search repositories")}
+          placeholder={gt("Search repositories…")}
           onChange={(event) => setQuery(event.target.value)}
         />
       </div>
       <ScrollArea className="min-h-40 flex-1">
-        <div className="p-1.5" role="group" aria-label="Repositories">
+        <div className="p-1.5" role="group" aria-label={gt("Repositories")}>
           {selected.length > 0 ? (
             <>
               <div className="px-2.5 py-1.5 font-medium text-muted-foreground text-xs">
-                Selected
+                <T context="heading for selected repositories">Selected</T>
               </div>
               {selected.map((repo) => (
                 <RepoRow
@@ -178,32 +183,38 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
             </>
           ) : null}
           {visible.length > 0 || selected.length === 0 ? (
-            <div className="px-2.5 py-1.5 font-medium text-muted-foreground text-xs">Repos</div>
+            <div className="px-2.5 py-1.5 font-medium text-muted-foreground text-xs">
+              <T>Repos</T>
+            </div>
           ) : null}
           {visible.map((repo) => (
             <RepoRow
               key={repo.path}
               repo={repo}
               checked={false}
-              disabledReason={repoDisabledReason(repo, selected)}
+              disabledReason={repoDisabledReason(repo, selected, resolve)}
               onToggle={() => setSelected(toggleRepo(selected, repo))}
             />
           ))}
           {scan === "scanning" ? (
             <p role="status" className="px-2.5 py-3 text-muted-foreground text-sm">
-              Looking for repositories…
+              <T>Looking for repositories…</T>
             </p>
           ) : scan === "failed" ? (
             <p role="alert" className="px-2.5 py-3 text-muted-foreground text-sm">
-              Could not read your repositories folder.
+              <T>Could not read your repositories folder.</T>
             </p>
           ) : visible.length === 0 ? (
             <p className="px-2.5 py-3 text-muted-foreground text-sm">
-              {repos.length === 0
-                ? "No git repositories found in ~/dev."
-                : selected.length > 0
-                  ? "No other repositories match."
-                  : "No repositories match."}
+              {repos.length === 0 ? (
+                <T>
+                  No git repositories found in <Var>~/dev</Var>.
+                </T>
+              ) : selected.length > 0 ? (
+                <T>No other repositories match.</T>
+              ) : (
+                <T>No repositories match.</T>
+              )}
             </p>
           ) : null}
         </div>
@@ -212,8 +223,8 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
         {selected.length > 1 ? (
           <Input
             value={projectName}
-            aria-label="Project name"
-            placeholder="Project name"
+            aria-label={gt("Project name")}
+            placeholder={gt("Project name")}
             className="min-w-0 flex-1"
             onChange={(event) => setNameDraft(event.target.value)}
           />
@@ -221,14 +232,18 @@ function CreateProjectFromReposBody(props: { readonly environmentId: Environment
           <span className="flex min-w-0 flex-1 items-center gap-1.5 text-muted-foreground text-xs">
             <FolderGit2Icon className="size-3.5 shrink-0" />
             <span className="truncate">
-              {selected.length === 0
-                ? "Pick one repository, or several to work across them."
-                : `Opens ${selected[0]!.name}`}
+              {selected.length === 0 ? (
+                <T>Pick one repository, or several to work across them.</T>
+              ) : (
+                <T>
+                  Opens <Var>{selected[0]!.name}</Var>
+                </T>
+              )}
             </span>
           </span>
         )}
         <Button type="button" disabled={!canSave} onClick={() => void save()}>
-          Save
+          <T context="verb, save a new project">Save</T>
         </Button>
       </div>
     </div>

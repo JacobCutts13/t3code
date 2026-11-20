@@ -1,9 +1,10 @@
+import { useGT } from "gt-react";
 import { useRef } from "react";
 
 import { Textarea } from "../ui/textarea";
 import { SettingsRow, SettingResetButton } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -11,6 +12,8 @@ import {
 } from "./useScopedSettings";
 
 export function ThreadSettlePromptSettings() {
+  const gt = useGT();
+  const searchableSetting = useSearchableSetting();
   const settings = useScopedSettings();
   const { targets } = useSettingsScope();
   const scopeKey = targets.map((target) => `${target.environmentId}:${target.projectId}`).join(",");
@@ -23,11 +26,13 @@ export function ThreadSettlePromptSettings() {
       serverScoped
       settingKeys={["threadSettlePrompt"]}
       {...searchableSetting("thread-settle-prompt")}
-      description="Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup."
+      description={gt(
+        "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
+      )}
       resetAction={
         mixed || settings.threadSettlePrompt !== "" ? (
           <SettingResetButton
-            label="prompt to run on settle"
+            ariaLabel={gt("Reset prompt to run on settle")}
             onClick={() => updateSettings({ threadSettlePrompt: "" })}
           />
         ) : null
@@ -36,7 +41,7 @@ export function ThreadSettlePromptSettings() {
       <div className="mt-3 max-w-2xl pb-3.5">
         <Textarea
           key={`${scopeKey}:${mixed}:${settings.threadSettlePrompt}`}
-          aria-label="Prompt to run on settle"
+          aria-label={gt("Prompt to run on settle")}
           onChange={() => {
             edited.current = true;
           }}
@@ -44,8 +49,8 @@ export function ThreadSettlePromptSettings() {
           defaultValue={mixed ? "" : settings.threadSettlePrompt}
           placeholder={
             mixed
-              ? "Mixed. Enter instructions to apply to all selected targets."
-              : "Summarise what changed and update the project notes."
+              ? gt("Mixed. Enter instructions to apply to all selected targets.")
+              : gt("Summarise what changed and update the project notes.")
           }
           onBlur={(event) => {
             const value = event.target.value.trim();

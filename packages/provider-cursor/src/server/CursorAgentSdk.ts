@@ -82,6 +82,11 @@ function sdkErrorReason(cause: unknown): string | undefined {
 
 export const isCursorAgentSdkRunnerError = Schema.is(CursorAgentSdkRunnerError);
 
+/** The SDK routes `bc-` agents to Cursor Cloud and every other id to the local store. */
+export function isCursorCloudAgentId(agentId: string | undefined): boolean {
+  return agentId?.startsWith("bc-") === true;
+}
+
 export interface CursorAgentSdkOpenInput {
   readonly operation: "create" | "resume";
   readonly agentId?: string;
@@ -137,6 +142,11 @@ export interface CursorAgentSdkSession {
    * run only from its first checkpoint on; before that the conversation lacks the run's request.
    */
   readonly runCheckpointed?: (runId?: string) => Effect.Effect<boolean, CursorAgentSdkRunnerError>;
+  /**
+   * Rewinds the conversation to just before the run after `runId`, as `cursor-agent` /rewind does.
+   * The open agent keeps its old conversation in memory, so reopen it before the next send.
+   */
+  readonly rewindAfterRun?: (runId: string) => Effect.Effect<void, CursorAgentSdkRunnerError>;
   readonly close: Effect.Effect<void, CursorAgentSdkRunnerError>;
 }
 
@@ -167,6 +177,9 @@ export interface CursorAgentSdkLoggedAgentOptions {
     readonly hasCustomTools?: boolean;
   };
   readonly agents?: ReadonlyArray<string>;
+  readonly cloud?: {
+    readonly repos: ReadonlyArray<{ readonly url: string; readonly startingRef?: string }>;
+  };
 }
 
 export interface CursorAgentSdkLoggedSendOptions {
@@ -278,6 +291,15 @@ export type CursorAgentSdkProtocolLogEvent =
       };
     }
   | {
+      readonly direction: "outgoing";
+      readonly stage: "decoded";
+      readonly payload: {
+        readonly type: "agent.rewind";
+        readonly agentId: string;
+        readonly afterRunId: string;
+      };
+    }
+  | {
       readonly direction: "incoming";
       readonly stage: "decoded";
       readonly payload: {
@@ -350,6 +372,15 @@ export function loggedCursorAgentOptions(options: AgentOptions): CursorAgentSdkL
           },
         }),
     ...(options.agents === undefined ? {} : { agents: Object.keys(options.agents).toSorted() }),
+    ...(options.cloud === undefined
+      ? {}
+      : {
+          cloud: {
+            repos: (options.cloud.repos ?? []).map(({ url, startingRef }) =>
+              startingRef === undefined ? { url } : { url, startingRef },
+            ),
+          },
+        }),
   };
 }
 
@@ -484,9 +515,11 @@ export const makeCursorAgentSdkRunner = Effect.fn("makeCursorAgentSdkRunner")(fu
         },
       });
 
+      const cloud = input.options.cloud !== undefined;
       // Cursor uses cwd for both execution and store lookup; a moved thread keeps its original store.
       const storeCwd = input.storeCwd;
       const storePlatform =
+        !cloud &&
         input.operation === "resume" &&
         storeCwd !== undefined &&
         storeCwd !== input.options.local?.cwd
@@ -529,7 +562,7 @@ export const makeCursorAgentSdkRunner = Effect.fn("makeCursorAgentSdkRunner")(fu
         ...(cwd === undefined ? {} : { cwd }),
         ...(input.options.local?.store === undefined ? {} : { store: input.options.local.store }),
       };
-      let abandonedRunRecoveryAvailable = input.operation === "resume";
+      let abandonedRunRecoveryAvailable = !cloud && input.operation === "resume";
       const storeView = async () =>
         storePlatform ??
         (await createAgentPlatform({
@@ -764,76 +797,147 @@ export const makeCursorAgentSdkRunner = Effect.fn("makeCursorAgentSdkRunner")(fu
             ),
           } satisfies CursorAgentSdkRun;
         }),
-        listMessages: log({
-          direction: "outgoing",
-          stage: "decoded",
-          payload: {
-            type: "agent.messages.list",
-            agentId: agent.agentId,
-          },
-        }).pipe(
-          Effect.andThen(
-            Effect.tryPromise({
-              try: () =>
-                storePlatform === undefined
-                  ? Agent.messages.list(agent.agentId, {
-                      runtime: "local",
-                      ...(cwd === undefined ? {} : { cwd }),
-                      ...(input.options.local?.store === undefined
-                        ? {}
-                        : { store: input.options.local.store }),
-                    })
-                  : storePlatform.getAgentMessages(agent.agentId),
-              catch: (cause) => runnerError(cause, "agent.messages.list"),
-            }),
-          ),
-          Effect.tap((messages) =>
-            log({
-              direction: "incoming",
+        // Message listing and the checkpoint store are local-only in the SDK.
+        listMessages: cloud
+          ? Effect.succeed([])
+          : log({
+              direction: "outgoing",
               stage: "decoded",
               payload: {
-                type: "agent.messages",
+                type: "agent.messages.list",
                 agentId: agent.agentId,
-                messages,
               },
+            }).pipe(
+              Effect.andThen(
+                Effect.tryPromise({
+                  try: () =>
+                    storePlatform === undefined
+                      ? Agent.messages.list(agent.agentId, {
+                          runtime: "local",
+                          ...(cwd === undefined ? {} : { cwd }),
+                          ...(input.options.local?.store === undefined
+                            ? {}
+                            : { store: input.options.local.store }),
+                        })
+                      : storePlatform.getAgentMessages(agent.agentId),
+                  catch: (cause) => runnerError(cause, "agent.messages.list"),
+                }),
+              ),
+              Effect.tap((messages) =>
+                log({
+                  direction: "incoming",
+                  stage: "decoded",
+                  payload: {
+                    type: "agent.messages",
+                    agentId: agent.agentId,
+                    messages,
+                  },
+                }),
+              ),
+            ),
+        ...(cloud
+          ? {}
+          : {
+              readContextUsage: Effect.tryPromise({
+                try: async () => (await storeView()).checkpointStore.loadLatest(agent.agentId),
+                catch: (cause) => runnerError(cause, "agent.checkpoint.load"),
+              }).pipe(
+                Effect.map((checkpoint) => {
+                  const usage = Option.getOrUndefined(
+                    decodeCursorCheckpoint(checkpoint),
+                  )?.tokenDetails;
+                  // An unset protobuf message reads as zeros.
+                  return usage === undefined || usage.maxTokens === 0 ? undefined : usage;
+                }),
+              ),
+              runCheckpointed: (runId) =>
+                Effect.tryPromise({
+                  try: async () => {
+                    const { store } = await storeView();
+                    let run: RunRecord | null | undefined;
+                    if (runId !== undefined) {
+                      run = await store.getRun(agent.agentId, runId);
+                    } else {
+                      let cursor: string | undefined;
+                      do {
+                        const page = await store.listRuns(
+                          agent.agentId,
+                          cursor === undefined ? {} : { cursor },
+                        );
+                        for (const candidate of page.items) {
+                          if (!run || candidate.turnNumber >= run.turnNumber) run = candidate;
+                        }
+                        cursor = page.nextCursor;
+                      } while (cursor !== undefined);
+                    }
+                    const checkpoint = run?.latestCheckpointRef?.blobId;
+                    return (
+                      checkpoint !== undefined && checkpoint !== run?.startCheckpointRef?.blobId
+                    );
+                  },
+                  catch: (cause) => runnerError(cause, "agent.run.get"),
+                }),
+              rewindAfterRun: (runId) =>
+                log({
+                  direction: "outgoing",
+                  stage: "decoded",
+                  payload: { type: "agent.rewind", agentId: agent.agentId, afterRunId: runId },
+                }).pipe(
+                  Effect.andThen(
+                    Effect.tryPromise({
+                      try: async () => {
+                        const { store, checkpointStore } = await storeView();
+                        const runs: Array<RunRecord> = [];
+                        let cursor: string | undefined;
+                        do {
+                          const page = await store.listRuns(
+                            agent.agentId,
+                            cursor === undefined ? {} : { cursor },
+                          );
+                          runs.push(...page.items);
+                          cursor = page.nextCursor;
+                        } while (cursor !== undefined);
+                        const kept = runs.find((candidate) => candidate.runId === runId);
+                        if (kept === undefined) {
+                          throw new Error(`Cursor agent ${agent.agentId} has no run ${runId}.`);
+                        }
+                        const unwound = runs
+                          .filter((candidate) => candidate.turnNumber > kept.turnNumber)
+                          .toSorted((a, b) => a.turnNumber - b.turnNumber)[0];
+                        if (unwound === undefined) return;
+                        const anchor = unwound.startCheckpointRef?.blobId;
+                        if (anchor === undefined) {
+                          throw new Error(
+                            `Cursor run ${unwound.runId} has no starting checkpoint.`,
+                          );
+                        }
+                        const blobStore = await checkpointStore.getBlobStore(agent.agentId);
+                        const getBlob =
+                          typeof blobStore === "object" && blobStore !== null
+                            ? Reflect.get(blobStore, "getBlob")
+                            : undefined;
+                        if (typeof getBlob !== "function") {
+                          throw new Error("Cursor's checkpoint store cannot read blobs.");
+                        }
+                        const bytes: unknown = await getBlob.call(
+                          blobStore,
+                          undefined,
+                          Buffer.from(anchor, "hex"),
+                        );
+                        if (!(bytes instanceof Uint8Array)) {
+                          throw new Error(`Cursor checkpoint ${anchor} is missing.`);
+                        }
+                        // Checkpoints are content-addressed, so re-saving the anchor's bytes moves the
+                        // agent's head back to that exact root, like cursor-agent's latestRootBlobId reset.
+                        await checkpointStore.saveCheckpoint(agent.agentId, {
+                          toBinary: () => bytes,
+                        });
+                      },
+                      catch: (cause) => runnerError(cause, "agent.rewind"),
+                    }),
+                  ),
+                ),
             }),
-          ),
-        ),
-        readContextUsage: Effect.tryPromise({
-          try: async () => (await storeView()).checkpointStore.loadLatest(agent.agentId),
-          catch: (cause) => runnerError(cause, "agent.checkpoint.load"),
-        }).pipe(
-          Effect.map((checkpoint) => {
-            const usage = Option.getOrUndefined(decodeCursorCheckpoint(checkpoint))?.tokenDetails;
-            // An unset protobuf message reads as zeros.
-            return usage === undefined || usage.maxTokens === 0 ? undefined : usage;
-          }),
-        ),
-        runCheckpointed: (runId) =>
-          Effect.tryPromise({
-            try: async () => {
-              const { store } = await storeView();
-              let run: RunRecord | null | undefined;
-              if (runId !== undefined) {
-                run = await store.getRun(agent.agentId, runId);
-              } else {
-                let cursor: string | undefined;
-                do {
-                  const page = await store.listRuns(
-                    agent.agentId,
-                    cursor === undefined ? {} : { cursor },
-                  );
-                  for (const candidate of page.items) {
-                    if (!run || candidate.turnNumber >= run.turnNumber) run = candidate;
-                  }
-                  cursor = page.nextCursor;
-                } while (cursor !== undefined);
-              }
-              const checkpoint = run?.latestCheckpointRef?.blobId;
-              return checkpoint !== undefined && checkpoint !== run?.startCheckpointRef?.blobId;
-            },
-            catch: (cause) => runnerError(cause, "agent.run.get"),
-          }),
         close: log({
           direction: "outgoing",
           stage: "decoded",

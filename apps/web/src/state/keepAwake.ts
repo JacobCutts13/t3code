@@ -1,6 +1,8 @@
+import { msg } from "gt-react";
 import { useSyncExternalStore } from "react";
 
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
+import { m } from "../i18n/messages";
 
 // null until the desktop app answers, and forever off macOS desktop.
 let on: boolean | null = null;
@@ -35,8 +37,11 @@ export async function setKeepAwake(next: boolean): Promise<void> {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not change keep awake",
-        description: error instanceof Error ? error.message : "pmset failed.",
+        title: m(msg("Could not change keep awake")),
+        description:
+          error instanceof Error
+            ? error.message
+            : m(msg("{command} failed.", { command: "pmset" })),
       }),
     );
   } finally {

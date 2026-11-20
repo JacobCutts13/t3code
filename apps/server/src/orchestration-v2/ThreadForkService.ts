@@ -116,8 +116,9 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
         ...(input.workspace === undefined
           ? {}
           : { worktreePath: input.workspace.worktreePath, branch: input.workspace.branch }),
-        // The source's title job completes only on the source thread.
+        // The source's title job and rename stay with the source thread.
         titleRegeneration: null,
+        titleRenamed: false,
         activeProviderThreadId: null,
         lineage: {
           parentThreadId: input.sourceProjection.thread.id,

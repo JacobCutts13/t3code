@@ -1,3 +1,4 @@
+import { T, useGT, Var } from "gt-react";
 import { CoffeeIcon } from "lucide-react";
 
 import { setKeepAwake, useKeepAwake } from "../../state/keepAwake";
@@ -6,6 +7,7 @@ import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export function SidebarKeepAwakeToggle() {
+  const gt = useGT();
   const on = useKeepAwake();
   if (on === null) return null;
   return (
@@ -14,7 +16,7 @@ export function SidebarKeepAwakeToggle() {
         <TooltipTrigger
           render={
             <Toggle
-              aria-label="Keep this Mac awake"
+              aria-label={gt("Keep this {product} awake", { product: "Mac" })}
               pressed={on}
               onPressedChange={(next) => void setKeepAwake(next)}
               variant="ghost"
@@ -24,7 +26,15 @@ export function SidebarKeepAwakeToggle() {
           }
         />
         <TooltipPopup side="top">
-          {on ? "Keeping this Mac awake. Click to let it sleep." : "Keep this Mac awake"}
+          {on ? (
+            <T>
+              Keeping this <Var>Mac</Var> awake. Click to let it sleep.
+            </T>
+          ) : (
+            <T>
+              Keep this <Var>Mac</Var> awake
+            </T>
+          )}
         </TooltipPopup>
       </Tooltip>
     </SidebarMenuItem>

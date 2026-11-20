@@ -4,6 +4,7 @@ import type {
   InteractionUpdate,
   McpServerConfig,
   RunResult,
+  SDKModel,
   SDKUserMessage,
   SettingSource,
   ToolCall,
@@ -57,6 +58,7 @@ import {
   rewriteCursorSkillMentions,
 } from "./skills.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
+import { type CursorCloudRepository, resolveCursorCloudRepository } from "./cloudRepository.ts";
 import { t3OrchestrationPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -90,7 +92,7 @@ export const CursorProviderCapabilitiesV2 = {
   threads: {
     canCreateEmptyThread: true,
     canReadThreadSnapshot: true,
-    canRollbackThread: false,
+    canRollbackThread: true,
     canForkThread: false,
     canForkFromTurn: false,
     canForkFromSubagentThread: false,
@@ -101,6 +103,7 @@ export const CursorProviderCapabilitiesV2 = {
     emitsTurnStarted: true,
     emitsTurnCompleted: true,
     supportsInterrupt: true,
+    supportsNativeResume: true,
     supportsActiveSteering: true,
     // A steer can move a foreground subagent to the background. Mailbox wakes
     // stay queued so a notification does not cut into the live turn.
@@ -162,8 +165,8 @@ export const CursorProviderCapabilitiesV2 = {
   checkpointing: {
     appCanCheckpointFilesystem: true,
     supportsNestedCheckpointScopes: true,
-    providerCanRollbackConversation: false,
-    providerRollbackReturnsSnapshot: false,
+    providerCanRollbackConversation: true,
+    providerRollbackReturnsSnapshot: true,
     providerCanReadConversationSnapshot: true,
   },
   identity: {
@@ -308,18 +311,33 @@ export function makeCursorAgentOptions(input: {
   readonly apiKey?: string;
   readonly modelSelection: ModelSelection;
   readonly models?: ReadonlyArray<ServerProviderModel>;
+  readonly sdkModels?: ReadonlyArray<SDKModel>;
   readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
   readonly threadId: ThreadId;
   readonly mcpSession: McpProviderSession.McpProviderSessionConfig | undefined;
   readonly platform: NodeJS.Platform;
+  /** Present for cloud agents; only a create names the repository to clone. */
+  readonly cloud?: { readonly repository?: CursorCloudRepository };
 }): AgentOptions {
+  const common = {
+    model: cursorSdkModelSelection(input.modelSelection, input.models, input.sdkModels),
+    // Cursor's cloud API rejects names over 100 characters; delegated thread ids run longer.
+    name: `T3 Code ${input.threadId}`.slice(0, 100),
+    mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
+    ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
+  } satisfies AgentOptions;
+  // The VM cannot reach this environment's T3 Code MCP server, so cloud agents get none.
+  if (input.cloud !== undefined) {
+    const repository = input.cloud.repository;
+    return {
+      ...common,
+      cloud: repository === undefined ? {} : { repos: [{ ...repository }], autoCreatePR: true },
+    };
+  }
   const policy = cursorRuntimeAgentPolicy(input.runtimePolicy, input.platform);
   const mcpServers = cursorMcpServers(input.mcpSession);
   return {
-    model: cursorSdkModelSelection(input.modelSelection, input.models),
-    name: `T3 Code ${input.threadId}`,
-    mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
-    ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
+    ...common,
     local: {
       ...(input.runtimePolicy.cwd === null ? {} : { cwd: input.runtimePolicy.cwd }),
       autoReview: policy.autoReview,
@@ -1016,6 +1034,8 @@ export interface CursorAdapterV2Options {
   readonly instanceId: ProviderInstanceId;
   readonly environment: NodeJS.ProcessEnv;
   readonly getModels?: () => ReadonlyArray<ServerProviderModel>;
+  readonly getSdkModels?: () => ReadonlyArray<SDKModel>;
+  readonly cloud?: boolean;
 }
 
 export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
@@ -2514,6 +2534,20 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                 ),
               );
 
+        const resolveCloudRepository = (cwd: string) =>
+          resolveCursorCloudRepository(cwd).pipe(
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+            Effect.filterOrFail(
+              (repository): repository is CursorCloudRepository => repository !== undefined,
+              () =>
+                new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: CursorAgentSdk.CURSOR_PROVIDER,
+                  detail:
+                    "Cursor Cloud needs a project with an `origin` remote that Cursor can clone, such as a GitHub repository.",
+                }),
+            ),
+          );
+
         const openAgent = Effect.fnUntraced(function* (openInput: {
           readonly operation: "create" | "resume";
           readonly threadId: ThreadId;
@@ -2543,10 +2577,20 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             yield* existing.session.close.pipe(Effect.ignore);
             yield* Ref.set(liveAgent, null);
           }
+          const cloud =
+            openInput.operation === "create"
+              ? adapterOptions.cloud === true
+                ? { repository: yield* resolveCloudRepository(cwd) }
+                : undefined
+              : CursorAgentSdk.isCursorCloudAgentId(openInput.agentId)
+                ? {}
+                : undefined;
           const options = makeCursorAgentOptions({
+            ...(cloud === undefined ? {} : { cloud }),
             ...(apiKey === undefined ? {} : { apiKey }),
             modelSelection: openInput.modelSelection,
             models: adapterOptions.getModels?.() ?? [],
+            sdkModels: adapterOptions.getSdkModels?.() ?? [],
             runtimePolicy: openInput.runtimePolicy,
             platform,
             threadId: openInput.threadId,
@@ -2705,7 +2749,8 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               modelSelection: turnInput.modelSelection,
               runtimePolicy: turnInput.runtimePolicy,
             });
-            const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+            const cloud = CursorAgentSdk.isCursorCloudAgentId(agent.nativeThreadId);
+            const mcpSession = cloud ? undefined : yield* mcpSessions.read(turnInput.threadId);
             const mcpServers = cursorMcpServers(mcpSession);
             const hasDeviceTools =
               mcpServers !== undefined && mcpSession?.capabilities?.has("device") === true;
@@ -2714,7 +2759,10 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             const delivered =
               known?.agent === agent.nativeThreadId
                 ? known
-                : { orchestration: turnInput.runOrdinal > 1, device: false };
+                : {
+                    orchestration: turnInput.nativeThreadHasTurns ?? turnInput.runOrdinal > 1,
+                    device: false,
+                  };
             const interrupted = yield* Ref.get(interruptedPrompt);
             const runCheckpointed = (runId?: string) =>
               agent.session.runCheckpointed?.(runId) ?? Effect.succeed(false);
@@ -2759,7 +2807,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             // A send-time set replaces the create-time set, so the workspace servers go only here and are
             // read again each turn from mcp.json and mcp-disabled.json; both merge with settingSources.
             const turnMcpServers = {
-              ...(yield* resolveWorkspaceMcpServers(turnInput.runtimePolicy.cwd)),
+              ...(cloud ? {} : yield* resolveWorkspaceMcpServers(turnInput.runtimePolicy.cwd)),
               ...mcpServers,
             };
             const sdkRun = yield* agent.session
@@ -2771,6 +2819,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                   model: cursorSdkModelSelection(
                     turnInput.modelSelection,
                     adapterOptions.getModels?.() ?? [],
+                    adapterOptions.getSdkModels?.() ?? [],
                   ),
                   mode: turnInput.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
                   ...(Object.keys(turnMcpServers).length === 0
@@ -3245,15 +3294,106 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                 ),
               ),
           ),
-          rollbackThread: (rollbackInput) =>
-            Effect.fail(
-              new ProviderAdapter.ProviderAdapterRollbackThreadError({
-                driver: CursorAgentSdk.CURSOR_PROVIDER,
-                providerThreadId: rollbackInput.providerThread.id,
-                checkpointId: rollbackInput.target.checkpointId,
-                cause: "Cursor Agent SDK does not expose conversation rollback.",
-              }),
-            ),
+          rollbackThread: Effect.fn("CursorAdapterV2.rollbackThread")(
+            function* (rollbackInput: ProviderAdapter.ProviderAdapterV2RollbackThreadInput) {
+              const current = yield* Ref.get(activeTurn);
+              if (current !== null) {
+                return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: CursorAgentSdk.CURSOR_PROVIDER,
+                  detail: `Cannot roll back Cursor provider thread ${rollbackInput.providerThread.id} while turn ${current.providerTurnId} is active.`,
+                });
+              }
+              const threadId = rollbackInput.providerThread.appThreadId ?? input.threadId;
+              const { target } = rollbackInput;
+              // The kept turns may predate a compaction, so the instructions are sent again.
+              const forgetConversation = (agent: string) =>
+                Effect.all([
+                  Ref.set(told, { agent, orchestration: false, device: false }),
+                  Ref.set(interruptedPrompt, null),
+                  Ref.set(resumedAgent, null),
+                ]);
+              const now = yield* DateTime.now;
+              if (target.type === "provider_turn") {
+                const keptRunId = target.providerTurn.nativeTurnRef?.nativeId;
+                if (keptRunId == null) {
+                  return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                    driver: CursorAgentSdk.CURSOR_PROVIDER,
+                    detail: `Provider turn ${target.providerTurn.id} has no Cursor run id.`,
+                  });
+                }
+                const agent = yield* openAgent({
+                  operation: "resume",
+                  agentId: nativeThreadId(rollbackInput.providerThread),
+                  storeCwd: rollbackInput.providerThread.nativeMetadata?.cursorStoreCwd,
+                  threadId,
+                  modelSelection: input.modelSelection,
+                  runtimePolicy: input.runtimePolicy,
+                });
+                if (agent.session.rewindAfterRun === undefined) {
+                  return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                    driver: CursorAgentSdk.CURSOR_PROVIDER,
+                    detail: "This Cursor SDK session cannot rewind its conversation.",
+                  });
+                }
+                yield* agent.session.rewindAfterRun(keptRunId);
+                yield* forgetConversation(agent.nativeThreadId);
+                yield* agent.session.close.pipe(Effect.ignore);
+                yield* Ref.set(liveAgent, null);
+                return {
+                  providerThread: {
+                    ...rollbackInput.providerThread,
+                    providerSessionId: input.providerSessionId,
+                    status: "idle" as const,
+                    updatedAt: now,
+                  },
+                  providerTurns: [],
+                  messages: [],
+                  runtimeRequests: [],
+                };
+              }
+              // The first run starts without a checkpoint, so there is nothing to rewind onto.
+              const opened = yield* openAgent({
+                operation: "create",
+                threadId,
+                modelSelection: input.modelSelection,
+                runtimePolicy: input.runtimePolicy,
+              });
+              yield* forgetConversation(opened.nativeThreadId);
+              return {
+                providerThread: {
+                  ...rollbackInput.providerThread,
+                  providerSessionId: input.providerSessionId,
+                  nativeThreadRef: {
+                    driver: CursorAgentSdk.CURSOR_PROVIDER,
+                    nativeId: opened.nativeThreadId,
+                    strength: "strong" as const,
+                  },
+                  nativeConversationHeadRef: null,
+                  nativeMetadata: {
+                    ...rollbackInput.providerThread.nativeMetadata,
+                    cursorStoreCwd: opened.storeCwd,
+                  },
+                  status: "idle" as const,
+                  updatedAt: now,
+                },
+                providerTurns: [],
+                messages: [],
+                runtimeRequests: [],
+              };
+            },
+            (effect, rollbackInput) =>
+              effect.pipe(
+                Effect.mapError(
+                  (cause) =>
+                    new ProviderAdapter.ProviderAdapterRollbackThreadError({
+                      driver: CursorAgentSdk.CURSOR_PROVIDER,
+                      providerThreadId: rollbackInput.providerThread.id,
+                      checkpointId: rollbackInput.target.checkpointId,
+                      cause,
+                    }),
+                ),
+              ),
+          ),
           forkThread: (forkInput) =>
             Effect.fail(
               new ProviderAdapter.ProviderAdapterForkThreadError({

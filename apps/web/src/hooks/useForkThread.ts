@@ -5,7 +5,9 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import type { ScopedThreadRef } from "@t3tools/contracts";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useNavigate } from "@tanstack/react-router";
+import { msg } from "gt-react";
 
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { newThreadId } from "../lib/utils";
@@ -13,15 +15,19 @@ import { waitForThreadShell } from "../state/entities";
 import { threadEnvironment } from "../state/threads";
 import { buildThreadRouteParams } from "../threadRoutes";
 import { useAtomCommand } from "../state/use-atom-command";
-
-const FORK_NOT_SYNCED_MESSAGE =
-  "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.";
+import { m } from "../i18n/messages";
 
 /** Opens a thread a fork just created, once its shell reaches this client; returns an error otherwise. */
 export function useOpenForkedThread() {
   const navigate = useNavigate();
   return async (targetThreadRef: ScopedThreadRef): Promise<string | null> => {
-    if (!(await waitForThreadShell(targetThreadRef))) return FORK_NOT_SYNCED_MESSAGE;
+    if (!(await waitForThreadShell(targetThreadRef))) {
+      return m(
+        msg(
+          "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
+        ),
+      );
+    }
     await navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(targetThreadRef),
@@ -36,7 +42,7 @@ export function useForkThread() {
   const openForkedThread = useOpenForkedThread();
   const failureToast = (description: string) =>
     toastManager.add(
-      stackedThreadToast({ type: "error", title: "Failed to fork thread", description }),
+      stackedThreadToast({ type: "error", title: m(msg("Failed to fork thread")), description }),
     );
   return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id">) => {
     const targetThreadId = newThreadId();
@@ -47,7 +53,7 @@ export function useForkThread() {
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        failureToast(error instanceof Error ? error.message : "An error occurred.");
+        failureToast(thrownErrorMessage(error, m) ?? m(msg("An error occurred.")));
       }
       return;
     }

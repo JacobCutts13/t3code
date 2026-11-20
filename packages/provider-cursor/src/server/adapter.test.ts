@@ -6,9 +6,11 @@ import { assert, describe, it } from "@effect/vitest";
 import type { InteractionUpdate } from "@cursor/sdk";
 import { toolOutputImages } from "@t3tools/shared/toolOutput";
 import {
+  CheckpointId,
   EnvironmentId,
   MessageId,
   NodeId,
+  type OrchestrationV2ProviderTurn,
   ProjectId,
   ProviderInstanceId,
   ProviderSessionId,
@@ -45,8 +47,10 @@ import {
   nestedToolCallFromEnvelope,
 } from "./adapter.ts";
 import * as CursorAgentSdk from "./CursorAgentSdk.ts";
+import * as CursorSdk from "./CursorSdk.ts";
 import { loadCursorSdk } from "./sdk.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
+import { cursorCloudRepositoryUrl } from "./cloudRepository.ts";
 
 // The SDK reads CURSOR_BACKEND_URL once when it loads, before any test body runs.
 const cursorBackendUrl = await vi.hoisted(async () => {
@@ -757,6 +761,9 @@ describe("CursorAdapterV2", () => {
       const fileSystem = yield* FileSystem.FileSystem;
       const workspace = yield* fileSystem.makeTempDirectoryScoped({ prefix: "cursor-v2-device-" });
       const sentMessages: Array<string> = [];
+      const rewoundAfter: Array<string> = [];
+      let rewindFails = false;
+      let createdAgents = 0;
       const instanceId = ProviderInstanceId.make("cursor");
       const threadId = ThreadId.make("cursor-device-thread");
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -783,11 +790,21 @@ describe("CursorAdapterV2", () => {
       }).pipe(
         Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
           assertComplete: Effect.void,
-          open: () =>
-            Effect.succeed({
-              agentId: "native-cursor-device",
+          open: (openInput) => {
+            const agentId = openInput.agentId ?? `native-cursor-device-${++createdAgents}`;
+            return Effect.succeed({
+              agentId,
               listMessages: Effect.succeed([]),
               close: Effect.void,
+              rewindAfterRun: (runId) =>
+                rewindFails
+                  ? Effect.fail(
+                      new CursorAgentSdk.CursorAgentSdkRunnerError({
+                        method: "agent.rewind",
+                        cause: "store unavailable",
+                      }),
+                    )
+                  : Effect.sync(() => void rewoundAfter.push(runId)),
               send: (input) =>
                 Effect.sync(() => {
                   sentMessages.push(
@@ -795,7 +812,7 @@ describe("CursorAdapterV2", () => {
                   );
                   const runId = `native-cursor-run-${sentMessages.length}`;
                   return {
-                    agentId: "native-cursor-device",
+                    agentId,
                     runId,
                     wait: Effect.succeed({
                       id: runId,
@@ -807,7 +824,8 @@ describe("CursorAdapterV2", () => {
                     cancel: Effect.void,
                   };
                 }),
-            }),
+            });
+          },
         }),
         Effect.provide(TestProviderHost.layer({ cwd: workspace })),
       );
@@ -817,7 +835,7 @@ describe("CursorAdapterV2", () => {
         modelSelection,
         runtimePolicy,
       });
-      const providerThread = yield* runtime.ensureThread({
+      let providerThread = yield* runtime.ensureThread({
         threadId,
         modelSelection,
         runtimePolicy,
@@ -848,13 +866,15 @@ describe("CursorAdapterV2", () => {
       };
       // Starts at run 5: a conversation from before device instructions existed, now resumed.
       let runOrdinal = 4;
-      const send = Effect.fnUntraced(function* (compact = false) {
+      let lastProviderTurn: OrchestrationV2ProviderTurn | undefined;
+      const send = Effect.fnUntraced(function* (compact = false, nativeThreadHasTurns?: boolean) {
         runOrdinal += 1;
         const turnInput = {
           threadId,
           providerThread,
           modelSelection,
           runtimePolicy,
+          ...(nativeThreadHasTurns === undefined ? {} : { nativeThreadHasTurns }),
           runId: RunId.make(`cursor-device-run-${runOrdinal}`),
           runOrdinal,
           providerTurnOrdinal: runOrdinal,
@@ -870,10 +890,13 @@ describe("CursorAdapterV2", () => {
           },
         };
         yield* compact ? runtime.compactThread!(turnInput) : runtime.startTurn(turnInput);
-        yield* runtime.events.pipe(
-          Stream.filter((event) => event.type === "turn.terminal"),
-          Stream.runHead,
+        const events = yield* runtime.events.pipe(
+          Stream.takeUntil((event) => event.type === "turn.terminal"),
+          Stream.runCollect,
         );
+        const providerTurn = events.findLast((event) => event.type === "provider_turn.updated");
+        if (providerTurn?.type === "provider_turn.updated")
+          lastProviderTurn = providerTurn.providerTurn;
         const sent = sentMessages.at(-1)!;
         return {
           orchestration: sent.includes("## T3 Code orchestration"),
@@ -896,6 +919,61 @@ describe("CursorAdapterV2", () => {
       yield* setDeviceAccess(true);
       assert.deepEqual(yield* send(), told(false, true), "device access turned on later");
       assert.deepEqual(yield* send(), told(false, false));
+
+      const keptTurn = lastProviderTurn!;
+      yield* send();
+      const rollbackToKept = runtime.rollbackThread({
+        providerThread,
+        target: {
+          type: "provider_turn",
+          checkpointId: CheckpointId.make("cursor-device-kept-checkpoint"),
+          appRunOrdinal: runOrdinal - 1,
+          providerTurn: keptTurn,
+        },
+        providerThreadTurns: [keptTurn],
+      });
+      rewindFails = true;
+      yield* Effect.flip(rollbackToKept);
+      rewindFails = false;
+      assert.deepEqual(
+        yield* send(false, true),
+        told(false, false),
+        "a failed rewind leaves the conversation, and what it was told, unchanged",
+      );
+      const rewound = yield* rollbackToKept;
+      assert.deepEqual(rewoundAfter, [keptTurn.nativeTurnRef?.nativeId]);
+      assert.deepEqual(
+        rewound.providerThread.nativeThreadRef,
+        providerThread.nativeThreadRef,
+        "Cursor rewinds the same agent",
+      );
+      assert.deepEqual(
+        yield* send(false, true),
+        told(true, true),
+        "the rewound conversation may have dropped instructions a later turn carried",
+      );
+
+      const rolledBack = yield* runtime.rollbackThread({
+        providerThread,
+        target: {
+          type: "thread_start",
+          checkpointId: CheckpointId.make("cursor-device-checkpoint"),
+          appRunOrdinal: 0,
+        },
+        providerThreadTurns: [],
+      });
+      assert.strictEqual(rolledBack.providerThread.id, providerThread.id);
+      assert.notStrictEqual(
+        rolledBack.providerThread.nativeThreadRef?.nativeId,
+        providerThread.nativeThreadRef?.nativeId,
+        "a rollback to the thread's start has no checkpoint to rewind onto",
+      );
+      providerThread = rolledBack.providerThread;
+      assert.deepEqual(
+        yield* send(false, false),
+        told(true, true),
+        "the fresh agent after a rollback has been told nothing",
+      );
     }).pipe(
       Effect.scoped,
       Effect.provide(
@@ -2312,6 +2390,53 @@ describe("CursorAdapterV2", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
+  it.live("opens a model added to the account after its workspace already ran an agent", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fileSystem.makeTempDirectoryScoped({ prefix: "cursor-new-model-" });
+      const backend = yield* fakeCursorBackend;
+      yield* scopedProcessEnv({
+        HOME: home,
+        USERPROFILE: home,
+        CURSOR_CONFIG_DIR: path.join(home, ".cursor"),
+      });
+      const runner = yield* CursorAgentSdk.makeCursorAgentSdkRunner(() => undefined).pipe(
+        Effect.provide(CursorSdk.layer),
+      );
+      const open = (model: string) =>
+        Effect.acquireRelease(
+          runner.open({
+            operation: "create",
+            options: makeCursorAgentOptions({
+              apiKey: "synthetic-cursor-api-key",
+              modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model },
+              runtimePolicy: {
+                runtimeMode: "full-access",
+                interactionMode: "default",
+                cwd: home,
+              },
+              threadId: ThreadId.make(`cursor-new-model-${model}`),
+              mcpSession: undefined,
+              platform: "linux",
+            }),
+            threadId: ThreadId.make(`cursor-new-model-${model}`),
+            providerSessionId: ProviderSessionId.make(`cursor-new-model-${model}`),
+          }),
+          (session) => Effect.ignore(session.close),
+        );
+
+      yield* open("composer-2");
+      backend.models.push("composer-2.5");
+
+      const exit = yield* Effect.exit(open("composer-2.5"));
+      assert.isTrue(
+        Exit.isSuccess(exit),
+        Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "opened",
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   it("maps runtime modes to the SDK sandbox and auto-review controls", () => {
     const base = {
       interactionMode: "default" as const,
@@ -2775,6 +2900,169 @@ describe("CursorAdapterV2", () => {
       ),
   );
 
+  it.effect("dispatches cloud instances to the project's pushed branch without local MCP", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const cwd = yield* fileSystem.realPath(
+        yield* fileSystem.makeTempDirectoryScoped({ prefix: "cursor-v2-cloud-" }),
+      );
+      for (const args of [
+        ["init", "-q", "-b", "feature/cloud", cwd],
+        ["-C", cwd, "remote", "add", "origin", "git@github.com:acme/widgets.git"],
+      ]) {
+        yield* spawnAndCollect("git", ChildProcess.make("git", args));
+      }
+      yield* fileSystem.makeDirectory(`${cwd}/.cursor`);
+      yield* fileSystem.writeFileString(
+        `${cwd}/.cursor/mcp.json`,
+        JSON.stringify({
+          mcpServers: { local: { command: "node", args: ["${workspaceFolder}/s.mjs"] } },
+        }),
+      );
+
+      const instanceId = ProviderInstanceId.make("cursor-cloud");
+      // Delegated children get ids this long.
+      const threadId = ThreadId.make(
+        "thread:delegated-task:command%3Amcp%3Aef63eab0-9999-41c8-b2a8-0534f2a49c36%3Adelegate-task%3A3b6b8bf4",
+      );
+      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+      yield* mcpSessions.set({
+        environmentId: EnvironmentId.make("cursor-cloud-environment"),
+        threadId,
+        providerSessionId: "cursor-cloud-session",
+        providerInstanceId: instanceId,
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer synthetic-cursor-token",
+        browserToolsAvailable: false,
+      });
+      const modelSelection = { instanceId, model: "composer-2.5" };
+      const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        cwd,
+      });
+      const opened: Array<CursorAgentSdk.CursorAgentSdkOpenInput> = [];
+      const sentWith: Array<Record<string, unknown> | undefined> = [];
+      const adapter = yield* makeCursorAdapterV2({
+        instanceId,
+        environment: {},
+        cloud: true,
+      }).pipe(
+        Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
+          assertComplete: Effect.void,
+          open: (input) =>
+            Effect.sync(() => {
+              opened.push(input);
+              return {
+                agentId: input.agentId ?? "bc-cloud-agent",
+                listMessages: Effect.succeed([]),
+                close: Effect.void,
+                send: (sendInput) => {
+                  sentWith.push(sendInput.options?.mcpServers);
+                  return Effect.die("sent");
+                },
+              };
+            }),
+        }),
+        Effect.provide(TestProviderHost.layer({ cwd })),
+      );
+      const runtime = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("cursor-cloud-session"),
+        modelSelection,
+        runtimePolicy,
+      });
+      const providerThread = yield* runtime.ensureThread({
+        threadId,
+        modelSelection,
+        runtimePolicy,
+      });
+      assert.deepEqual(opened[0]?.options.cloud, {
+        repos: [{ url: "https://github.com/acme/widgets", startingRef: "feature/cloud" }],
+        autoCreatePR: true,
+      });
+      assert.isUndefined(opened[0]?.options.local);
+      assert.isUndefined(opened[0]?.options.mcpServers);
+      assert.isAtMost(opened[0]?.options.name?.length ?? 0, 100);
+
+      const now = yield* DateTime.now;
+      yield* runtime
+        .startTurn({
+          threadId,
+          providerThread,
+          modelSelection,
+          runtimePolicy,
+          runId: RunId.make("cursor-cloud-run"),
+          runOrdinal: 1,
+          providerTurnOrdinal: 1,
+          attemptId: RunAttemptId.make("cursor-cloud-attempt"),
+          rootNodeId: NodeId.make("cursor-cloud-root"),
+          appThread: {
+            id: threadId,
+            projectId: ProjectId.make("cursor-cloud-project"),
+            createdBy: "user",
+            creationSource: "web",
+            title: "Cursor Cloud",
+            providerInstanceId: instanceId,
+            modelSelection,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: null,
+            activeProviderThreadId: providerThread.id,
+            lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+            forkedFrom: null,
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            settledOverride: null,
+            settledAt: null,
+            lastVisitedAt: null,
+            deletedAt: null,
+          },
+          message: {
+            messageId: MessageId.make("cursor-cloud-message"),
+            createdBy: "user",
+            creationSource: "web",
+            text: "Hello.",
+            attachments: [],
+          },
+        })
+        .pipe(Effect.exit);
+      assert.deepEqual(sentWith, [undefined]);
+
+      // The SDK rejects local options for a cloud agent, whatever runtime the instance has now.
+      const resumed = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("cursor-cloud-session-2"),
+        modelSelection,
+        runtimePolicy,
+      });
+      yield* resumed.resumeThread({ providerThread });
+      assert.deepEqual(opened[1]?.options.cloud, {});
+      assert.isUndefined(opened[1]?.options.local);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(NodeServices.layer, IdAllocator.layer, McpProviderSessions.layer),
+      ),
+    ),
+  );
+
+  it("normalizes git remotes to the HTTPS URLs Cursor Cloud clones", () => {
+    for (const [remote, expected] of [
+      ["git@github.com:acme/widgets.git", "https://github.com/acme/widgets"],
+      ["ssh://git@github.com:22/acme/widgets.git", "https://github.com/acme/widgets"],
+      ["https://token@github.com/acme/widgets/", "https://github.com/acme/widgets"],
+      ["https://gitlab.com/acme/platform/widgets.git", "https://gitlab.com/acme/platform/widgets"],
+      ["/srv/git/widgets.git", undefined],
+      ["file:///srv/git/acme/widgets.git", undefined],
+      ["", undefined],
+    ] as const) {
+      assert.equal(cursorCloudRepositoryUrl(remote), expected, remote);
+    }
+  });
+
   it("recognizes direct and SDK-wrapped abort failures as cancellation", () => {
     assert.isTrue(CursorAgentSdk.isCursorCancellationError({ name: "AbortError" }));
     assert.isTrue(
@@ -3187,6 +3475,7 @@ const fakeCursorBackend = Effect.gen(function* () {
     2,
     Buffer.concat([Buffer.from([0x08, 0x01]), protoField(15, Buffer.from("ctx")), protoField(10)]),
   );
+  const models = ["composer-2"];
   const runFrame = Buffer.alloc(5 + requestContextExec.length);
   runFrame.writeUInt32BE(requestContextExec.length, 1);
   requestContextExec.copy(runFrame, 5);
@@ -3201,7 +3490,7 @@ const fakeCursorBackend = Effect.gen(function* () {
           return;
         case "/v1/models":
           response.setHeader("content-type", "application/json");
-          response.end(JSON.stringify({ items: [{ id: "composer-2" }] }));
+          response.end(JSON.stringify({ items: models.map((id) => ({ id })) }));
           return;
         case "/agent.v1.AgentService/RunSSE":
           response.writeHead(200, { "content-type": "application/connect+proto" });
@@ -3243,7 +3532,7 @@ const fakeCursorBackend = Effect.gen(function* () {
         server.close(() => resume(Effect.void));
       }),
   );
-  return { requestContext };
+  return { requestContext, models };
 });
 
 function protoVarint(value: number): Buffer {
