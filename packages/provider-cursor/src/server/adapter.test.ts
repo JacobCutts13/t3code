@@ -2921,7 +2921,10 @@ describe("CursorAdapterV2", () => {
       );
 
       const instanceId = ProviderInstanceId.make("cursor-cloud");
-      const threadId = ThreadId.make("cursor-cloud-thread");
+      // Delegated children get ids this long.
+      const threadId = ThreadId.make(
+        "thread:delegated-task:command%3Amcp%3Aef63eab0-9999-41c8-b2a8-0534f2a49c36%3Adelegate-task%3A3b6b8bf4",
+      );
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
       yield* mcpSessions.set({
         environmentId: EnvironmentId.make("cursor-cloud-environment"),
@@ -2980,6 +2983,7 @@ describe("CursorAdapterV2", () => {
       });
       assert.isUndefined(opened[0]?.options.local);
       assert.isUndefined(opened[0]?.options.mcpServers);
+      assert.isAtMost(opened[0]?.options.name?.length ?? 0, 100);
 
       const now = yield* DateTime.now;
       yield* runtime

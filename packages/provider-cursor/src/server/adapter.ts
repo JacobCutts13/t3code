@@ -321,7 +321,8 @@ export function makeCursorAgentOptions(input: {
 }): AgentOptions {
   const common = {
     model: cursorSdkModelSelection(input.modelSelection, input.models, input.sdkModels),
-    name: `T3 Code ${input.threadId}`,
+    // Cursor's cloud API rejects names over 100 characters; delegated thread ids run longer.
+    name: `T3 Code ${input.threadId}`.slice(0, 100),
     mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
     ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
   } satisfies AgentOptions;
