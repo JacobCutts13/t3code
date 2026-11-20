@@ -19,6 +19,7 @@ import { Atom } from "effect/reactivity";
 import type { EnvironmentThreadShell, PendingSubagentRequest } from "./models.ts";
 import { presentThreadShell, threadRuntimeIsActive } from "./models.ts";
 import { hiddenThreadKeys, NO_HIDDEN_THREADS } from "./threadTagFilter.ts";
+import { isThreadTreeRow } from "./threadTree.ts";
 import { type EnvironmentCatalogState, enabledEnvironmentIds } from "./connections.ts";
 import {
   arrayElementsEqual,
@@ -69,46 +70,6 @@ export function isShownUnderParent(
   delegatedUnderParent: ReadonlySet<string>,
 ): boolean {
   return !isListedThreadLineage(lineage) || delegatedUnderParent.has(threadKey(ref));
-}
-
-// Subagents, side chats and tasks delegated from a listed parent have no list row,
-// so an open one is represented by its nearest listed ancestor. A broken chain
-// (missing or archived parent, cycle) resolves to the thread itself, which then matches no row.
-export function resolveListedAncestorThreadRef(
-  ref: ScopedThreadRef,
-  threads: readonly Pick<
-    EnvironmentThreadShell,
-    "id" | "environmentId" | "lineage" | "delegatedFrom" | "archivedAt"
-  >[],
-): ScopedThreadRef {
-  const findThread = (target: ScopedThreadRef) =>
-    threads.find(
-      (thread) => thread.id === target.threadId && thread.environmentId === target.environmentId,
-    );
-  const visited = new Set<string>();
-  let current = ref;
-  let thread = findThread(current);
-  while (thread !== undefined) {
-    let parent: ScopedThreadRef;
-    if (!isListedThreadLineage(thread.lineage)) {
-      if (thread.lineage.parentThreadId === null) return ref;
-      parent = { environmentId: thread.environmentId, threadId: thread.lineage.parentThreadId };
-    } else if (thread.delegatedFrom != null) {
-      parent = {
-        environmentId: thread.delegatedFrom.environmentId,
-        threadId: thread.delegatedFrom.threadId,
-      };
-      // Mirrors delegatedUnderParent: a task whose parent is not listed keeps its own row.
-      if (findThread(parent)?.archivedAt !== null) return current;
-    } else {
-      return current;
-    }
-    if (visited.has(threadKey(current))) return ref;
-    visited.add(threadKey(current));
-    current = parent;
-    thread = findThread(current);
-  }
-  return ref;
 }
 
 /** Provider-native
@@ -756,28 +717,52 @@ export function createEnvironmentThreadShellAtoms(input: {
     return next;
   }).pipe(Atom.withLabel("environment-delegated-under-parent"));
 
-  let previousNavigationShells: ReadonlyArray<EnvironmentThreadShell> = [];
-  const navigationThreadShellsAtom = Atom.make((get) => {
-    const next: EnvironmentThreadShell[] = [];
-    const underParent = get(delegatedUnderParentAtom);
-    const hidden = get(hiddenThreadKeysAtom);
-    for (const environmentId of enabledEnvironmentIds(get(input.catalogValueAtom))) {
-      const subagentRequests = get(pendingSubagentRequestsAtom(environmentId));
-      for (const thread of get(environmentThreadsAtom(environmentId))) {
-        if (
-          thread.archivedAt !== null ||
-          isShownUnderParent({ environmentId, threadId: thread.id }, thread.lineage, underParent) ||
-          hidden.has(threadKey({ environmentId, threadId: thread.id }))
-        ) {
-          continue;
+  // Non-archived, non-hidden shells across enabled environments that `include` keeps.
+  const shellListAtom = (
+    label: string,
+    include: (get: Atom.AtomContext) => (shell: EnvironmentThreadShell) => boolean,
+  ) => {
+    let previous: ReadonlyArray<EnvironmentThreadShell> = [];
+    return Atom.make((get) => {
+      const next: EnvironmentThreadShell[] = [];
+      const keep = include(get);
+      const hidden = get(hiddenThreadKeysAtom);
+      for (const environmentId of enabledEnvironmentIds(get(input.catalogValueAtom))) {
+        const subagentRequests = get(pendingSubagentRequestsAtom(environmentId));
+        for (const thread of get(environmentThreadsAtom(environmentId))) {
+          if (
+            thread.archivedAt !== null ||
+            hidden.has(threadKey({ environmentId, threadId: thread.id }))
+          )
+            continue;
+          const shell = scopedThread(environmentId, thread, subagentRequests);
+          if (keep(shell)) next.push(shell);
         }
-        next.push(scopedThread(environmentId, thread, subagentRequests));
       }
-    }
-    if (arrayElementsEqual(previousNavigationShells, next)) return previousNavigationShells;
-    previousNavigationShells = next;
-    return next;
-  }).pipe(Atom.withLabel("environment-navigation-thread-shells"));
+      if (arrayElementsEqual(previous, next)) return previous;
+      previous = next;
+      return next;
+    }).pipe(Atom.withLabel(label));
+  };
+
+  const navigationThreadShellsAtom = shellListAtom(
+    "environment-navigation-thread-shells",
+    (get) => {
+      const underParent = get(delegatedUnderParentAtom);
+      return (shell) =>
+        !isShownUnderParent(
+          { environmentId: shell.environmentId, threadId: shell.id },
+          shell.lineage,
+          underParent,
+        );
+    },
+  );
+
+  /** navigationThreadShellsAtom plus the child threads a list nests under their parents. */
+  const treeThreadShellsAtom = shellListAtom(
+    "environment-tree-thread-shells",
+    () => isThreadTreeRow,
+  );
 
   return {
     environmentThreadsAtom,
@@ -791,6 +776,7 @@ export function createEnvironmentThreadShellAtoms(input: {
     anyEnvironmentHidingAtom,
     quietThreadShellsAtom,
     navigationThreadShellsAtom,
+    treeThreadShellsAtom,
     delegatedUnderParentAtom,
     pendingSubagentRequestsAtom,
     threadShellsForProjectRefsAtom: (refs: ReadonlyArray<ScopedProjectRef>) =>

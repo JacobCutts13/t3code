@@ -1251,5 +1251,6 @@ export * from "./threadDetail.ts";
 export * from "./threadFamilies.ts";
 export * from "./olderSettledThreads.ts";
 export * from "./threadShell.ts";
+export * from "./threadTree.ts";
 export * from "./threadState.ts";
 export * from "./threadTagFilter.ts";

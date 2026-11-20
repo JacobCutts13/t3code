@@ -7,6 +7,7 @@ import { m, type MessageResolver } from "../i18n/messages";
 export type ThreadActionMenuId =
   | "find"
   | "new-thread-on-branch"
+  | "fork"
   | "filter-by-project"
   | "turn-into-project"
   | "project-settings"
@@ -123,6 +124,8 @@ export interface ThreadActionMenuState {
   readonly canShareWithGuest?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
+  /** Why the thread cannot be forked yet; null when it can. Omitted hides the action. */
+  readonly forkBlockedReason?: string | null;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -158,6 +161,18 @@ export function buildThreadActionMenuItems(
           },
         ]
       : []),
+    ...(state.forkBlockedReason === undefined
+      ? []
+      : [
+          {
+            id: "fork" as const,
+            label: resolve(msg("Fork thread")),
+            icon: "git-fork",
+            ...(state.forkBlockedReason === null
+              ? {}
+              : { disabled: true, detail: state.forkBlockedReason }),
+          },
+        ]),
     ...(state.supports.pinning
       ? [
           state.isPinned

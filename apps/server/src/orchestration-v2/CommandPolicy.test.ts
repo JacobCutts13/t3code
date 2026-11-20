@@ -316,6 +316,7 @@ layer("CommandPolicyV2", (it) => {
         sourceRunStatus: "completed",
         fromSpecificTurn: true,
         sourceBusy: false,
+        movesWorkspace: false,
       });
 
       assert.equal(result, "portable_context");
@@ -360,7 +361,7 @@ layer("CommandPolicyV2", (it) => {
     ({ capabilities, hasNativeTurnBoundary, busyStrategy }) =>
       Effect.gen(function* () {
         const policy = yield* CommandPolicy.CommandPolicyV2;
-        const decide = (sourceBusy: boolean) =>
+        const decide = (sourceBusy: boolean, movesWorkspace = false) =>
           policy.decideForkExecution({
             commandId,
             threadId,
@@ -372,10 +373,12 @@ layer("CommandPolicyV2", (it) => {
             sourceRunStatus: "completed",
             fromSpecificTurn: true,
             sourceBusy,
+            movesWorkspace,
           });
 
         assert.equal(yield* decide(false), "native_fork");
         assert.equal(yield* decide(true), busyStrategy);
+        assert.equal(yield* decide(false, true), "portable_context");
       }),
   );
 });

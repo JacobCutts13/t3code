@@ -65,6 +65,7 @@ import {
   OrchestrationV2GetShellSnapshotError,
   OrchestrationV2GetThreadProjectionError,
   OrchestrationV2ThreadLaunchError,
+  OrchestrationV2ThreadForkError,
   type OrchestrationProjectShell,
   type OrchestrationV2ShellSnapshot,
   type OrchestrationV2ShellStreamItem,
@@ -124,6 +125,7 @@ import * as CommandOutputHub from "./orchestration-v2/CommandOutputHub.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
+import * as ThreadForkWorkspaceService from "./orchestration-v2/ThreadForkWorkspaceService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
@@ -1481,6 +1483,7 @@ export const layerWsRpc = (
         ).pipe(Effect.ignore);
       };
       const threadLaunch = yield* ThreadLaunchService.ThreadLaunchService;
+      const threadForkWorkspace = yield* ThreadForkWorkspaceService.ThreadForkWorkspaceService;
       const commandOutputHub = yield* CommandOutputHub.CommandOutputHub;
       const threadViewers = yield* ThreadViewers.ThreadViewers;
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
@@ -2185,6 +2188,26 @@ export const layerWsRpc = (
                 ),
             ),
           ),
+        [ORCHESTRATION_V2_WS_METHODS.forkThread]: (input) =>
+          startup
+            .enqueueCommand(
+              threadForkWorkspace.fork({
+                ...input,
+                createdBy: "user",
+                creationSource: input.creationSource ?? "web",
+              }),
+            )
+            .pipe(
+              Effect.catchTags({
+                ServerRuntimeStartupError: (cause) =>
+                  new OrchestrationV2ThreadForkError({
+                    sourceThreadId: input.sourceThreadId,
+                    targetThreadId: input.targetThreadId,
+                    message: "Failed to fork thread",
+                    cause,
+                  }),
+              }),
+            ),
         [ORCHESTRATION_V2_WS_METHODS.launchThread]: (input) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": input.commandId,

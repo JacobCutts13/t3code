@@ -87,6 +87,25 @@ it("stamps authoritative provenance on commands that create threads or messages"
   expect(stamped).not.toHaveProperty("linkOrigin");
   expect(stamped).not.toHaveProperty("delegatedFrom");
   expect(stamped).not.toHaveProperty("initialMessage");
+
+  // A client cannot point a fork at a folder; only the server's fork workspace sets one.
+  const fork = ThreadManagementService.withCreationProvenance(
+    {
+      type: "thread.fork",
+      createdBy: "agent",
+      creationSource: "mcp",
+      commandId: CommandId.make("command:thread-management:fork"),
+      sourceThreadId: ThreadId.make("thread:thread-management:create"),
+      targetThreadId: ThreadId.make("thread:thread-management:fork"),
+      sourcePoint: { type: "latest_stable" },
+      worktreePath: "/etc",
+      branch: "forged",
+    },
+    { createdBy: "user", creationSource: "web" },
+  );
+  expect(fork).toMatchObject({ createdBy: "user", creationSource: "web" });
+  expect(fork).not.toHaveProperty("worktreePath");
+  expect(fork).not.toHaveProperty("branch");
 });
 
 const layerReceiptsTest = CommandReceiptStore.layer.pipe(

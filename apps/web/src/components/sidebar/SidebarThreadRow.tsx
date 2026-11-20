@@ -42,6 +42,7 @@ import {
   AlarmClockOffIcon,
   ArrowRightLeftIcon,
   CheckIcon,
+  ChevronDownIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   CircleDashedIcon,
@@ -578,6 +579,11 @@ type SidebarThreadRowProps = {
   // "folder-multiline" adds the card's branch and PR line under it.
   variant: "card" | "slim" | "folder" | "folder-multiline";
   navigationParent?: string | undefined;
+  // Child threads (forks, subagents, delegated tasks) nest under their parent row.
+  nestDepth?: number | undefined;
+  childCount?: number | undefined;
+  childrenCollapsed?: boolean | undefined;
+  onToggleChildren?: ((threadKey: string) => void) | undefined;
   variantAction: SidebarSweepAction;
   settlementSupported: boolean;
   snoozeSupported: boolean;
@@ -1030,21 +1036,20 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       "bg-sidebar bg-linear-to-b from-sidebar-row-active to-sidebar-row-active text-sidebar-foreground opacity-100 shadow-lg",
   );
   const sortable = props.sortable;
-  const sortableRootProps = sortable
+  const sortableStyle = sortable
     ? {
-        ref: sortable.setNodeRef,
-        style: {
-          transform: CSS.Translate.toString(sortable.transform),
-          transition: sortable.transition,
-          // A zero-height boundary also makes dnd-kit scale the source to
-          // zero. Only projected peers use scaleY as a visibility sentinel.
-          visibility:
-            !sortable.isDragging && sortable.transform?.scaleY === 0
-              ? ("hidden" as const)
-              : undefined,
-        },
-        ...sortable.listeners,
+        transform: CSS.Translate.toString(sortable.transform),
+        transition: sortable.transition,
+        // A zero-height boundary also makes dnd-kit scale the source to
+        // zero. Only projected peers use scaleY as a visibility sentinel.
+        visibility:
+          !sortable.isDragging && sortable.transform?.scaleY === 0
+            ? ("hidden" as const)
+            : undefined,
       }
+    : undefined;
+  const sortableRootProps = sortable
+    ? { ref: sortable.setNodeRef, style: sortableStyle, ...sortable.listeners }
     : {};
   const destinationVerb = sortable?.isDragging
     ? props.dropVerb
@@ -1068,6 +1073,35 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     isActive: props.isActive,
   });
 
+  const { childCount = 0, childrenCollapsed = false, onToggleChildren } = props;
+  const childToggle =
+    childCount === 0 || onToggleChildren === undefined ? null : (
+      <button
+        type="button"
+        data-sidebar-action-for={threadKey}
+        aria-expanded={!childrenCollapsed}
+        aria-label={`${childrenCollapsed ? "Show" : "Hide"} ${childCount} child ${
+          childCount === 1 ? "thread" : "threads"
+        }`}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onToggleChildren(threadKey);
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+        className="inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded-sm text-xs tabular-nums text-sidebar-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
+        <ChevronDownIcon
+          aria-hidden
+          className={cn("size-3 transition-transform", childrenCollapsed && "-rotate-90")}
+        />
+        {childCount}
+      </button>
+    );
+  const nestStyle =
+    props.nestDepth === undefined || props.nestDepth === 0
+      ? sortableStyle
+      : { ...sortableStyle, paddingInlineStart: `${props.nestDepth * 0.875}rem` };
   const title = isRenaming ? (
     <ThreadRenameInput
       title={renamingTitle}
@@ -1330,6 +1364,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       <li
         data-thread-item={threadKey}
         {...sortableRootProps}
+        style={nestStyle}
         {...(fileDropHandlers ?? {})}
         className={cn(
           "list-none [content-visibility:auto] [contain-intrinsic-size:auto_--spacing(9)]",
@@ -1381,6 +1416,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 </span>
               )}
               {draftIndicator}
+              {childToggle}
               {title}
               {multiline ? titleLineIcons : null}
               {pinIndicator}
@@ -1534,6 +1570,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     <li
       data-thread-item={threadKey}
       {...sortableRootProps}
+      style={nestStyle}
       {...(fileDropHandlers ?? {})}
       // The hints are the rendered heights inside py-0.5. Revealing the open thread measures rows
       // that have not rendered yet, so a hint off by a pixel lands it a pixel short per row above.
@@ -1571,6 +1608,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             )}
           >
             <div className="flex h-5 min-w-0 items-center gap-1.5">
+              {childToggle}
               {draftIndicator}
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />

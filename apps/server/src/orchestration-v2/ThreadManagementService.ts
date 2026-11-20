@@ -95,8 +95,12 @@ export function withCreationProvenance(
       } = command;
       return { ...rest, ...provenance };
     }
+    case "thread.fork": {
+      // Only the server points a fork at the worktree it prepared, so a client cannot.
+      const { worktreePath: _worktreePath, branch: _branch, ...rest } = command;
+      return { ...rest, ...provenance };
+    }
     case "message.dispatch":
-    case "thread.fork":
     case "thread.merge_back":
     case "delegated_task.request":
       return { ...command, ...provenance };

@@ -23,6 +23,7 @@ import {
   shouldRecedeSidebarThread,
   sortInboxThreadsByReturn,
   resolveSidebarDropTarget,
+  filterSidebarV2TreeRows,
   planSidebarThreadDrop,
   resolveSidebarReorderableThreadKeys,
   sortPinnedThreadsForSidebar,
@@ -810,6 +811,55 @@ describe("sortScopedProjectsForSidebar", () => {
   });
 });
 
+describe("filterSidebarV2TreeRows", () => {
+  const parentId = ThreadId.make("thread-parent");
+  const child = (id: string, overrides: ThreadFixtureOverrides) =>
+    makeThread({ id: ThreadId.make(id), ...overrides });
+  const subagentLineage = {
+    rootThreadId: parentId,
+    parentThreadId: parentId,
+    relationshipToParent: "subagent",
+  } as const;
+
+  it("lists forks, app-owned subagents and delegated tasks, but not side chats or provider subagents", () => {
+    const threads = [
+      makeThread({ id: parentId }),
+      child("fork", {
+        lineage: { rootThreadId: parentId, parentThreadId: parentId, relationshipToParent: "fork" },
+      }),
+      child("mcp-subagent", {
+        lineage: subagentLineage,
+        source: { ...makeThreadFixture().source, creationSource: "mcp" },
+      }),
+      child("native-subagent", {
+        lineage: subagentLineage,
+        source: { ...makeThreadFixture().source, creationSource: "provider" },
+      }),
+      child("side-chat", {
+        lineage: {
+          rootThreadId: parentId,
+          parentThreadId: parentId,
+          relationshipToParent: "fork",
+          sideChat: true,
+        },
+      }),
+      child("delegated", {
+        delegatedFrom: { environmentId: localEnvironmentId, threadId: parentId, title: "Parent" },
+      }),
+      child("archived-fork", {
+        archivedAt: "2026-03-09T10:00:00.000Z",
+        lineage: { rootThreadId: parentId, parentThreadId: parentId, relationshipToParent: "fork" },
+      }),
+    ];
+    expect(filterSidebarV2TreeRows(threads, null).map((thread) => thread.id)).toEqual([
+      "thread-parent",
+      "fork",
+      "mcp-subagent",
+      "delegated",
+    ]);
+  });
+});
+
 describe("sortSidebarV2ProjectGroups", () => {
   it("does not let a hidden subagent thread reorder projects", () => {
     const olderProjectId = ProjectId.make("project-older");
@@ -1157,6 +1207,19 @@ describe("Working shelf (beta)", () => {
         activeOrder: ["a1", "a2", "p1"],
       });
       expect(resolveSidebarDropVerb("active", "working")).toBeNull();
+    });
+
+    it("leaves nested child rows out of the manual order", () => {
+      const withChild: readonly SidebarListItem[] = [
+        ...items.slice(0, 4),
+        { kind: "thread", key: "a1-child", section: "active", nested: true },
+        ...items.slice(4),
+      ];
+      expect(resolveSidebarDropTarget(withChild, "p1", "a1-child")?.activeOrder).toEqual([
+        "a1",
+        "p1",
+        "a2",
+      ]);
     });
 
     it.each([

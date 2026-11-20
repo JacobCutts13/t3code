@@ -64,7 +64,11 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import {
-  resolveListedAncestorThreadRef,
+  buildThreadTree,
+  flattenThreadTree,
+  resolveThreadTreeRowRef,
+  sortThreadTreeRoots,
+  threadForkBlockedReason,
   type OlderSettledScope,
 } from "@t3tools/client-runtime/state/threads";
 
@@ -180,8 +184,10 @@ import {
   buildThreadActionMenuItems,
   threadActionRequiresOperate,
 } from "./threadActionMenu.logic";
+import { useForkThread } from "../hooks/useForkThread";
 import {
   applySidebarThreadDrop,
+  filterSidebarV2TreeRows,
   filterSidebarV2VisibleThreads,
   groupSidebarThreadsByProject,
   sidebarFolderExpansionKeys,
@@ -378,6 +384,13 @@ function threadShellKey(thread: Pick<SidebarThreadSummary, "environmentId" | "id
   return scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
 }
 
+interface SidebarRowNesting {
+  readonly depth: number;
+  readonly parentKey: string | null;
+  readonly childCount: number;
+  readonly collapsed: boolean;
+}
+
 const NO_DRAGGED_ORDER: readonly string[] = [];
 const NO_DRAGGED_ORDERS: {
   readonly settledOrder: readonly string[];
@@ -474,6 +487,8 @@ function useSidebarThreads(input: {
   // Shared with the old per-project sidebar, so folders keep their open state.
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const setProjectExpanded = useUiStateStore((store) => store.setProjectExpanded);
+  const threadChildrenCollapsedById = useUiStateStore((store) => store.threadChildrenCollapsedById);
+  const setThreadChildrenCollapsed = useUiStateStore((store) => store.setThreadChildrenCollapsed);
   const [settledTail, setSettledTail] = useState({
     scopeKey: projectScopeKey,
     count: SETTLED_TAIL_INITIAL_COUNT,
@@ -505,31 +520,43 @@ function useSidebarThreads(input: {
     visibleCount: settledVisibleCount,
   });
   const listedSettledThreads = settledThreads.filter(olderSettledShelf.isListed);
+  const { tree } = partition;
+  const isChildrenCollapsed = (thread: EnvironmentThreadShell) =>
+    threadChildrenCollapsedById[threadShellKey(thread)] === true;
+  // Collapsed shelves and folders keep the open thread's row; a nested one keeps its root's.
+  const routeThread =
+    routeRowThreadKey === null
+      ? undefined
+      : threads.find((candidate) => threadShellKey(candidate) === routeRowThreadKey);
+  const routeRootKey =
+    routeThread === undefined ? routeRowThreadKey : threadShellKey(tree.root(routeThread));
+  const nestRows = (list: readonly EnvironmentThreadShell[]) =>
+    flattenThreadTree(tree, list, isChildrenCollapsed);
+  const withDescendants = (list: readonly EnvironmentThreadShell[]) =>
+    flattenThreadTree(tree, list, () => false).map((entry) => entry.thread);
   useOlderSettledShelfGrowth(olderSettledShelf, listedSettledThreads);
   const settledCount =
     settledThreads.length + olderSettledShelf.unloadedCount(partition.visibleThreads);
   const visibleSettledThreads = (() => {
     const visible = listedSettledThreads.slice(0, settledVisibleCount);
     if (
-      routeRowThreadKey !== null &&
-      !visible.some((thread) => threadShellKey(thread) === routeRowThreadKey)
+      routeRootKey !== null &&
+      !visible.some((thread) => threadShellKey(thread) === routeRootKey)
     ) {
-      const routeThread = settledThreads.find(
-        (thread) => threadShellKey(thread) === routeRowThreadKey,
-      );
+      const routeThread = settledThreads.find((thread) => threadShellKey(thread) === routeRootKey);
       if (routeThread !== undefined) visible.push(routeThread);
     }
     return visible.length === settledThreads.length ? settledThreads : visible;
   })();
   const renderedSettledThreads = settledShelfExpanded
     ? visibleSettledThreads
-    : routeThreadOnly(visibleSettledThreads, routeRowThreadKey);
+    : routeThreadOnly(visibleSettledThreads, routeRootKey);
   const visibleSnoozedThreads = snoozedShelfExpanded
     ? snoozedThreads
-    : routeThreadOnly(snoozedThreads, routeRowThreadKey);
+    : routeThreadOnly(snoozedThreads, routeRootKey);
   const visibleWorkingThreads = workingShelfExpanded
     ? workingThreads
-    : routeThreadOnly(workingThreads, routeRowThreadKey);
+    : routeThreadOnly(workingThreads, routeRootKey);
   const projectFolders =
     folderGroups === null
       ? null
@@ -542,23 +569,33 @@ function useSidebarThreads(input: {
             group: folder.group,
             collapsed,
             // A closed folder still shows the open thread, and hints at the rest.
-            threads: collapsed
-              ? routeThreadOnly(folder.threads, routeRowThreadKey)
-              : folder.threads,
+            threads: collapsed ? routeThreadOnly(folder.threads, routeRootKey) : folder.threads,
             hiddenThreads: collapsed
-              ? folder.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
+              ? folder.threads.filter((thread) => threadShellKey(thread) !== routeRootKey)
               : EMPTY_THREADS,
           };
         });
-  const orderedThreads = [
-    ...pinnedThreads,
-    ...(projectFolders === null
-      ? activeThreads
-      : projectFolders.flatMap((folder) => folder.threads)),
-    ...visibleWorkingThreads,
-    ...visibleSnoozedThreads,
-    ...renderedSettledThreads,
+  const orderedRows = [
+    ...nestRows(pinnedThreads),
+    ...nestRows(
+      projectFolders === null ? activeThreads : projectFolders.flatMap((folder) => folder.threads),
+    ),
+    ...nestRows(visibleWorkingThreads),
+    ...nestRows(visibleSnoozedThreads),
+    ...nestRows(renderedSettledThreads),
   ];
+  const orderedThreads = orderedRows.map((entry) => entry.thread);
+  const nestingByThreadKey = new Map<string, SidebarRowNesting>();
+  for (const entry of orderedRows) {
+    const childCount = tree.children(entry.thread).length;
+    if (entry.depth === 0 && childCount === 0) continue;
+    nestingByThreadKey.set(threadShellKey(entry.thread), {
+      depth: entry.depth,
+      parentKey: entry.parent === undefined ? null : threadShellKey(entry.parent),
+      childCount,
+      collapsed: isChildrenCollapsed(entry.thread),
+    });
+  }
   const sectionByThreadKey = new Map<string, SidebarSection>();
   for (const [list, section] of [
     [pinnedThreads, "pinned"],
@@ -567,19 +604,25 @@ function useSidebarThreads(input: {
     [snoozedThreads, "snoozed"],
     [settledThreads, "settled"],
   ] as const) {
-    for (const thread of list) sectionByThreadKey.set(threadShellKey(thread), section);
+    for (const thread of withDescendants(list)) {
+      sectionByThreadKey.set(threadShellKey(thread), section);
+    }
   }
   return {
     ...partition,
     threads,
     workingShelfEnabled,
-    searchableThreads: [
+    searchableThreads: withDescendants([
       ...pinnedThreads,
       ...activeThreads,
       ...workingThreads,
       ...snoozedThreads,
       ...settledThreads,
-    ],
+    ]),
+    nestRows,
+    nestingByThreadKey,
+    toggleThreadChildren: (threadKey: string) =>
+      setThreadChildrenCollapsed(threadKey, threadChildrenCollapsedById[threadKey] !== true),
     settledVisibleCount,
     settledCount,
     olderSettledShelf,
@@ -631,6 +674,13 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   } = input;
   const preciseNow = new Date().toISOString();
   const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
+  // Children render under their parent in its section, so only roots are placed and sorted.
+  const tree = buildThreadTree(filterSidebarV2TreeRows(threads, scopedProjectKeys));
+  const byGroup = (
+    list: readonly EnvironmentThreadShell[],
+    sort: (threads: readonly EnvironmentThreadShell[]) => readonly EnvironmentThreadShell[],
+    keepsOwnPlace?: (root: EnvironmentThreadShell) => boolean,
+  ) => sortThreadTreeRoots(list, tree, sort, keepsOwnPlace);
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
@@ -643,11 +693,11 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const snoozed: EnvironmentThreadShell[] = [];
   const settled: EnvironmentThreadShell[] = [];
   const { draggableThreadKeys, activeReorderableThreadKeys } = resolveSidebarReorderableThreadKeys({
-    threads: visible,
+    threads: tree.roots,
     serverConfigs,
     connectedEnvironmentIds: input.connectedEnvironmentIds,
   });
-  for (const thread of visible) {
+  for (const thread of tree.roots) {
     const configLoaded = serverConfigs.has(thread.environmentId);
     const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
     if (optimisticDrop?.key === threadKey) {
@@ -684,12 +734,16 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     }
   }
   // Availability gates dragging only; sorting must stay consistent across clients.
-  const sortedPinned = sortPinnedThreadsForSidebar(pinned);
+  const sortedPinned = byGroup(
+    pinned,
+    sortPinnedThreadsForSidebar,
+    (root) => root.pinOrderKey != null,
+  );
   const sortedActive = sortActiveBySend
-    ? sortWorkingThreadsBySend(active)
+    ? byGroup(active, sortWorkingThreadsBySend)
     : workingShelfEnabled
-      ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
-      : sortThreadsForSidebar(active);
+      ? byGroup(active, (list) => sortInboxThreadsByReturn(list, inboxObservation.returnedAt))
+      : byGroup(active, sortThreadsForSidebar, (root) => root.activeOrderKey != null);
   return {
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
@@ -709,7 +763,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
             preferredIds: optimisticDrop.order,
             getId: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
           }),
-    workingThreads: sortWorkingThreadsBySend(working),
+    workingThreads: byGroup(working, sortWorkingThreadsBySend),
     snoozedThreads: snoozed.toSorted(
       (left, right) =>
         firstValidTimestampMs(left.snoozedUntil ?? null) -
@@ -717,6 +771,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     ),
     settledThreads: sortSettledThreads(settled),
     visibleThreads: visible,
+    tree,
     snoozeNow: preciseNow,
   };
 }
@@ -993,6 +1048,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const newThreadContext = useHandleNewThread();
   // Row callbacks capture only the handler; the rest of the context changes with the route.
   const { handleNewThread } = newThreadContext;
+  const forkThread = useForkThread();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const clearSelection = useThreadSelectionStore((s) => s.clearSelection);
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
@@ -1109,6 +1165,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ),
         );
   const threads = useQuietThreadShells();
+  const threadChildrenCollapsedById = useUiStateStore((store) => store.threadChildrenCollapsedById);
   const promotingDraftThreadKeys = usePromotingDraftThreadKeys();
   const listedThreads =
     promotingDraftThreadKeys.length === 0
@@ -1121,7 +1178,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const routeRowThreadKey =
     routeThreadRef === null
       ? null
-      : scopedThreadKey(resolveListedAncestorThreadRef(routeThreadRef, threads));
+      : scopedThreadKey(
+          resolveThreadTreeRowRef(
+            routeThreadRef,
+            threads,
+            (thread) => threadChildrenCollapsedById[threadShellKey(thread)] === true,
+          ),
+        );
   const isSearchingThreads = threadSearchQuery.trim().length > 0;
   // The open draft's first send names its thread in place; a finalized draft reached by
   // navigation resolves through its redirect instead, and still reveals.
@@ -1343,6 +1406,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     activeKeys,
     pinnedKeysById,
     activeKeysById,
+    nestRows,
+    nestingByThreadKey,
+    toggleThreadChildren,
   } = useSidebarThreads({
     projectScopeKey,
     scopedProjectKeys,
@@ -1950,9 +2016,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       list: readonly EnvironmentThreadShell[],
       section: SidebarSection,
     ): SidebarListItem[] =>
-      list.map((thread) => {
+      nestRows(list).map(({ thread, depth }) => {
         const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-        return { kind: "thread", key, section };
+        return depth === 0
+          ? { kind: "thread", key, section }
+          : { kind: "thread", key, section, nested: true };
       });
     // Boring mode keeps a pinned open project or one the user filtered to, so it can start a thread.
     if (
@@ -1989,7 +2057,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   })();
   // Preserve the list while streamed updates leave order unchanged to retain row memoization.
   const sidebarListItemsKey = sidebarListItemsFresh
-    .map((item) => (item.kind === "thread" ? item.section + ":" + item.key : item.marker))
+    .map((item) =>
+      item.kind === "thread"
+        ? item.section + ":" + item.key + (item.nested ? ":nested" : "")
+        : item.marker,
+    )
     .join("\n");
   const [sidebarListItemsState, setSidebarListItems] = useState(sidebarListItemsFresh);
   const [sidebarListItemsKeyState, setSidebarListItemsKeyState] = useState(sidebarListItemsKey);
@@ -2684,12 +2756,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 canShareWithGuestAtom(threadRef.environmentId),
               ),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+              // Rows arrange quiet shells; the live one knows whether the latest run finished.
+              forkBlockedReason: threadForkBlockedReason(readThreadShell(threadRef) ?? thread, m),
               canRename: !fromSearch,
               supports: {
                 settlement: configLoaded,
                 autoSettleOptOut: supportsAutoSettleOptOut,
                 snooze: configLoaded,
-                pinning: configLoaded,
+                // Only top-level rows take a pinned place; a nested row stays under its parent.
+                pinning: configLoaded && (nestingByThreadKey.get(threadKey)?.depth ?? 0) === 0,
                 titleRegeneration: configLoaded,
               },
               snoozePresets,
@@ -2729,6 +2804,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 environmentId: threadRef.environmentId,
                 projectId: thread.projectId,
               });
+            return;
+          case "fork":
+            await forkThread(thread);
             return;
           case "new-thread-on-branch": {
             const result = await settlePromise(() =>
@@ -3418,8 +3496,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
+                        const nesting = nestingByThreadKey.get(threadKey);
+                        const nested = nesting !== undefined && nesting.depth > 0;
                         const isCard =
-                          section === "active" || section === "pinned" || section === "working";
+                          !nested &&
+                          (section === "active" || section === "pinned" || section === "working");
                         const rowVariant = folderRow
                           ? folderRowsMultiline
                             ? "folder-multiline"
@@ -3439,7 +3520,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             }
                             thread={thread}
                             variant={rowVariant}
+                            nestDepth={nesting?.depth}
+                            childCount={nesting?.childCount}
+                            childrenCollapsed={nesting?.collapsed}
+                            onToggleChildren={
+                              nesting !== undefined && nesting.childCount > 0
+                                ? toggleThreadChildren
+                                : undefined
+                            }
                             navigationParent={
+                              nesting?.parentKey ??
                               folderRow ??
                               (section === "working" ||
                               section === "snoozed" ||
@@ -3562,7 +3652,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 onContextMenu={handleProjectFolderContextMenu}
                               />,
                             );
-                            for (const thread of folder.threads) {
+                            for (const { thread } of nestRows(folder.threads)) {
                               items.push(
                                 renderThreadRow(
                                   thread,

@@ -31,6 +31,7 @@ export interface PersistedUiState {
   sidebarProjectScopeKeys?: string[];
   threadChangedFilesExpansionVersion?: number;
   threadChangedFilesExpandedById?: Record<string, Record<string, boolean>>;
+  threadChildrenCollapsedById?: Record<string, boolean>;
   pullRequestMergeMethod?: string;
 }
 
@@ -43,6 +44,8 @@ export interface UiProjectState {
 export interface UiThreadState {
   threadLastVisitedAtById: Record<string, string>;
   threadChangedFilesExpandedById: Record<string, Record<string, boolean>>;
+  /** Sidebar rows whose nested child threads are folded away; rows default to open. */
+  threadChildrenCollapsedById: Record<string, boolean>;
 }
 
 export interface UiEndpointState {
@@ -62,6 +65,7 @@ const initialState: UiState = {
   sidebarProjectScopeKeys: [],
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
+  threadChildrenCollapsedById: {},
   defaultAdvertisedEndpointKey: null,
   pullRequestMergeMethod: "merge",
 };
@@ -149,6 +153,7 @@ export function parsePersistedState(parsed: PersistedUiState): UiState {
       parsed.threadChangedFilesExpansionVersion === THREAD_CHANGED_FILES_EXPANSION_VERSION
         ? sanitizePersistedThreadChangedFilesExpanded(parsed.threadChangedFilesExpandedById)
         : {},
+    threadChildrenCollapsedById: sanitizeBooleanRecord(parsed.threadChildrenCollapsedById),
     defaultAdvertisedEndpointKey: sanitizeOptionalKey(parsed.defaultAdvertisedEndpointKey),
     sidebarProjectScopeKeys: sanitizeStringArray(
       parsed.sidebarProjectScopeKeys ?? [parsed.sidebarProjectScopeKey],
@@ -229,6 +234,7 @@ export function persistState(state: UiState): void {
             : null,
         threadChangedFilesExpansionVersion: THREAD_CHANGED_FILES_EXPANSION_VERSION,
         threadChangedFilesExpandedById: state.threadChangedFilesExpandedById,
+        threadChildrenCollapsedById: state.threadChildrenCollapsedById,
         pullRequestMergeMethod: state.pullRequestMergeMethod,
       } satisfies PersistedUiState),
     );
@@ -378,6 +384,18 @@ export function setProjectExpanded(
   };
 }
 
+function setThreadChildrenCollapsed(
+  state: UiState,
+  threadKey: string,
+  collapsed: boolean,
+): UiState {
+  if ((state.threadChildrenCollapsedById[threadKey] ?? false) === collapsed) return state;
+  const threadChildrenCollapsedById = { ...state.threadChildrenCollapsedById };
+  if (collapsed) threadChildrenCollapsedById[threadKey] = true;
+  else delete threadChildrenCollapsedById[threadKey];
+  return { ...state, threadChildrenCollapsedById };
+}
+
 export function reorderProjects(
   state: UiState,
   currentProjectOrder: readonly string[],
@@ -430,6 +448,7 @@ interface UiStateStore extends UiState {
   setSidebarProjectScopeKeys: (projectKeys: readonly string[]) => void;
   setPullRequestMergeMethod: (method: PullRequestMergeMethod) => void;
   setProjectExpanded: (projectIds: string | readonly string[], expanded: boolean) => void;
+  setThreadChildrenCollapsed: (threadKey: string, collapsed: boolean) => void;
   reorderProjects: (
     currentProjectOrder: readonly string[],
     draggedProjectIds: readonly string[],
@@ -452,6 +471,8 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
   setPullRequestMergeMethod: (method) => set((state) => setPullRequestMergeMethod(state, method)),
   setProjectExpanded: (projectIds, expanded) =>
     set((state) => setProjectExpanded(state, projectIds, expanded)),
+  setThreadChildrenCollapsed: (threadKey, collapsed) =>
+    set((state) => setThreadChildrenCollapsed(state, threadKey, collapsed)),
   reorderProjects: (currentProjectOrder, draggedProjectIds, targetProjectIds) =>
     set((state) =>
       reorderProjects(state, currentProjectOrder, draggedProjectIds, targetProjectIds),

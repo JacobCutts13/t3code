@@ -33,7 +33,14 @@ import {
   sortPinnedThreadsByOrderKey,
   sortSettledThreads,
 } from "@t3tools/client-runtime/state/thread-sort";
-import { isListedThreadLineage, type EnvironmentId, type ProjectId } from "@t3tools/contracts";
+import {
+  buildThreadTree,
+  flattenThreadTree,
+  isThreadTreeRow,
+  sortThreadTreeRoots,
+  type ThreadTree,
+} from "@t3tools/client-runtime/state/threads";
+import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
 import type { MenuAction } from "@react-native-menu/menu";
 
@@ -380,8 +387,11 @@ export function getThreadListV2OrderedSection(input: {
   readonly queuedThreadKeys?: ReadonlySet<string>;
 }): EnvironmentThreadShell[] {
   const queuedThreadKeys = input.queuedThreadKeys?.size ? input.queuedThreadKeys : undefined;
-  const threads = input.threads.filter((thread) => {
-    if (thread.archivedAt !== null || !isListedThreadLineage(thread.lineage)) return false;
+  // Nested children follow their parent, so only roots take a place in manual order.
+  const tree = buildThreadTree(
+    input.threads.filter((thread) => thread.archivedAt === null && isThreadTreeRow(thread)),
+  );
+  const threads = tree.roots.filter((thread) => {
     if (
       (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
       thread.settledOverride === "settled" &&
@@ -399,8 +409,13 @@ export function getThreadListV2OrderedSection(input: {
   });
   const ordered =
     input.section === "pinned"
-      ? sortPinnedThreadsByOrderKey(threads)
-      : sortActiveThreadsByOrderKey(threads);
+      ? sortPinnedRoots(threads, tree)
+      : sortThreadTreeRoots(
+          threads,
+          tree,
+          sortActiveThreadsByOrderKey,
+          (root) => root.activeOrderKey != null,
+        );
   const pending =
     input.pendingOrder?.section === input.section
       ? reconcilePendingThreadOrder(input.pendingOrder, ordered)
@@ -415,6 +430,22 @@ export interface ThreadListV2Item {
   readonly pinned: boolean;
   readonly wokeAt: string | null;
   readonly isLast: boolean;
+  /** Nesting under a parent row; unset for a top-level row without children. */
+  readonly depth?: number;
+  readonly childCount?: number;
+  readonly childrenCollapsed?: boolean;
+}
+
+function sortPinnedRoots(
+  roots: readonly EnvironmentThreadShell[],
+  tree: ThreadTree<EnvironmentThreadShell>,
+): EnvironmentThreadShell[] {
+  return sortThreadTreeRoots(
+    roots,
+    tree,
+    sortPinnedThreadsByOrderKey,
+    (root) => root.pinOrderKey != null,
+  );
 }
 
 export interface ThreadListV2Layout {
@@ -515,6 +546,9 @@ export function threadListV2ListItemsAreEqual(
         previous.item.snoozed === item.item.snoozed &&
         previous.item.pinned === item.item.pinned &&
         previous.item.wokeAt === item.item.wokeAt &&
+        previous.item.depth === item.item.depth &&
+        previous.item.childCount === item.item.childCount &&
+        previous.item.childrenCollapsed === item.item.childrenCollapsed &&
         previous.snoozeWakeLabelText === item.snoozeWakeLabelText &&
         previous.timeLabel === item.timeLabel &&
         previous.snoozePresetMinute === item.snoozePresetMinute &&
@@ -737,6 +771,8 @@ export function buildThreadListV2Items(input: {
   readonly isListedSettled?: (thread: EnvironmentThreadShell) => boolean;
   /** Settled threads in scope that are not local (older settled threads not loaded). */
   readonly unloadedSettledCount?: number;
+  /** Thread keys whose nested children are hidden. */
+  readonly collapsedThreadKeys?: ReadonlySet<string>;
 }): ThreadListV2Layout {
   const now = input.now;
   const pending =
@@ -767,7 +803,7 @@ export function buildThreadListV2Items(input: {
   const listedThreads = input.threads.filter(
     (thread) =>
       thread.archivedAt === null &&
-      isListedThreadLineage(thread.lineage) &&
+      isThreadTreeRow(thread) &&
       (input.environmentId === null || thread.environmentId === input.environmentId) &&
       (projectKeys === null || projectKeys.has(`${thread.environmentId}:${thread.projectId}`)),
   );
@@ -786,7 +822,17 @@ export function buildThreadListV2Items(input: {
   // Threads listed only because their messages match; only their rows show
   // the message and open at it.
   const contentOnlyThreadKeys = new Set<string>();
-  for (const thread of listedThreads) {
+  // Search lists matches flat; otherwise children render under their parent, so only roots
+  // are placed in sections and sorted.
+  const tree = buildThreadTree(listedThreads);
+  const isSnoozedRow = (thread: EnvironmentThreadShell) =>
+    (input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true) &&
+    effectiveSnoozed(thread, { now });
+  const isSettledRow = (thread: EnvironmentThreadShell) =>
+    (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
+    thread.settledOverride === "settled" &&
+    queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true;
+  for (const thread of rankedMatches === null ? tree.roots : listedThreads) {
     if (matchingThreads !== null && !matchingThreads.has(thread)) {
       const key = threadSearchMatchKey({
         environmentId: thread.environmentId,
@@ -795,9 +841,7 @@ export function buildThreadListV2Items(input: {
       if (input.matchedThreadKeys?.has(key) !== true) continue;
       contentOnlyThreadKeys.add(key);
     }
-    const supportsSettlement = input.settlementEnvironmentIds?.has(thread.environmentId) ?? true;
-    const supportsSnooze = input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true;
-    if (supportsSnooze && effectiveSnoozed(thread, { now })) {
+    if (isSnoozedRow(thread)) {
       snoozed.push(thread);
       if (
         thread.snoozedUntil != null &&
@@ -808,9 +852,7 @@ export function buildThreadListV2Items(input: {
       }
       continue;
     }
-    const hasQueuedMessages =
-      queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) === true;
-    if (supportsSettlement && thread.settledOverride === "settled" && !hasQueuedMessages) {
+    if (isSettledRow(thread)) {
       settled.push(thread);
     } else if (thread.pinnedAt != null) {
       pinned.push(thread);
@@ -862,14 +904,32 @@ export function buildThreadListV2Items(input: {
   }
 
   const orderedActive = workingShelfEnabled
-    ? sortInboxThreadsByReturn(active, input.inboxReturnAt)
-    : applyPendingThreadOrder(sortThreadsForListV2(active), "active", pending);
-  const orderedWorking = sortWorkingThreadsBySend(working);
+    ? sortThreadTreeRoots(active, tree, (list) =>
+        sortInboxThreadsByReturn(list, input.inboxReturnAt),
+      )
+    : applyPendingThreadOrder(
+        sortThreadTreeRoots(
+          active,
+          tree,
+          sortThreadsForListV2,
+          (root) => root.activeOrderKey != null,
+        ),
+        "active",
+        pending,
+      );
+  const orderedWorking = sortThreadTreeRoots(working, tree, sortWorkingThreadsBySend);
   const orderedSnoozed = [...snoozed].sort(
     (left, right) =>
       parseTimestampMs(left.snoozedUntil ?? "") - parseTimestampMs(right.snoozedUntil ?? ""),
   );
-  const selectedThreadKey = input.selectedThreadKey ?? null;
+  // A collapsed shelf keeps the selected row's group, so it keeps the row's root.
+  const selectedThreadKey = (() => {
+    const key = input.selectedThreadKey ?? null;
+    const thread = listedThreads.find((row) => `${row.environmentId}:${row.id}` === key);
+    if (thread === undefined) return key;
+    const root = tree.root(thread);
+    return `${root.environmentId}:${root.id}`;
+  })();
   const visibleWorking =
     input.workingShelfExpanded === true
       ? orderedWorking
@@ -907,13 +967,37 @@ export function buildThreadListV2Items(input: {
           (thread) => `${thread.environmentId}:${thread.id}` === selectedThreadKey,
         );
 
+  const collapsed = input.collapsedThreadKeys;
+  const isCollapsed = (thread: EnvironmentThreadShell) =>
+    collapsed?.has(`${thread.environmentId}:${thread.id}`) === true;
   const items: ThreadListV2Item[] = [];
-  for (const thread of applyPendingThreadOrder(
-    sortPinnedThreadsByOrderKey(pinned),
-    "pinned",
-    pending,
-  )) {
-    items.push({
+  const pushGroup = (root: ThreadListV2Item) => {
+    for (const { thread, depth } of flattenThreadTree(tree, [root.thread], isCollapsed)) {
+      const childCount = tree.children(thread).length;
+      const nesting =
+        depth === 0 && childCount === 0
+          ? {}
+          : { depth, childCount, childrenCollapsed: isCollapsed(thread) };
+      if (depth === 0) {
+        items.push({ ...root, ...nesting });
+        continue;
+      }
+      // A child keeps its own status, so it looks like the shelf its own state belongs to.
+      const childSnoozed = isSnoozedRow(thread);
+      const childSlim = childSnoozed || isSettledRow(thread);
+      items.push({
+        thread,
+        variant: childSlim ? "slim" : "card",
+        snoozed: childSnoozed,
+        pinned: false,
+        wokeAt: childSlim ? null : resolveThreadListV2WokeAt(thread, { now }),
+        isLast: false,
+        ...nesting,
+      });
+    }
+  };
+  for (const thread of applyPendingThreadOrder(sortPinnedRoots(pinned, tree), "pinned", pending)) {
+    pushGroup({
       thread,
       variant: "card",
       snoozed: false,
@@ -923,7 +1007,7 @@ export function buildThreadListV2Items(input: {
     });
   }
   for (const thread of orderedActive) {
-    items.push({
+    pushGroup({
       thread,
       variant: "card",
       snoozed: false,
@@ -934,7 +1018,7 @@ export function buildThreadListV2Items(input: {
   }
   const workingShelfHeaderIndex = orderedWorking.length > 0 ? items.length : null;
   for (const thread of visibleWorking) {
-    items.push({
+    pushGroup({
       thread,
       variant: "card",
       snoozed: false,
@@ -945,7 +1029,7 @@ export function buildThreadListV2Items(input: {
   }
   const snoozedShelfHeaderIndex = orderedSnoozed.length > 0 ? items.length : null;
   for (const thread of visibleSnoozed) {
-    items.push({
+    pushGroup({
       thread,
       variant: "slim",
       snoozed: true,
@@ -956,7 +1040,7 @@ export function buildThreadListV2Items(input: {
   }
   const settledShelfHeaderIndex = settledTotal > 0 ? items.length : null;
   for (const thread of visibleSettled) {
-    items.push({
+    pushGroup({
       thread,
       variant: "slim",
       snoozed: false,
