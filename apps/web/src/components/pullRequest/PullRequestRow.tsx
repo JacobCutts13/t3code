@@ -1,5 +1,7 @@
+import { useGT, useMessages } from "gt-react";
 import type { PullRequestAction } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { T } from "gt-react";
 import { SearchIcon } from "lucide-react";
 import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import { PullRequestStackPopover } from "./PullRequestStackPopover";
@@ -108,6 +110,8 @@ function PullRequestRowImpl({
   /** An action shown after the row, before its hover actions. */
   trailing?: ReactNode;
 }) {
+  const gt = useGT();
+  const resolve = useMessages();
   const { Icon, providerName, terminology } = getSourceControlPresentationForKind(entry.provider);
   return (
     <div
@@ -147,8 +151,11 @@ function PullRequestRowImpl({
               inRow
               url={entry.url}
               label={`#${entry.number}`}
-              openLabel={openOnHostLabel(sourceControlClients.get(entry.provider))}
-              ariaLabel={`Open #${entry.number} on ${providerName}`}
+              openLabel={openOnHostLabel(sourceControlClients.get(entry.provider), resolve)}
+              ariaLabel={gt("Open #{number} on {host}", {
+                number: entry.number,
+                host: providerName,
+              })}
               className={PULL_REQUEST_ROW_NUMBER_CLASS}
             />
           }
@@ -211,13 +218,17 @@ function PullRequestRowImpl({
                       <span className="flex min-w-6 items-center gap-1 overflow-hidden rounded-full border border-border/60 px-1 text-3xs" />
                     }
                   >
-                    <span className="sr-only">matched in the description</span>
+                    <span className="sr-only">
+                      <T>matched in the description</T>
+                    </span>
                     <SearchIcon aria-hidden className="size-3 shrink-0" />
                     <span aria-hidden className="hidden truncate @xs/pr-row-meta:block">
-                      matched in the description
+                      <T>matched in the description</T>
                     </span>
                   </TooltipTrigger>
-                  <TooltipPopup side="top">Matched in the description</TooltipPopup>
+                  <TooltipPopup side="top">
+                    <T>Matched in the description</T>
+                  </TooltipPopup>
                 </Tooltip>
               ) : null}
               {showProvider ? (

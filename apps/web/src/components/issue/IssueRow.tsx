@@ -1,4 +1,5 @@
 import type { EnvironmentIssueEntry } from "@t3tools/client-runtime/issue-list";
+import { useGT } from "gt-react";
 import { MessageSquareIcon } from "lucide-react";
 import { memo } from "react";
 
@@ -41,6 +42,7 @@ function IssueRowImpl({
   environmentLabel?: string | undefined;
   onSelect: (entry: IssueRowTarget) => void;
 }) {
+  const gt = useGT();
   const tracker = issueTrackerPresentation(entry.tracker);
   return (
     <div
@@ -62,8 +64,11 @@ function IssueRowImpl({
               inRow
               url={entry.url}
               label={entry.displayKey}
-              openLabel={`Open on ${tracker.providerName}`}
-              ariaLabel={`Open ${entry.displayKey} on ${tracker.providerName}`}
+              openLabel={gt("Open on {host}", { host: tracker.providerName })}
+              ariaLabel={gt("Open {key} on {host}", {
+                key: entry.displayKey,
+                host: tracker.providerName,
+              })}
               className={PULL_REQUEST_ROW_NUMBER_CLASS}
             />
           }

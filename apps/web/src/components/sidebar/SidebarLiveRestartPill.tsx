@@ -1,8 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
 import { LIVE_SHELL_STATUSES, type EnvironmentId } from "@t3tools/contracts";
+import { msg, Plural, T, useGT, Var } from "gt-react";
 import { RotateCwIcon } from "lucide-react";
 import { useState } from "react";
 
+import { m } from "../../i18n/messages";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useLiveRestartState } from "../../state/liveRestart";
 import { environmentThreadShells } from "../../state/threads";
@@ -27,14 +29,32 @@ function InterruptedThreads({ environmentId }: { readonly environmentId: Environ
     environmentThreadShells.environmentThreadsAtom(environmentId),
   ).filter((thread) => LIVE_SHELL_STATUSES.has(thread.status));
   if (interrupted.length === 0) {
-    return <AlertDialogDescription>No threads are running.</AlertDialogDescription>;
+    return (
+      <AlertDialogDescription>
+        <T>No threads are running.</T>
+      </AlertDialogDescription>
+    );
   }
   return (
     <>
       <AlertDialogDescription>
-        {interrupted.length === 1
-          ? "This running thread will be interrupted. T3 tries to resume it after the restart."
-          : `These ${interrupted.length} running threads will be interrupted. T3 tries to resume them after the restart.`}
+        <T>
+          <Plural
+            n={interrupted.length}
+            singular={
+              <>
+                This running thread will be interrupted. <Var>T3</Var> tries to resume it after the
+                restart.
+              </>
+            }
+            other={
+              <>
+                These <Var>{interrupted.length}</Var> running threads will be interrupted.{" "}
+                <Var>T3</Var> tries to resume them after the restart.
+              </>
+            }
+          />
+        </T>
       </AlertDialogDescription>
       <ul className="max-h-48 list-disc overflow-y-auto pl-4 text-sm">
         {interrupted.map((thread) => (
@@ -48,6 +68,7 @@ function InterruptedThreads({ environmentId }: { readonly environmentId: Environ
 }
 
 export function SidebarLiveRestartPill() {
+  const gt = useGT();
   const state = useLiveRestartState();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -64,14 +85,14 @@ export function SidebarLiveRestartPill() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not restart T3",
-          description: error instanceof Error ? error.message : "Restart failed.",
+          title: m(msg("Could not restart {product}", { product: "T3" })),
+          description: error instanceof Error ? error.message : m(msg("Restart failed.")),
         }),
       );
     }
   };
 
-  const label = "New code pulled · Restart";
+  const label = gt("New code pulled · Restart");
   return (
     <SidebarMenuItem className="shrink-0">
       <Tooltip>
@@ -97,23 +118,27 @@ export function SidebarLiveRestartPill() {
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Restart T3 to apply pulled code?</AlertDialogTitle>
+            <AlertDialogTitle>
+              <T>
+                Restart <Var>T3</Var> to apply pulled code?
+              </T>
+            </AlertDialogTitle>
             {confirmOpen && primaryEnvironmentId !== null ? (
               <InterruptedThreads environmentId={primaryEnvironmentId} />
             ) : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose disabled={restarting} render={<Button variant="outline" />}>
-              Later
+              <T context="postpone restarting">Later</T>
             </AlertDialogClose>
             <Button disabled={restarting} onClick={() => void restart()}>
               {restarting ? (
                 <>
                   <Spinner size="sm" />
-                  Restarting…
+                  <T>Restarting…</T>
                 </>
               ) : (
-                "Restart now"
+                <T>Restart now</T>
               )}
             </Button>
           </AlertDialogFooter>

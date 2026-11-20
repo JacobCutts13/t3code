@@ -4,6 +4,9 @@ import {
   type FilesystemEntryMetadata,
   isValidNestedRepoName,
 } from "@t3tools/contracts";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../i18n/messages";
 
 /** Folders searched for clones, relative to the home folder of the machine that hosts the project. */
 const REPO_SCAN_ROOT = "~/dev";
@@ -93,19 +96,31 @@ export function filterRepos(
 export function repoDisabledReason(
   repo: RepoCandidate,
   selected: ReadonlyArray<RepoCandidate>,
+  resolve: MessageResolver = m,
 ): string | null {
   if (selected.some((entry) => entry.path === repo.path)) return null;
   if (selected.length === 0) return null;
   if (selected.length >= NESTED_REPO_MAX_COUNT)
-    return `Up to ${NESTED_REPO_MAX_COUNT} repositories can share a project.`;
+    return resolve(
+      msg("Up to {count} repositories can share a project.", { count: NESTED_REPO_MAX_COUNT }),
+    );
   // Several repos share one project, so each name becomes a folder inside every thread's worktree.
   const unusable = [repo, ...selected].find((entry) => !isValidNestedRepoName(entry.name));
   if (unusable !== undefined)
-    return `${unusable.name} can't be combined with other repositories: its folder name has characters that aren't allowed.`;
+    return resolve(
+      msg(
+        "{name} can't be combined with other repositories: its folder name has characters that aren't allowed.",
+        { name: unusable.name },
+      ),
+    );
   const clash = selected.find((entry) => entry.name.toLowerCase() === repo.name.toLowerCase());
   return clash === undefined
     ? null
-    : `A repository named ${clash.name} is already selected; both would use the same folder.`;
+    : resolve(
+        msg("A repository named {name} is already selected; both would use the same folder.", {
+          name: clash.name,
+        }),
+      );
 }
 
 export function defaultProjectName(repos: ReadonlyArray<RepoCandidate>): string {

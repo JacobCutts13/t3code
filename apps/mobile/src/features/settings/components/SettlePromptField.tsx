@@ -1,3 +1,4 @@
+import { T, useGT } from "gt-react-native";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { View } from "react-native";
 
@@ -8,6 +9,7 @@ export function SettlePromptField(props: {
   readonly disabled: boolean;
   readonly onSave: (value: string) => void;
 }) {
+  const gt = useGT();
   const draft = useRef<{ text: string; over: string | null } | null>(null);
   const save = () => {
     const pending = draft.current;
@@ -22,14 +24,18 @@ export function SettlePromptField(props: {
 
   return (
     <View className="gap-2 px-4 py-3">
-      <Text className="text-lg text-foreground">Prompt to run on settle</Text>
+      <Text className="text-lg text-foreground">
+        <T>Prompt to run on settle</T>
+      </Text>
       <Text className="text-sm text-foreground-muted">
-        Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn
-        before cleanup.
+        <T>
+          Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra
+          turn before cleanup.
+        </T>
       </Text>
       <AppTextInput
         key={props.value}
-        accessibilityLabel="Prompt to run on settle"
+        accessibilityLabel={gt("Prompt to run on settle")}
         defaultValue={props.value ?? ""}
         onChangeText={(text) => {
           draft.current = { text, over: props.value };
@@ -37,8 +43,8 @@ export function SettlePromptField(props: {
         onEndEditing={() => save()}
         placeholder={
           props.value === null
-            ? "Mixed. Enter a prompt for all selected targets."
-            : "Summarise what changed and update the project notes."
+            ? gt("Mixed. Enter a prompt for all selected targets.")
+            : gt("Summarise what changed and update the project notes.")
         }
         editable={!props.disabled}
         multiline

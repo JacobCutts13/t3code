@@ -3,6 +3,7 @@ import {
   type ProjectNestedRepo,
   isValidNestedRepoName,
 } from "@t3tools/contracts";
+import { msg, Plural, T, useGT, useMessages, Var } from "gt-react";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
@@ -17,6 +18,8 @@ import {
 
 /** Extra repositories every new worktree thread of a project also gets a worktree of. */
 export function ProjectRepositoriesSettings() {
+  const gt = useGT();
+  const resolve = useMessages();
   const { scope } = useSettingsScope();
   const repos = useScopedSettings((settings) => settings.nestedRepos);
   const updateScopedSettings = useUpdateScopedSettings();
@@ -38,13 +41,13 @@ export function ProjectRepositoriesSettings() {
       ...(base.trim() ? { base: base.trim() } : {}),
     };
     if (!isValidNestedRepoName(entry.name)) {
-      setError("Use letters, numbers, dots, dashes or underscores for the folder name.");
+      setError(msg("Use letters, numbers, dots, dashes or underscores for the folder name."));
     } else if (entry.path === "") {
-      setError("Enter the path of the repository's clone.");
+      setError(msg("Enter the path of the repository's clone."));
     } else if (repos.some((repo) => repo.name.toLowerCase() === entry.name.toLowerCase())) {
-      setError("A repository with that folder name is already listed.");
+      setError(msg("A repository with that folder name is already listed."));
     } else if (repos.length >= NESTED_REPO_MAX_COUNT) {
-      setError(`At most ${NESTED_REPO_MAX_COUNT} repositories.`);
+      setError(msg("At most {count} repositories.", { count: NESTED_REPO_MAX_COUNT }));
     } else {
       setError(null);
       void save([...repos, entry]);
@@ -55,21 +58,37 @@ export function ProjectRepositoriesSettings() {
   };
 
   return (
-    <SettingsSection id="project-repositories" title="Repositories">
+    <SettingsSection id="project-repositories" title={gt("Repositories")}>
       <SettingsRow
         serverScoped
         settingKeys={["nestedRepos"]}
-        title="Repositories"
-        description="Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine."
+        title={gt("Repositories")}
+        description={gt(
+          "Every new worktree thread also gets a worktree of each repository below, in its own folder inside the thread. Paths are clones on this machine.",
+        )}
         control={
           <span className="text-xs text-muted-foreground">
-            {repos.length} {repos.length === 1 ? "repository" : "repositories"}
+            <T>
+              <Plural
+                n={repos.length}
+                one={
+                  <>
+                    <Var>{repos.length}</Var> repository
+                  </>
+                }
+                other={
+                  <>
+                    <Var>{repos.length}</Var> repositories
+                  </>
+                }
+              />
+            </T>
           </span>
         }
       >
         <div className="mt-2 pb-3.5">
           {repos.length > 0 ? (
-            <ul aria-label="Repositories" className="mb-3 flex flex-col gap-1.5">
+            <ul aria-label={gt("Repositories")} className="mb-3 flex flex-col gap-1.5">
               {repos.map((repo) => (
                 <li
                   key={repo.name}
@@ -85,7 +104,7 @@ export function ProjectRepositoriesSettings() {
                     size="icon-xs"
                     variant="ghost-muted"
                     disabled={!canWriteSettings}
-                    aria-label={`Remove ${repo.name}`}
+                    aria-label={gt("Remove {name}", { name: repo.name })}
                     onClick={() => void save(repos.filter((entry) => entry.name !== repo.name))}
                   >
                     <XIcon />
@@ -97,8 +116,8 @@ export function ProjectRepositoriesSettings() {
           <div className="flex flex-wrap items-start gap-1.5">
             <Input
               value={name}
-              placeholder="Folder name"
-              aria-label="Repository folder name"
+              placeholder={gt("Folder name")}
+              aria-label={gt("Repository folder name")}
               className="w-36"
               disabled={!canWriteSettings}
               onChange={(event) => setName(event.target.value)}
@@ -106,15 +125,15 @@ export function ProjectRepositoriesSettings() {
             <Input
               value={path}
               placeholder="~/dev/my-repo"
-              aria-label="Repository path"
+              aria-label={gt("Repository path")}
               className="min-w-48 flex-1"
               disabled={!canWriteSettings}
               onChange={(event) => setPath(event.target.value)}
             />
             <Input
               value={base}
-              placeholder="default branch"
-              aria-label="Repository base branch"
+              placeholder={gt("default branch")}
+              aria-label={gt("Repository base branch")}
               className="w-36"
               disabled={!canWriteSettings}
               onChange={(event) => setBase(event.target.value)}
@@ -125,12 +144,12 @@ export function ProjectRepositoriesSettings() {
               }}
             />
             <Button type="button" disabled={!canWriteSettings} onClick={add}>
-              Add
+              <T context="verb, add a repository">Add</T>
             </Button>
           </div>
           {error ? (
             <p role="alert" className="mt-2 text-xs text-destructive">
-              {error}
+              {resolve(error)}
             </p>
           ) : null}
         </div>

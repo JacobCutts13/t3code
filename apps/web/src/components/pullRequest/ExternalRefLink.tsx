@@ -1,6 +1,8 @@
+import { msg, T, Var } from "gt-react";
 import { ExternalLinkIcon } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 
+import { m } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
 
@@ -11,7 +13,7 @@ import { showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
 export function openExternalUrl(url: string): void {
   void readLocalApi()
     ?.shell.openExternal(url)
-    .catch(() => toastManager.add({ type: "error", title: "Could not open the link" }));
+    .catch(() => toastManager.add({ type: "error", title: m(msg("Could not open the link")) }));
 }
 
 /**
@@ -112,7 +114,11 @@ export function ExternalRefScope({ scope, url }: { scope: string; url: string | 
           </button>
         }
       />
-      <TooltipPopup side="top">Open {scope} repository</TooltipPopup>
+      <TooltipPopup side="top">
+        <T>
+          Open <Var>{scope}</Var> repository
+        </T>
+      </TooltipPopup>
     </Tooltip>
   );
 }
