@@ -15,10 +15,10 @@ By default, runs operate in the selected T3 Code workspace through the SDK's loc
 
 ## Cursor Cloud agents
 
-To dispatch threads to Cursor Cloud, add a Cursor instance in **Settings > Providers** and set its
-**Runtime** to **Cursor Cloud**, then pick that instance for a thread. Each new thread starts a cloud
-agent on a Cursor-hosted VM that clones the project's `origin` remote at its current branch and opens
-a pull request when it finishes. Follow-up messages continue the same cloud agent.
+Turn on **Cursor Cloud** in **Settings > Providers > Cursor**. It uses the instance's existing
+sign-in. Each new Cursor thread then starts a cloud agent on a Cursor-hosted VM that clones the
+project's `origin` remote at its current branch and opens a pull request when it finishes.
+Follow-up messages continue the same cloud agent.
 
 - Push the branch first. The VM clones from the remote, so local commits and uncommitted changes
   are not included.
@@ -30,7 +30,7 @@ a pull request when it finishes. Follow-up messages continue the same cloud agen
   the repository's own Cursor configuration.
 - Compaction, rewinding with **Edit from here**, and conversation snapshots are local-agent
   features. Cloud agents summarize on their own.
-- Changing an instance's runtime only affects new threads. Existing cloud threads stay in the cloud.
+- The switch only affects new threads. Existing threads keep running where they started.
 
 Custom Cursor MCP servers and plugins are not configured in T3 Code. They load from the environment
 machine's Cursor config when the agent opens: project `.cursor/mcp.json`, user `~/.cursor/mcp.json`,

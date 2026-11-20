@@ -171,7 +171,7 @@ export const CursorDriver: ProviderDriver<
       environment: processEnv,
       getModels: () => catalogModels,
       getSdkModels: () => catalogSdkModels,
-      runtime: config.runtime,
+      cloud: config.cloud,
     }).pipe(
       Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
         ...sdkRunner,

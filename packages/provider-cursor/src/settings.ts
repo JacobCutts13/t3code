@@ -2,28 +2,19 @@ import { CustomModelSetting, makeProviderSettingsSchema, TrimmedString } from "@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-export const CursorRuntime = Schema.Literals(["local", "cloud"]);
-export type CursorRuntime = typeof CursorRuntime.Type;
-
 export const CursorSettings = makeProviderSettingsSchema(
   {
     enabled: Schema.Boolean.pipe(
       Schema.withDecodingDefault(Effect.succeed(false)),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
-    runtime: CursorRuntime.pipe(
-      Schema.withDecodingDefault(Effect.succeed("local" as const)),
+    cloud: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
       Schema.annotateKey({
-        title: "Runtime",
+        title: "Cursor Cloud",
         description:
-          "Cursor Cloud runs each thread on a Cursor-hosted VM against the project's pushed branch and opens a pull request.",
-        providerSettingsForm: {
-          control: "select",
-          options: [
-            { value: "local", label: "Local workspace" },
-            { value: "cloud", label: "Cursor Cloud" },
-          ],
-        },
+          "Run new threads on a Cursor-hosted VM from the project's pushed branch and open a pull request.",
+        providerSettingsForm: { control: "switch" },
       }),
     ),
     // Preserve V1 CLI fields when V2's SDK rewrites shared settings.
@@ -39,7 +30,7 @@ export const CursorSettings = makeProviderSettingsSchema(
     ),
   },
   {
-    order: ["runtime"],
+    order: ["cloud"],
   },
 );
 export type CursorSettings = typeof CursorSettings.Type;

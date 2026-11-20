@@ -59,7 +59,6 @@ import {
 } from "./skills.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
 import { type CursorCloudRepository, resolveCursorCloudRepository } from "./cloudRepository.ts";
-import type { CursorRuntime } from "../settings.ts";
 import { t3OrchestrationPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -1035,7 +1034,7 @@ export interface CursorAdapterV2Options {
   readonly environment: NodeJS.ProcessEnv;
   readonly getModels?: () => ReadonlyArray<ServerProviderModel>;
   readonly getSdkModels?: () => ReadonlyArray<SDKModel>;
-  readonly runtime?: CursorRuntime;
+  readonly cloud?: boolean;
 }
 
 export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
@@ -2579,7 +2578,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           }
           const cloud =
             openInput.operation === "create"
-              ? adapterOptions.runtime === "cloud"
+              ? adapterOptions.cloud === true
                 ? { repository: yield* resolveCloudRepository(cwd) }
                 : undefined
               : CursorAgentSdk.isCursorCloudAgentId(openInput.agentId)
