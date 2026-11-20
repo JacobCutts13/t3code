@@ -4,6 +4,7 @@ import {
   issueTrackerSummary,
 } from "@t3tools/client-runtime/state/issue-trackers";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { T, useGT, useMessages } from "gt-react";
 import { ChevronDownIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { useState, type ElementType } from "react";
 import type {
@@ -28,7 +29,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Skeleton } from "../ui/skeleton";
 import { SecretInput } from "./SecretInput";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 
 type TrackerIcon = ElementType<{ className?: string }>;
 
@@ -45,13 +46,16 @@ const UNBOUND = "";
  * host's. Generic over the trackers the server reports; nothing here names Linear but its icon.
  */
 export function IssueTrackerSettings({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const gt = useGT();
+  const searchableSetting = useSearchableSetting();
+  const title = gt("Issue trackers");
   const query = useEnvironmentQuery(
     issueTrackerEnvironment.connections({ environmentId, input: {} }),
   );
   const trackers = query.data?.trackers ?? [];
   if (query.data === null && query.isPending) {
     return (
-      <SettingsSection id={searchableSetting("issue-trackers").id} title="Issue trackers">
+      <SettingsSection id={searchableSetting("issue-trackers").id} title={title}>
         <div className="grid gap-3 px-4 py-3">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-8 w-full" />
@@ -61,13 +65,13 @@ export function IssueTrackerSettings({ environmentId }: { readonly environmentId
   }
   if (query.data === null && query.error !== null) {
     return (
-      <SettingsSection id={searchableSetting("issue-trackers").id} title="Issue trackers">
+      <SettingsSection id={searchableSetting("issue-trackers").id} title={title}>
         <SettingsRow
-          title="Could not load issue trackers"
+          title={gt("Could not load issue trackers")}
           description={query.error}
           control={
             <Button size="xs" variant="outline" onClick={query.refresh}>
-              Retry
+              <T>Retry</T>
             </Button>
           }
         />
@@ -76,7 +80,7 @@ export function IssueTrackerSettings({ environmentId }: { readonly environmentId
   }
   if (trackers.length === 0) return null;
   return (
-    <SettingsSection id={searchableSetting("issue-trackers").id} title="Issue trackers">
+    <SettingsSection id={searchableSetting("issue-trackers").id} title={title}>
       {trackers.map((tracker) => (
         <TrackerRow
           // Drafts belong to one environment; switching must not carry them over.
@@ -99,6 +103,8 @@ function TrackerRow({
   readonly tracker: IssueTrackerConnection;
   readonly bindings: IssueTrackerConnectionList["bindings"];
 }) {
+  const gt = useGT();
+  const messages = useMessages();
   const Icon = TRACKER_ICONS[tracker.tracker];
   const canEdit = useAtomValue(issueTrackerEnvironment.connect.permissionAtom(environmentId));
   const connect = useAtomCommand(issueTrackerEnvironment.connect, {
@@ -118,12 +124,12 @@ function TrackerRow({
     setBusy(false);
     if (result._tag === "Success") return;
     const error = squashAtomCommandFailure(result);
-    setFailure(error instanceof Error ? error.message : "The request failed.");
+    setFailure(error instanceof Error ? error.message : gt("The request failed."));
   };
 
   const inputId = `issue-tracker-${tracker.tracker}-${environmentId}`;
   const usable = tracker.connected && tracker.account !== null;
-  const summary = issueTrackerSummary(tracker, bindings);
+  const summary = issueTrackerSummary(tracker, bindings, messages);
 
   return (
     <div className="first:rounded-t-xl last:rounded-b-xl transition-colors hover:bg-muted/20">
@@ -145,7 +151,7 @@ function TrackerRow({
             </span>
             {tracker.connected && tracker.account === null ? (
               <Badge variant="destructive" size="sm">
-                Credential rejected
+                <T>Credential rejected</T>
               </Badge>
             ) : null}
           </div>
@@ -156,7 +162,7 @@ function TrackerRow({
           variant="ghost-muted"
           onClick={() => setIsExpanded((open) => !open)}
           aria-expanded={isExpanded}
-          aria-label={`Toggle ${tracker.displayName} details`}
+          aria-label={gt("Toggle {tracker} details", { tracker: tracker.displayName })}
         >
           <ChevronDownIcon
             className={cn("size-3.5 transition-transform", isExpanded && "rotate-180")}
@@ -172,7 +178,7 @@ function TrackerRow({
                 title={<label htmlFor={inputId}>{tracker.credential.label}</label>}
                 description={
                   <>
-                    Stored on the server.
+                    <T>Stored on the server.</T>
                     {tracker.credential.helpUrl ? (
                       <>
                         {" "}
@@ -185,7 +191,7 @@ function TrackerRow({
                             />
                           }
                         >
-                          Create one
+                          <T>Create one</T>
                           <ExternalLinkIcon aria-hidden className="size-3" />
                         </InlineButton>
                       </>
@@ -211,7 +217,7 @@ function TrackerRow({
                         size="icon-sm"
                         variant="ghost-destructive"
                         onClick={() => void submit(null)}
-                        aria-label={`Disconnect ${tracker.displayName}`}
+                        aria-label={gt("Disconnect {tracker}", { tracker: tracker.displayName })}
                       >
                         <XIcon className="size-3.5" />
                       </Button>
@@ -244,6 +250,7 @@ function ProjectBindings({
   readonly tracker: IssueTrackerConnection;
   readonly bindings: IssueTrackerConnectionList["bindings"];
 }) {
+  const gt = useGT();
   const projects = useProjects().filter((project) => project.environmentId === environmentId);
   const bind = useAtomCommand(issueTrackerEnvironment.bindProject, {
     label: `bind project to ${tracker.displayName}`,
@@ -266,8 +273,11 @@ function ProjectBindings({
   return (
     <>
       <SettingsRow
-        title="Projects"
-        description={`Pick the ${tracker.displayName} ${tracker.scopeNoun} whose issues each project lists beside its repository's own, or all of them.`}
+        title={gt("Projects")}
+        description={gt(
+          "Pick the {tracker} {scope} whose issues each project lists beside its repository's own, or all of them.",
+          { tracker: tracker.displayName, scope: tracker.scopeNoun },
+        )}
       />
       {projects.map((project) => {
         const bound = bindings[project.id];
@@ -286,20 +296,26 @@ function ProjectBindings({
                 }}
               >
                 <SelectTrigger
-                  aria-label={`${tracker.displayName} ${tracker.scopeNoun} for ${project.title}`}
+                  aria-label={gt("{tracker} {scope} for {project}", {
+                    tracker: tracker.displayName,
+                    scope: tracker.scopeNoun,
+                    project: project.title,
+                  })}
                   className="w-full @min-[32rem]/settings-row:w-56"
                   size="sm"
                 >
                   <SelectValue>
                     {value === UNBOUND
-                      ? "Not bound"
+                      ? gt("Not bound")
                       : value === ALL_ISSUE_SCOPES
                         ? issueTrackerAllScopesLabel(tracker)
                         : (tracker.scopes.find((scope) => scope.key === value)?.name ?? value)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
-                  <SelectItem value={UNBOUND}>Not bound</SelectItem>
+                  <SelectItem value={UNBOUND}>
+                    <T>Not bound</T>
+                  </SelectItem>
                   <SelectItem value={ALL_ISSUE_SCOPES}>
                     {issueTrackerAllScopesLabel(tracker)}
                   </SelectItem>

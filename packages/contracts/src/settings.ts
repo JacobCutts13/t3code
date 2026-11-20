@@ -25,7 +25,7 @@ import {
 import { UsageLimitSourceId } from "./usageLimitSourceId.ts";
 import { UsageModelFilter } from "./usage.ts";
 import { SecretProviderId, SecretProviderSlug } from "./secretReference.ts";
-import { SettingsSecretValue } from "./settingsSecretValue.ts";
+import { containsSecretReference, SettingsSecretValue } from "./settingsSecretValue.ts";
 import { EnvironmentMachineKind, ThreadEnvMode, WorktreeSubmodules } from "./environment.ts";
 import { KeybindingShortcut } from "./keybindings.ts";
 import { ProjectNestedRepos } from "./nestedRepos.ts";
@@ -1401,6 +1401,8 @@ export const ServerSettings = Schema.Struct({
   ),
 
   enableAgentBrowserAccess: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  /** Lets clients reach this machine's loopback ports over `/api/preview/tunnel`. */
+  enablePreviewTunnel: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   cloudSpeechCredentials: CloudSpeechCredentials.pipe(
     Schema.withDecodingDefault(Effect.succeed({ openai: "", xai: "", openrouter: "" })),
   ),
@@ -1866,6 +1868,7 @@ export const ServerSettingsPatch = Schema.Struct({
   keepAwakeWhileAgentsWork: Schema.optionalKey(Schema.Boolean),
   requireConnectDeviceApproval: Schema.optionalKey(Schema.Boolean),
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),
+  enablePreviewTunnel: Schema.optionalKey(Schema.Boolean),
   cloudSpeechCredentials: Schema.optionalKey(
     Schema.Struct({
       openai: Schema.optionalKey(SettingsSecretValue),
@@ -2016,7 +2019,7 @@ export function requiredScopesForServerSettingsPatch(
   let changesAccess = false;
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
-    if (key === "requireConnectDeviceApproval") {
+    if (key === "requireConnectDeviceApproval" || key === "enablePreviewTunnel") {
       changesAccess = true;
     } else if (
       key === "providers" ||
@@ -2030,6 +2033,8 @@ export function requiredScopesForServerSettingsPatch(
       changesSettings = true;
     }
   }
+  // A reference can name any secret the store holds; choosing where one goes is provider authority.
+  if (containsSecretReference(patch)) changesProviders = true;
   // Removing a secret provider also clears the settings fields that read from it.
   if (Object.values(patch.secretProviders ?? {}).some((entry) => entry === null)) {
     changesSettings = true;
