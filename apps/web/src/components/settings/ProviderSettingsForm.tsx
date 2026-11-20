@@ -207,6 +207,12 @@ const PACKAGE_FIELD_TEXT: ReadonlyMap<string, string> = new Map([
     "Path to the Muse Code binary on this environment. Sign in with muse login on that host.",
     msg("Path to the Muse Code binary on this environment. Sign in with muse login on that host."),
   ],
+  [
+    "Cursor Cloud runs each thread on a Cursor-hosted VM against the project's pushed branch and opens a pull request.",
+    msg(
+      "Cursor Cloud runs each thread on a Cursor-hosted VM against the project's pushed branch and opens a pull request.",
+    ),
+  ],
   ["Path to the OpenCode binary.", msg("Path to the OpenCode binary.")],
   [
     "Leave blank to let T3 Code spawn the server when needed.",
@@ -252,6 +258,8 @@ const PACKAGE_FIELD_TEXT: ReadonlyMap<string, string> = new Map([
   ["Google account", msg("Google account")],
   ["Gemini API key", msg("Gemini API key")],
   ["Local command", msg("Local command")],
+  ["Runtime", msg("Runtime", { $context: "settings field, where a Cursor agent runs" })],
+  ["Local workspace", msg("Local workspace")],
 ]);
 
 function packageFieldText(text: string, resolve: MessageResolver): string {

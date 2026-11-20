@@ -50,6 +50,7 @@ import * as CursorAgentSdk from "./CursorAgentSdk.ts";
 import * as CursorSdk from "./CursorSdk.ts";
 import { loadCursorSdk } from "./sdk.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
+import { cursorCloudRepositoryUrl } from "./cloudRepository.ts";
 
 // The SDK reads CURSOR_BACKEND_URL once when it loads, before any test body runs.
 const cursorBackendUrl = await vi.hoisted(async () => {
@@ -2898,6 +2899,165 @@ describe("CursorAdapterV2", () => {
         ),
       ),
   );
+
+  it.effect("dispatches cloud instances to the project's pushed branch without local MCP", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const cwd = yield* fileSystem.realPath(
+        yield* fileSystem.makeTempDirectoryScoped({ prefix: "cursor-v2-cloud-" }),
+      );
+      for (const args of [
+        ["init", "-q", "-b", "feature/cloud", cwd],
+        ["-C", cwd, "remote", "add", "origin", "git@github.com:acme/widgets.git"],
+      ]) {
+        yield* spawnAndCollect("git", ChildProcess.make("git", args));
+      }
+      yield* fileSystem.makeDirectory(`${cwd}/.cursor`);
+      yield* fileSystem.writeFileString(
+        `${cwd}/.cursor/mcp.json`,
+        JSON.stringify({
+          mcpServers: { local: { command: "node", args: ["${workspaceFolder}/s.mjs"] } },
+        }),
+      );
+
+      const instanceId = ProviderInstanceId.make("cursor-cloud");
+      const threadId = ThreadId.make("cursor-cloud-thread");
+      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+      yield* mcpSessions.set({
+        environmentId: EnvironmentId.make("cursor-cloud-environment"),
+        threadId,
+        providerSessionId: "cursor-cloud-session",
+        providerInstanceId: instanceId,
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer synthetic-cursor-token",
+        browserToolsAvailable: false,
+      });
+      const modelSelection = { instanceId, model: "composer-2.5" };
+      const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        cwd,
+      });
+      const opened: Array<CursorAgentSdk.CursorAgentSdkOpenInput> = [];
+      const sentWith: Array<Record<string, unknown> | undefined> = [];
+      const adapter = yield* makeCursorAdapterV2({
+        instanceId,
+        environment: {},
+        runtime: "cloud",
+      }).pipe(
+        Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
+          assertComplete: Effect.void,
+          open: (input) =>
+            Effect.sync(() => {
+              opened.push(input);
+              return {
+                agentId: input.agentId ?? "bc-cloud-agent",
+                listMessages: Effect.succeed([]),
+                close: Effect.void,
+                send: (sendInput) => {
+                  sentWith.push(sendInput.options?.mcpServers);
+                  return Effect.die("sent");
+                },
+              };
+            }),
+        }),
+        Effect.provide(TestProviderHost.layer({ cwd })),
+      );
+      const runtime = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("cursor-cloud-session"),
+        modelSelection,
+        runtimePolicy,
+      });
+      const providerThread = yield* runtime.ensureThread({
+        threadId,
+        modelSelection,
+        runtimePolicy,
+      });
+      assert.deepEqual(opened[0]?.options.cloud, {
+        repos: [{ url: "https://github.com/acme/widgets", startingRef: "feature/cloud" }],
+        autoCreatePR: true,
+      });
+      assert.isUndefined(opened[0]?.options.local);
+      assert.isUndefined(opened[0]?.options.mcpServers);
+
+      const now = yield* DateTime.now;
+      yield* runtime
+        .startTurn({
+          threadId,
+          providerThread,
+          modelSelection,
+          runtimePolicy,
+          runId: RunId.make("cursor-cloud-run"),
+          runOrdinal: 1,
+          providerTurnOrdinal: 1,
+          attemptId: RunAttemptId.make("cursor-cloud-attempt"),
+          rootNodeId: NodeId.make("cursor-cloud-root"),
+          appThread: {
+            id: threadId,
+            projectId: ProjectId.make("cursor-cloud-project"),
+            createdBy: "user",
+            creationSource: "web",
+            title: "Cursor Cloud",
+            providerInstanceId: instanceId,
+            modelSelection,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: null,
+            activeProviderThreadId: providerThread.id,
+            lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+            forkedFrom: null,
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+            settledOverride: null,
+            settledAt: null,
+            lastVisitedAt: null,
+            deletedAt: null,
+          },
+          message: {
+            messageId: MessageId.make("cursor-cloud-message"),
+            createdBy: "user",
+            creationSource: "web",
+            text: "Hello.",
+            attachments: [],
+          },
+        })
+        .pipe(Effect.exit);
+      assert.deepEqual(sentWith, [undefined]);
+
+      // The SDK rejects local options for a cloud agent, whatever runtime the instance has now.
+      const resumed = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("cursor-cloud-session-2"),
+        modelSelection,
+        runtimePolicy,
+      });
+      yield* resumed.resumeThread({ providerThread });
+      assert.deepEqual(opened[1]?.options.cloud, {});
+      assert.isUndefined(opened[1]?.options.local);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(NodeServices.layer, IdAllocator.layer, McpProviderSessions.layer),
+      ),
+    ),
+  );
+
+  it("normalizes git remotes to the HTTPS URLs Cursor Cloud clones", () => {
+    for (const [remote, expected] of [
+      ["git@github.com:acme/widgets.git", "https://github.com/acme/widgets"],
+      ["ssh://git@github.com:22/acme/widgets.git", "https://github.com/acme/widgets"],
+      ["https://token@github.com/acme/widgets/", "https://github.com/acme/widgets"],
+      ["https://gitlab.com/acme/platform/widgets.git", "https://gitlab.com/acme/platform/widgets"],
+      ["/srv/git/widgets.git", undefined],
+      ["file:///srv/git/acme/widgets.git", undefined],
+      ["", undefined],
+    ] as const) {
+      assert.equal(cursorCloudRepositoryUrl(remote), expected, remote);
+    }
+  });
 
   it("recognizes direct and SDK-wrapped abort failures as cancellation", () => {
     assert.isTrue(CursorAgentSdk.isCursorCancellationError({ name: "AbortError" }));

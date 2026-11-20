@@ -58,6 +58,8 @@ import {
   rewriteCursorSkillMentions,
 } from "./skills.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
+import { type CursorCloudRepository, resolveCursorCloudRepository } from "./cloudRepository.ts";
+import type { CursorRuntime } from "../settings.ts";
 import { t3OrchestrationPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -315,14 +317,27 @@ export function makeCursorAgentOptions(input: {
   readonly threadId: ThreadId;
   readonly mcpSession: McpProviderSession.McpProviderSessionConfig | undefined;
   readonly platform: NodeJS.Platform;
+  /** Present for cloud agents; only a create names the repository to clone. */
+  readonly cloud?: { readonly repository?: CursorCloudRepository };
 }): AgentOptions {
-  const policy = cursorRuntimeAgentPolicy(input.runtimePolicy, input.platform);
-  const mcpServers = cursorMcpServers(input.mcpSession);
-  return {
+  const common = {
     model: cursorSdkModelSelection(input.modelSelection, input.models, input.sdkModels),
     name: `T3 Code ${input.threadId}`,
     mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
     ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
+  } satisfies AgentOptions;
+  // The VM cannot reach this environment's T3 Code MCP server, so cloud agents get none.
+  if (input.cloud !== undefined) {
+    const repository = input.cloud.repository;
+    return {
+      ...common,
+      cloud: repository === undefined ? {} : { repos: [{ ...repository }], autoCreatePR: true },
+    };
+  }
+  const policy = cursorRuntimeAgentPolicy(input.runtimePolicy, input.platform);
+  const mcpServers = cursorMcpServers(input.mcpSession);
+  return {
+    ...common,
     local: {
       ...(input.runtimePolicy.cwd === null ? {} : { cwd: input.runtimePolicy.cwd }),
       autoReview: policy.autoReview,
@@ -1020,6 +1035,7 @@ export interface CursorAdapterV2Options {
   readonly environment: NodeJS.ProcessEnv;
   readonly getModels?: () => ReadonlyArray<ServerProviderModel>;
   readonly getSdkModels?: () => ReadonlyArray<SDKModel>;
+  readonly runtime?: CursorRuntime;
 }
 
 export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
@@ -2518,6 +2534,20 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                 ),
               );
 
+        const resolveCloudRepository = (cwd: string) =>
+          resolveCursorCloudRepository(cwd).pipe(
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+            Effect.filterOrFail(
+              (repository): repository is CursorCloudRepository => repository !== undefined,
+              () =>
+                new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: CursorAgentSdk.CURSOR_PROVIDER,
+                  detail:
+                    "Cursor Cloud needs a project with an `origin` remote that Cursor can clone, such as a GitHub repository.",
+                }),
+            ),
+          );
+
         const openAgent = Effect.fnUntraced(function* (openInput: {
           readonly operation: "create" | "resume";
           readonly threadId: ThreadId;
@@ -2547,7 +2577,16 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             yield* existing.session.close.pipe(Effect.ignore);
             yield* Ref.set(liveAgent, null);
           }
+          const cloud =
+            openInput.operation === "create"
+              ? adapterOptions.runtime === "cloud"
+                ? { repository: yield* resolveCloudRepository(cwd) }
+                : undefined
+              : CursorAgentSdk.isCursorCloudAgentId(openInput.agentId)
+                ? {}
+                : undefined;
           const options = makeCursorAgentOptions({
+            ...(cloud === undefined ? {} : { cloud }),
             ...(apiKey === undefined ? {} : { apiKey }),
             modelSelection: openInput.modelSelection,
             models: adapterOptions.getModels?.() ?? [],
@@ -2710,7 +2749,8 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               modelSelection: turnInput.modelSelection,
               runtimePolicy: turnInput.runtimePolicy,
             });
-            const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+            const cloud = CursorAgentSdk.isCursorCloudAgentId(agent.nativeThreadId);
+            const mcpSession = cloud ? undefined : yield* mcpSessions.read(turnInput.threadId);
             const mcpServers = cursorMcpServers(mcpSession);
             const hasDeviceTools =
               mcpServers !== undefined && mcpSession?.capabilities?.has("device") === true;
@@ -2767,7 +2807,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             // A send-time set replaces the create-time set, so the workspace servers go only here and are
             // read again each turn from mcp.json and mcp-disabled.json; both merge with settingSources.
             const turnMcpServers = {
-              ...(yield* resolveWorkspaceMcpServers(turnInput.runtimePolicy.cwd)),
+              ...(cloud ? {} : yield* resolveWorkspaceMcpServers(turnInput.runtimePolicy.cwd)),
               ...mcpServers,
             };
             const sdkRun = yield* agent.session
