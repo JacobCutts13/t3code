@@ -199,7 +199,13 @@ it.layer(layerGit)("ThreadForkWorkspaceService", (it) => {
       const { repo, parentWorktree } = yield* setupRepo;
       yield* git(repo, ["branch", "feature/x-fork-1"]);
       const harness = newHarness(parentWorktree);
-      const result = yield* runFork(harness, repo);
+      // A double click: both requests share one target id and race on one service.
+      const [result, doubleClicked] = yield* Effect.flatMap(
+        ThreadForkWorkspaceService.ThreadForkWorkspaceService,
+        (service) =>
+          Effect.all([service.fork(forkInput), service.fork(forkInput)], { concurrency: 2 }),
+      ).pipe(Effect.provide(makeLayer(harness, repo)));
+      assert.deepEqual(doubleClicked, result);
 
       assert.equal(result.branch, "feature/x-fork-2");
       const forkPath = result.worktreePath!;
