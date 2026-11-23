@@ -13,7 +13,10 @@ import { assert, it, vi } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import {
   ChatAttachmentId,
+  CheckpointId,
   ComposerContextId,
+  EventId,
+  ProviderThreadId,
   type ChatAttachment,
   CommandId,
   DEFAULT_SERVER_SETTINGS,
@@ -63,6 +66,7 @@ import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import { ClaudeProviderCapabilitiesV2 } from "./Adapters/ClaudeAdapterV2.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
+import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -326,6 +330,7 @@ function makeHarness(options: HarnessOptions = {}) {
     layer: Layer.mergeAll(
       layerLaunch,
       layerRegistry,
+      layerOrchestrator,
       layerThreadManagement,
       layerTitleRegeneration,
       layerOutbox,
@@ -2054,7 +2059,109 @@ it.effect.each(["failed", "interrupted"] as const)(
   },
 );
 
-it.effect("replays a server-allocated launch", () =>
+/** A worktree thread with a completed, checkpointed run, which a fork starts from. */
+const writeForkSource = (threadId: ThreadId) =>
+  Effect.gen(function* () {
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const now = yield* DateTime.now;
+    yield* threads.dispatch({
+      type: "thread.create",
+      commandId: CommandId.make(`${threadId}:create`),
+      threadId,
+      projectId,
+      title: "Source",
+      modelSelection,
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      branch: "feature",
+      worktreePath: "/repo/.t3/worktrees/source",
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const runId = RunId.make(`${threadId}:run`);
+    const providerThreadId = ProviderThreadId.make(`${threadId}:provider-thread`);
+    yield* eventSink.write({
+      events: [
+        {
+          id: EventId.make(`${threadId}:provider-thread`),
+          type: "provider-thread.updated",
+          threadId,
+          occurredAt: now,
+          payload: {
+            id: providerThreadId,
+            driver: adapter.driver,
+            providerInstanceId: modelSelection.instanceId,
+            providerSessionId: null,
+            appThreadId: threadId,
+            ownerNodeId: null,
+            nativeThreadRef: { driver: adapter.driver, nativeId: "native", strength: "strong" },
+            nativeConversationHeadRef: null,
+            status: "idle",
+            firstRunOrdinal: 1,
+            lastRunOrdinal: 1,
+            handoffIds: [],
+            forkedFrom: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        },
+        {
+          id: EventId.make(`${threadId}:run`),
+          type: "run.created",
+          threadId,
+          runId,
+          occurredAt: now,
+          payload: {
+            id: runId,
+            threadId,
+            ordinal: 1,
+            providerInstanceId: modelSelection.instanceId,
+            modelSelection,
+            providerThreadId,
+            userMessageId: MessageId.make(`${threadId}:message`),
+            rootNodeId: null,
+            activeAttemptId: null,
+            status: "completed",
+            queuePosition: null,
+            requestedAt: now,
+            startedAt: now,
+            completedAt: now,
+            checkpointId: CheckpointId.make(`${threadId}:checkpoint`),
+            contextHandoffId: null,
+          },
+        },
+      ],
+    });
+  });
+
+it.effect("refuses a fork outside its source's project before committing anything", () => {
+  const harness = makeHarness();
+  return Effect.gen(function* () {
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    const sourceThreadId = ThreadId.make("thread:launch:fork-other-source");
+    yield* writeForkSource(sourceThreadId);
+    const failed = yield* launches
+      .launch({
+        ...launchInput({
+          command: "command:launch:fork-other-project",
+          thread: "thread:launch:fork-other-project",
+          message: "Continue",
+          workspace: { type: "worktree", baseRef: "feature" },
+        }),
+        projectId: otherProjectId,
+        forkOf: sourceThreadId,
+      })
+      .pipe(Effect.flip);
+    if (failed._tag !== "ThreadLaunchError") {
+      assert.fail(`expected ThreadLaunchError, got ${failed._tag}`);
+    }
+    assert.isNull(yield* threads.getThreadShell(ThreadId.make("thread:launch:fork-other-project")));
+  }).pipe(Effect.provide(harness.layer));
+});
+
+it.effect.each(["create", "fork"] as const)("replays a server-allocated %s launch", (kind) =>
   Effect.gen(function* () {
     const setupEntered = yield* Deferred.make<void>();
     const allowSetup = yield* Deferred.make<void>();
@@ -2068,13 +2175,19 @@ it.effect("replays a server-allocated launch", () =>
     yield* Effect.gen(function* () {
       const launches = yield* ThreadLaunch.ThreadLaunchService;
       const threads = yield* ThreadManagement.ThreadManagementService;
-      const { threadId: _unusedThreadId, ...rest } = launchInput({
+      const sourceThreadId = ThreadId.make("thread:launch:fork-source");
+      if (kind === "fork") yield* writeForkSource(sourceThreadId);
+      const { threadId: _unusedThreadId, ...launch } = launchInput({
         command: "command:launch:allocated-retry",
         thread: "unused",
         message: "Only once",
-        workspace: { type: "worktree", baseRef: "main" },
+        workspace: { type: "worktree", baseRef: kind === "fork" ? "feature" : "main" },
       });
+      const rest = kind === "fork" ? { ...launch, forkOf: sourceThreadId } : launch;
       const first = yield* launches.launch(rest);
+      if (kind === "fork") {
+        assert.equal(first.projection.thread.lineage.parentThreadId, sourceThreadId);
+      }
       // One commit holds the thread and its first run, so no client sees the thread idle between.
       const launchCommits = yield* threads
         .streamStoredEventsFrom({ threadId: first.threadId })

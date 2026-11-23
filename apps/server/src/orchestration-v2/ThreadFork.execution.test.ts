@@ -16,12 +16,14 @@ import {
   RunAttemptId,
   RunId,
   ScheduledTaskId,
+  type OrchestrationV2ThreadLaunchWorkspaceStrategy,
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Statement from "effect/sql/Statement";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
@@ -29,6 +31,7 @@ import * as TestClock from "effect/testing/TestClock";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import { ClaudeProviderCapabilitiesV2 } from "./Adapters/ClaudeAdapterV2.ts";
 import * as EffectWorker from "./EffectWorker.ts";
+import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
@@ -958,24 +961,48 @@ it.effect("a fork with a first message commits a preparing run that waits for it
       text: "Work",
       stable: true,
     });
-    const workspaceStrategy = { type: "worktree", baseRef: "feature" } as const;
-    yield* orchestrator.dispatch({
-      type: "thread.fork",
-      commandId: CommandId.make("fork-first-message"),
-      sourceThreadId: parentId,
-      targetThreadId: forkId,
-      sourcePoint: { type: "latest_stable" },
-      worktreePath: null,
-      branch: null,
-      initialMessage: {
-        messageId: MessageId.make("fork-first-message:message"),
-        text: "Continue here",
-        attachments: [],
-        workspaceStrategy,
-      },
-      createdBy: "user",
-      creationSource: "web",
-    });
+    const forkWith = (
+      commandId: string,
+      workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy,
+    ) =>
+      orchestrator.dispatch({
+        type: "thread.fork",
+        commandId: CommandId.make(commandId),
+        sourceThreadId: parentId,
+        targetThreadId: forkId,
+        sourcePoint: { type: "latest_stable" },
+        worktreePath: null,
+        branch: null,
+        initialMessage: {
+          messageId: MessageId.make(`${commandId}:message`),
+          text: "Continue here",
+          attachments: [],
+          workspaceStrategy,
+        },
+        createdBy: "user",
+        creationSource: "web",
+      });
+    const worktreeStrategy = { type: "worktree", baseRef: "feature" } as const;
+    // A worktree thread's fork never runs in the project checkout, nor builds from origin.
+    for (const [commandId, strategy] of [
+      ["fork-first-message:root", { type: "root" }],
+      ["fork-first-message:origin", { ...worktreeStrategy, startFromOrigin: true }],
+      ["fork-first-message:other-branch", { ...worktreeStrategy, baseRef: "main" }],
+    ] as const) {
+      const refused = yield* forkWith(commandId, strategy).pipe(Effect.flip);
+      assert.include(String(refused.cause), "must use its source's workspace");
+    }
+    assert.isTrue(Exit.isFailure(yield* Effect.exit(orchestrator.getThreadProjection(forkId))));
+
+    const workspaceStrategy = worktreeStrategy;
+    yield* forkWith("fork-first-message", workspaceStrategy);
+    // The run waits for its worktree, so the commit starts no provider turn.
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    assert.isFalse(
+      (yield* outbox.listByCommandId(CommandId.make("fork-first-message"))).some(
+        (effect) => effect.request.type === "provider-turn.start",
+      ),
+    );
     const fork = yield* orchestrator.getThreadProjection(forkId);
     assert.deepEqual(
       [fork.thread.lineage.parentThreadId, fork.thread.lineage.relationshipToParent],

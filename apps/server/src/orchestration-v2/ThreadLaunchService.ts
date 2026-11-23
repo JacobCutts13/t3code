@@ -1338,7 +1338,8 @@ const make = Effect.gen(function* () {
           input.threadId === undefined &&
           Option.isSome(launchReceipt) &&
           launchReceipt.value.status === "accepted" &&
-          launchReceipt.value.commandType === "thread.create"
+          (launchReceipt.value.commandType === "thread.create" ||
+            launchReceipt.value.commandType === "thread.fork")
             ? launchReceipt.value
             : undefined;
         const candidateThreadId =
@@ -1366,6 +1367,19 @@ const make = Effect.gen(function* () {
 
         if (input.reuseExistingThread === true && Option.isNone(launchReceipt)) {
           yield* validateReusableThread(input, candidateThreadId);
+        }
+        // A thread never changes project, so this needs no lock; nothing commits before it.
+        if (input.forkOf !== undefined) {
+          const source = yield* threads
+            .getThreadShell(input.forkOf)
+            .pipe(Effect.mapError(mapError(input, "resolve-project", candidateThreadId)));
+          if (source?.projectId !== input.projectId || input.initialMessage === undefined) {
+            return yield* mapError(
+              input,
+              "resolve-project",
+              candidateThreadId,
+            )("A fork starts with its first message, in its source's project.");
+          }
         }
 
         const workspaceStrategy: ThreadLaunchWorkspaceStrategy =

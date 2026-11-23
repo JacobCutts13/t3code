@@ -1626,6 +1626,34 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const projects = yield* ProjectStore.ProjectStoreV2;
   const projectionStore = yield* ProjectionStoreV2;
   const effectOutbox = yield* EffectOutbox.EffectOutboxV2;
+  /** The running "Preparing workspace" item a deferred run shows after its message. */
+  const workspacePreparationItem = (
+    driver: OrchestrationV2ProviderThread["driver"],
+    message: Pick<OrchestrationV2TurnItem, "threadId" | "runId" | "nodeId" | "ordinal">,
+    providerThreadId: OrchestrationV2ProviderThread["id"],
+    now: DateTime.Utc,
+  ): OrchestrationV2TurnItem => ({
+    id: idAllocator.derive.turnItemFromProviderItem({
+      driver,
+      nativeItemId: `workspace-preparation:${message.runId}`,
+    }),
+    threadId: message.threadId,
+    runId: message.runId,
+    nodeId: message.nodeId,
+    providerThreadId,
+    providerTurnId: null,
+    nativeItemRef: null,
+    parentItemId: null,
+    ordinal: message.ordinal + 1,
+    status: "running",
+    title: WORKSPACE_PREPARATION_INPUT,
+    startedAt: now,
+    completedAt: null,
+    updatedAt: now,
+    type: "command_execution",
+    input: WORKSPACE_PREPARATION_INPUT,
+  });
+
   const nextTurnItemOrdinal = (
     projection: Pick<OrchestrationV2ThreadProjection, "thread"> &
       Partial<Pick<OrchestrationV2ThreadProjection, "turnItems">>,
@@ -6214,6 +6242,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: `Thread ${command.sourceThreadId} has no worktree yet. Start the side chat once its worktree is set up.`,
       });
     }
+    // A fork's first message builds the workspace its source implies, read under the source's
+    // lock: a new worktree from its branch as it is here, or the same checkout without one.
+    const forkWorkspace = command.initialMessage?.workspaceStrategy;
+    if (
+      command.initialMessage !== undefined &&
+      !(sourceProjection.thread.worktreePath === null
+        ? forkWorkspace?.type === "root"
+        : forkWorkspace?.type === "worktree" &&
+          forkWorkspace.baseRef === sourceProjection.thread.branch &&
+          forkWorkspace.startFromOrigin !== true)
+    ) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: `A fork of thread ${command.sourceThreadId} must use its source's workspace.`,
+      });
+    }
     if ((yield* findThread(command.targetThreadId)) !== null) {
       return yield* new OrchestratorThreadAlreadyExistsError({
         commandId: command.commandId,
@@ -8843,29 +8888,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ...(freshContext ? { freshContext: true } : {}),
         ...(run.contextHandoffId === null ? modelSwitchSince(projection, modelSelection) : {}),
       };
-      const preparationTurnItem: OrchestrationV2TurnItem | null =
+      const preparationTurnItem =
         dispatchMode.type === "defer_start"
-          ? {
-              id: idAllocator.derive.turnItemFromProviderItem({
-                driver: adapter.driver,
-                nativeItemId: `workspace-preparation:${runId}`,
-              }),
-              threadId: command.threadId,
-              runId,
-              nodeId: rootNodeId,
-              providerThreadId,
-              providerTurnId: null,
-              nativeItemRef: null,
-              parentItemId: null,
-              ordinal: turnItem.ordinal + 1,
-              status: "running",
-              title: WORKSPACE_PREPARATION_INPUT,
-              startedAt: now,
-              completedAt: null,
-              updatedAt: now,
-              type: "command_execution",
-              input: WORKSPACE_PREPARATION_INPUT,
-            }
+          ? workspacePreparationItem(adapter.driver, turnItem, providerThreadId, now)
           : null;
       const emitEvent = emit(events, command);
       yield* emitEvent({
@@ -10002,27 +10027,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         nodeId: rootNodeId,
         providerInstanceId: modelSelection.instanceId,
         occurredAt: now,
-        payload: {
-          id: idAllocator.derive.turnItemFromProviderItem({
-            driver: adapter.driver,
-            nativeItemId: `workspace-preparation:${runId}`,
-          }),
-          threadId: command.threadId,
-          runId,
-          nodeId: rootNodeId,
-          providerThreadId: providerThread.id,
-          providerTurnId: null,
-          nativeItemRef: null,
-          parentItemId: null,
-          ordinal: turnItem.ordinal + 1,
-          status: "running",
-          title: WORKSPACE_PREPARATION_INPUT,
-          startedAt: now,
-          completedAt: null,
-          updatedAt: now,
-          type: "command_execution",
-          input: WORKSPACE_PREPARATION_INPUT,
-        },
+        payload: workspacePreparationItem(adapter.driver, turnItem, providerThread.id, now),
       });
     }
     const forkResolution = nativeForkResolution ?? portableForkResolution;
