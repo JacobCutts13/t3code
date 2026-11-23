@@ -238,6 +238,8 @@ export interface ThreadDetailScreenProps {
     readonly editorRef: React.RefObject<ComposerEditorHandle | null>;
     readonly sendBlockedReason: string | null;
     readonly interactionLocked: boolean;
+    /** The model and modes show but cannot change, as a fork draft takes its source's. */
+    readonly settingsLocked?: boolean;
   };
   readonly worktreeSetup?: WorktreeSetupCardProps | null;
   readonly canOperateThread: boolean;
@@ -1950,6 +1952,7 @@ function ThreadDetailBody(
                               : null
                         }
                         interactionLocked={props.draftMode?.interactionLocked}
+                        settingsLocked={props.draftMode?.settingsLocked}
                         draftKey={props.composerDraftKey ?? undefined}
                         followUpBehavior={
                           props.activePendingApprovals.length > 0 &&

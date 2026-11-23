@@ -1591,7 +1591,11 @@ function OpenCommandPaletteDialog(props: {
 
   if (activeThread !== null && canOperateActiveThread) {
     const thread = activeThread;
-    const forkBlockedReason = threadForkBlockedReason(thread, m);
+    const forkBlockedReason = threadForkBlockedReason(
+      thread,
+      activeThreadServerConfig?.environment.capabilities.forkOnLaunch === true,
+      m,
+    );
     if (forkBlockedReason !== undefined)
       actionItems.push({
         kind: "action",

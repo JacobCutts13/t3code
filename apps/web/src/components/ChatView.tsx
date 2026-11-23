@@ -113,6 +113,7 @@ import { HandoffRow } from "./chat/V2LifecycleRow";
 import {
   codexFeedbackMessage,
   deriveWorkspaceMutationId,
+  forkDraftSource,
   isCompleteTurnItemRow,
   shouldShowLoadEarlierControl,
   type CodexFeedbackSubmission,
@@ -1326,13 +1327,16 @@ export default function ChatView(props: ChatViewProps) {
     advertisedFileAttachmentBytes === null
       ? null
       : clampFileAttachmentUploadBytes(advertisedFileAttachmentBytes);
+  // A fork draft's machine, workspace, model and modes are its source's.
+  const isForkDraft = forkDraftSource(draftThread?.logicalProjectKey) !== null;
   const envLocked =
-    Boolean(activeThread) &&
-    isThreadEnvironmentLocked({
-      messageCount: activeMessageCount,
-      hasRuntime: activeRuntime !== null,
-      activeProviderThreadId: serverThread?.activeProviderThreadId ?? null,
-    });
+    isForkDraft ||
+    (Boolean(activeThread) &&
+      isThreadEnvironmentLocked({
+        messageCount: activeMessageCount,
+        hasRuntime: activeRuntime !== null,
+        activeProviderThreadId: serverThread?.activeProviderThreadId ?? null,
+      }));
   // onEnvironmentChange only retargets an unsent draft. envLocked alone does not
   // rule out a started thread: one whose machine is offline never loads its
   // messages, so it would otherwise be offered a machine picker that does nothing.
@@ -3544,7 +3548,9 @@ export default function ChatView(props: ChatViewProps) {
                   onCancelWorktreeSetup={onCancelWorktreeSetupStable}
                   retryableWorkspacePreparationRunIds={retryableWorkspacePreparationRunIds}
                   onRetryWorkspacePreparation={onRetryWorkspacePreparationStable}
-                  {...(draftId
+                  {...(draftId &&
+                  !isForkDraft &&
+                  activeThread?.lineage.relationshipToParent !== "fork"
                     ? { onWorktreeSetupWorkLocally: onWorktreeSetupWorkLocallyStable }
                     : {})}
                   {...(onOpenWorktreeSetupTerminal ? { onOpenWorktreeSetupTerminal } : {})}
@@ -3699,6 +3705,7 @@ export default function ChatView(props: ChatViewProps) {
                             ) : null}
                             {!composerMounted ? null : (
                               <ChatComposer
+                                controlsLocked={isForkDraft}
                                 canOperateThread={canOperateThread}
                                 reportedModelSelection={reportedModelSelection}
                                 multipleModelSelections={multipleModelSelections}

@@ -3,7 +3,7 @@ import { isProviderNativeSubagentThread } from "@t3tools/contracts";
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
-import { threadKey } from "./entities.ts";
+import { parseThreadKey, threadKey } from "./entities.ts";
 import type { EnvironmentThreadShell } from "./models.ts";
 
 export type ThreadTreeThread = Pick<
@@ -207,7 +207,8 @@ export function resolveThreadTreeRowRef<
 
 /**
  * Why Fork is unavailable, or null; undefined hides it. The server forks at the latest completed
- * run and stays authoritative.
+ * run and stays authoritative. `supported`: the server's `forkOnLaunch`, without which a fork's
+ * first send would start a plain thread.
  */
 export function threadForkBlockedReason(
   thread: {
@@ -216,10 +217,11 @@ export function threadForkBlockedReason(
     readonly branch: string | null;
     readonly worktreePath: string | null;
   },
+  supported: boolean,
   resolve: MFunctionType = mFallback,
 ): string | null | undefined {
   // A fork's worktree starts from its parent's branch; a detached worktree has none.
-  if (thread.worktreePath !== null && thread.branch === null) return undefined;
+  if (!supported || (thread.worktreePath !== null && thread.branch === null)) return undefined;
   if (thread.lineage.sideChat === true) return resolve(msg("Side chats can't be forked"));
   if (thread.latestRun?.completedAt == null)
     return resolve(msg("Available after a completed turn"));
@@ -229,13 +231,13 @@ export function threadForkBlockedReason(
 const FORK_DRAFT_KEY_PREFIX = "fork:";
 
 /** A fork is a draft of its own, keyed by its source, until its first message creates it. */
-export function forkDraftKey(sourceThreadId: string): string {
-  return `${FORK_DRAFT_KEY_PREFIX}${sourceThreadId}`;
+export function forkDraftKey(source: ScopedThreadRef): string {
+  return `${FORK_DRAFT_KEY_PREFIX}${threadKey(source)}`;
 }
 
 /** The thread a draft forks, or null for an ordinary draft. */
-export function forkDraftSourceThreadId(draftKey: string | undefined): string | null {
+export function forkDraftSource(draftKey: string | undefined): ScopedThreadRef | null {
   return draftKey?.startsWith(FORK_DRAFT_KEY_PREFIX) === true
-    ? draftKey.slice(FORK_DRAFT_KEY_PREFIX.length)
+    ? parseThreadKey(draftKey.slice(FORK_DRAFT_KEY_PREFIX.length))
     : null;
 }

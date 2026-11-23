@@ -34,6 +34,7 @@ import { readEnvironmentScope } from "../state/session";
 import {
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
+  readEnvironmentSupportsForkOnLaunch,
   readThreadShell,
   useProjects,
 } from "../state/entities";
@@ -157,7 +158,11 @@ export function useThreadActionMenu(input: {
         snoozePresets,
         canShareWithGuest,
         canTurnIntoProject: canTurnThreadIntoProject(threadRef),
-        forkBlockedReason: threadForkBlockedReason(thread, m),
+        forkBlockedReason: threadForkBlockedReason(
+          thread,
+          readEnvironmentSupportsForkOnLaunch(threadRef.environmentId),
+          m,
+        ),
       });
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;

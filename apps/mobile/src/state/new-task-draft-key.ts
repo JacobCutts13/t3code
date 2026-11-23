@@ -2,13 +2,19 @@ const NEW_TASK_DRAFT_PREFIX = "new-task:";
 const FORK_DRAFT_PREFIX = `${NEW_TASK_DRAFT_PREFIX}fork:`;
 
 /** A fork's draft, keyed by its source so Fork reopens it. */
-export function forkNewTaskDraftKey(sourceThreadId: string): string {
-  return `${FORK_DRAFT_PREFIX}${sourceThreadId}`;
+export function forkNewTaskDraftKey(environmentId: string, sourceThreadId: string): string {
+  return `${FORK_DRAFT_PREFIX}${encodeURIComponent(environmentId)}/${encodeURIComponent(sourceThreadId)}`;
 }
 
 /** The thread a new-task draft forks, or null. */
-export function newTaskDraftForkOf(draftKey: string): string | null {
-  return draftKey.startsWith(FORK_DRAFT_PREFIX) ? draftKey.slice(FORK_DRAFT_PREFIX.length) : null;
+export function newTaskDraftForkOf(
+  draftKey: string,
+): { readonly environmentId: string; readonly threadId: string } | null {
+  if (!draftKey.startsWith(FORK_DRAFT_PREFIX)) return null;
+  const [environmentId, threadId] = draftKey.slice(FORK_DRAFT_PREFIX.length).split("/");
+  return environmentId === undefined || threadId === undefined
+    ? null
+    : { environmentId: decodeURIComponent(environmentId), threadId: decodeURIComponent(threadId) };
 }
 
 export function newTaskDraftKey(draftId: string): string {

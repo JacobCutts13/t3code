@@ -96,7 +96,10 @@ describe("buildThreadActionMenuItems", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,
       branch: "main",
-      forkBlockedReason: threadForkBlockedReason({ branch: "main", worktreePath: null, ...thread }),
+      forkBlockedReason: threadForkBlockedReason(
+        { branch: "main", worktreePath: null, ...thread },
+        true,
+      ),
     });
     const ids = items.map((item) => item.id);
     expect(ids.indexOf("fork")).toBe(ids.indexOf("new-thread-on-branch") + 1);
@@ -108,12 +111,31 @@ describe("buildThreadActionMenuItems", () => {
   it("hides Fork thread for a worktree with no branch to start the fork from", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,
-      forkBlockedReason: threadForkBlockedReason({
-        lineage: {},
-        latestRun: { completedAt: "2026-08-07T15:00:00Z" },
-        branch: null,
-        worktreePath: "/repo/.t3/worktrees/detached",
-      }),
+      forkBlockedReason: threadForkBlockedReason(
+        {
+          lineage: {},
+          latestRun: { completedAt: "2026-08-07T15:00:00Z" },
+          branch: null,
+          worktreePath: "/repo/.t3/worktrees/detached",
+        },
+        true,
+      ),
+    });
+    expect(items.some((item) => item.id === "fork")).toBe(false);
+  });
+
+  it("hides Fork thread on a server that would start a plain thread instead", () => {
+    const items = buildThreadActionMenuItems({
+      ...baseState,
+      forkBlockedReason: threadForkBlockedReason(
+        {
+          lineage: {},
+          latestRun: { completedAt: "2026-08-07T15:00:00Z" },
+          branch: "main",
+          worktreePath: null,
+        },
+        false,
+      ),
     });
     expect(items.some((item) => item.id === "fork")).toBe(false);
   });

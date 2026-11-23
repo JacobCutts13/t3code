@@ -17,7 +17,7 @@ export function useForkThread() {
   const selectDetail = useSelectWorkspaceDetail();
   return async (thread: EnvironmentThreadShell) => {
     await waitForComposerDraftsLoaded();
-    const draftKey = forkNewTaskDraftKey(thread.id);
+    const draftKey = forkNewTaskDraftKey(thread.environmentId, thread.id);
     if (getComposerDraftSnapshot(draftKey).project === undefined) {
       createNewTaskDraft(
         { environmentId: thread.environmentId, projectId: thread.projectId },
@@ -30,7 +30,12 @@ export function useForkThread() {
         workspaceSelection:
           thread.worktreePath === null
             ? { mode: "local", branch: null, worktreePath: null }
-            : { mode: "worktree", branch: thread.branch, worktreePath: null },
+            : {
+                mode: "worktree",
+                branch: thread.branch,
+                worktreePath: null,
+                startFromOrigin: false,
+              },
       });
     }
     selectDetail({

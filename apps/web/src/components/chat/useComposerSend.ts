@@ -39,7 +39,7 @@ import {
   sendApprovalFeedback,
 } from "@t3tools/client-runtime/state/thread-requests";
 import {
-  forkDraftSourceThreadId,
+  forkDraftSource,
   parseCodexFeedbackCommand,
   submitCodexFeedback,
   type CodexFeedbackSubmission,
@@ -1436,11 +1436,12 @@ export function useComposerSend(input: ComposerSendInput) {
 
     let backgroundDraftOpened = false;
     let turnStartSucceeded = false;
-    const forkOf = forkDraftSourceThreadId(
-      draftId === null
-        ? undefined
-        : useComposerDraftStore.getState().getDraftSession(draftId)?.logicalProjectKey,
-    );
+    const forkOf =
+      forkDraftSource(
+        draftId === null
+          ? undefined
+          : useComposerDraftStore.getState().getDraftSession(draftId)?.logicalProjectKey,
+      )?.threadId ?? null;
     if (failure === null && turnAttachmentsResult._tag === "Success") {
       const bootstrap =
         isLocalDraftThread || baseBranchForWorktree
@@ -1456,7 +1457,7 @@ export function useComposerSend(input: ComposerSendInput) {
                       branch: activeThreadBranch,
                       worktreePath: activeThread.worktreePath,
                       createdAt: activeThread.createdAt,
-                      ...(forkOf === null ? {} : { forkOf: ThreadId.make(forkOf) }),
+                      ...(forkOf === null ? {} : { forkOf }),
                     },
                   }
                 : {}),

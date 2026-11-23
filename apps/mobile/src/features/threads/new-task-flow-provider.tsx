@@ -578,7 +578,14 @@ export function NewTaskFlowProvider(
     return createNewTaskDraft(target);
   };
 
+  // A fork draft stays in its source's project and on its machine.
+  const forkDraftOpen = () => {
+    const draftKey = readFlow().draftKey;
+    return draftKey !== null && newTaskDraftForkOf(draftKey) !== null;
+  };
+
   const setProject = (project: EnvironmentProject) => {
+    if (forkDraftOpen()) return;
     updateFlow({
       draftKey: carryDraftContentTo(project),
       environmentId: project.environmentId,
@@ -587,6 +594,7 @@ export function NewTaskFlowProvider(
   };
 
   const selectEnvironment = (environmentId: EnvironmentId) => {
+    if (forkDraftOpen()) return;
     const match = resolveEnvironmentProjectMatch(
       projects.filter((project) => project.environmentId === environmentId),
       selectedProject,
@@ -798,7 +806,7 @@ export function NewTaskFlowProvider(
         ...((workspaceSelection?.startFromOrigin ?? startFromOrigin)
           ? { startFromOrigin: true }
           : {}),
-        ...(forkOf === null ? {} : { forkOf: ThreadId.make(forkOf) }),
+        ...(forkOf === null ? {} : { forkOf: ThreadId.make(forkOf.threadId) }),
       },
       createdAt: metadata.createdAt,
     };

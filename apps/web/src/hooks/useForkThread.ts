@@ -1,4 +1,4 @@
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { forkDraftKey } from "@t3tools/client-runtime/state/threads";
 import type { ScopedThreadRef } from "@t3tools/contracts";
@@ -38,7 +38,7 @@ export function useForkThread() {
   const navigate = useNavigate();
   return async (thread: EnvironmentThreadShell) => {
     const store = useComposerDraftStore.getState();
-    const key = forkDraftKey(thread.id);
+    const key = forkDraftKey(scopeThreadRef(thread.environmentId, thread.id));
     const draftId = store.getDraftSessionByLogicalProjectKey(key)?.draftId ?? newDraftId();
     if (store.getDraftSession(draftId) === null) {
       store.setLogicalProjectDraftThreadId(
@@ -59,7 +59,10 @@ export function useForkThread() {
           interactionMode: thread.interactionMode,
         },
       );
-      store.setModelSelection(draftId, thread.modelSelection, { replaceOptions: true });
+      store.setModelSelection(draftId, thread.modelSelection, {
+        explicit: true,
+        replaceOptions: true,
+      });
     }
     await navigate({ to: "/draft/$draftId", params: buildDraftThreadRouteParams(draftId) });
   };

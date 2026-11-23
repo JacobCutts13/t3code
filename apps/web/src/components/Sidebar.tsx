@@ -151,6 +151,7 @@ import {
   usePrimaryEnvironmentId,
 } from "../state/environments";
 import {
+  readEnvironmentSupportsForkOnLaunch,
   readThreadShell,
   useAllEnvironmentProjectSnapshotsReady,
   useDelegatedUnderParent,
@@ -2757,7 +2758,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               ),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
               // Rows arrange quiet shells; the live one knows whether the latest run finished.
-              forkBlockedReason: threadForkBlockedReason(readThreadShell(threadRef) ?? thread, m),
+              forkBlockedReason: threadForkBlockedReason(
+                readThreadShell(threadRef) ?? thread,
+                readEnvironmentSupportsForkOnLaunch(threadRef.environmentId),
+                m,
+              ),
               canRename: !fromSearch,
               supports: {
                 settlement: configLoaded,

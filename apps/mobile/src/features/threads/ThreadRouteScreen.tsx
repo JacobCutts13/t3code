@@ -1079,7 +1079,13 @@ function ThreadRouteContent(
                   snapshot: worktreeSetup,
                   turnStarted: setupTurnStartedAt !== null,
                   onCancel: handleCancelWorktreeSetup,
-                  onWorkLocally: setupMessage && selectedThreadProject ? handleWorkLocally : null,
+                  // Resending locally would start a plain thread, not the fork.
+                  onWorkLocally:
+                    setupMessage &&
+                    selectedThreadProject &&
+                    selectedThread?.lineage.relationshipToParent !== "fork"
+                      ? handleWorkLocally
+                      : null,
                 }
               : null
           }

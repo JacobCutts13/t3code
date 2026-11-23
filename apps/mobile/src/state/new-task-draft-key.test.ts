@@ -9,8 +9,11 @@ import {
 
 describe("fork drafts", () => {
   it("keys a fork's draft by its source, so Fork reopens it and its send forks that thread", () => {
-    expect(forkNewTaskDraftKey("thread-1")).toBe(forkNewTaskDraftKey("thread-1"));
-    expect(newTaskDraftForkOf(forkNewTaskDraftKey("thread-1"))).toBe("thread-1");
+    const key = forkNewTaskDraftKey("env:a/b", "thread:1");
+    expect(key).toBe(forkNewTaskDraftKey("env:a/b", "thread:1"));
+    expect(newTaskDraftForkOf(key)).toEqual({ environmentId: "env:a/b", threadId: "thread:1" });
+    // The same thread id on another machine is another source.
+    expect(forkNewTaskDraftKey("env-2", "thread:1")).not.toBe(key);
   });
 
   it("never reads an ordinary or restored draft as a fork", () => {

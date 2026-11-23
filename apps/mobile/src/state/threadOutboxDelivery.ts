@@ -51,7 +51,7 @@ import {
   forgetAcknowledgedThreadMessage,
 } from "./acknowledged-thread-messages";
 import { appAtomRegistry } from "./atom-registry";
-import { restoredNewTaskDraftKey } from "./new-task-draft-key";
+import { forkNewTaskDraftKey, restoredNewTaskDraftKey } from "./new-task-draft-key";
 import {
   clearPendingThreadCreationOutcome,
   pendingThreadCreationOutcomesAtom,
@@ -608,6 +608,10 @@ export const restoreRejectedQueuedMessage = Effect.fn("ThreadOutbox.restoreRejec
 
 /** Derive keys from message ids so failed recovery retries reuse the same draft. */
 function recoveryDraftKey(queuedMessage: QueuedThreadMessage): string {
+  // A fork's message returns to its fork draft, which keeps it a fork.
+  if (queuedMessage.creation?.forkOf !== undefined) {
+    return forkNewTaskDraftKey(queuedMessage.environmentId, queuedMessage.creation.forkOf);
+  }
   return queuedMessage.creation
     ? restoredNewTaskDraftKey(queuedMessage.messageId)
     : scopedThreadKey(queuedMessage.environmentId, queuedMessage.threadId);

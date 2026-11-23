@@ -5,7 +5,12 @@ import { vcsActionLabelText } from "@t3tools/client-runtime/state/vcs";
 import { useGT, useMessages } from "gt-react-native";
 import { AsyncResult } from "effect/reactivity";
 import * as Cause from "effect/Cause";
-import { AuthFilesystemReadScope, AuthSourceControlWriteScope, ThreadId } from "@t3tools/contracts";
+import {
+  AuthFilesystemReadScope,
+  AuthSourceControlWriteScope,
+  EnvironmentId,
+  ThreadId,
+} from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type {
   EnvironmentProject,
@@ -24,13 +29,16 @@ export function DraftThreadHeader(props: {
   readonly project: EnvironmentProject;
   readonly cwd: string | null;
   /** The thread this draft forks, if it is a fork's draft. */
-  readonly forkOf: string | null;
+  readonly forkOf: { readonly environmentId: string; readonly threadId: string } | null;
 }) {
   const gt = useGT();
   const forkSource = useQuietThreadShell(
     props.forkOf === null
       ? null
-      : scopeThreadRef(props.thread.environmentId, ThreadId.make(props.forkOf)),
+      : scopeThreadRef(
+          EnvironmentId.make(props.forkOf.environmentId),
+          ThreadId.make(props.forkOf.threadId),
+        ),
   );
   const messages = useMessages();
   const navigation = useNavigation();

@@ -164,6 +164,7 @@ export interface ThreadComposerProps {
   readonly projectCwd: string | null;
   readonly sendBlockedReason?: string | null;
   readonly interactionLocked?: boolean;
+  readonly settingsLocked?: boolean | undefined;
   readonly draftKey?: string;
   readonly queuedEdit?: {
     readonly existingAttachments: ReadonlyArray<ChatAttachment>;
@@ -611,6 +612,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         option.selection.model === currentModelSelection.model,
     ) ?? null;
   const openSettings = () => {
+    if (props.settingsLocked === true) return;
     settingsSheetPresentation.open();
   };
 

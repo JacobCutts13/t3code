@@ -10,7 +10,9 @@ import {
 } from "./thread-list-v2-row-appearance";
 import { RowPressable } from "../../components/ui/RowPressable";
 import { CustomSnoozeSheet } from "./CustomSnoozeSheet";
+import { useAtomValue } from "@effect/atom-react";
 import { appAtomRegistry } from "../../state/atom-registry";
+import { serverEnvironment } from "../../state/server";
 import { threadArrangementOpenAtom } from "../../state/thread-order";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -1150,7 +1152,11 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
     [gt, props.autoSettleOptOutSupported, thread.autoSettleDisabledAt],
   );
   const canTurnIntoProject = canTurnThreadIntoProject(thread);
-  const canFork = threadForkBlockedReason(thread) === null;
+  const forkSupported = useAtomValue(
+    serverEnvironment.configValueAtom(thread.environmentId),
+    (config) => config?.environment.capabilities.forkOnLaunch === true,
+  );
+  const canFork = threadForkBlockedReason(thread, forkSupported) === null;
   const titleMenuItems = useMemo<MenuAction[]>(
     () => [
       {

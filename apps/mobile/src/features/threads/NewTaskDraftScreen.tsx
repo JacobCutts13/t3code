@@ -370,9 +370,12 @@ export function NewTaskDraftScreen(props: {
   const isImportingContext = flow.draftKey ? contextImports[flow.draftKey] === true : false;
   const isComposerInteractionLocked =
     isIncomingShareTransferPending || flow.submitting || isImportingContext;
+  // A fork draft's project, machine, workspace, model and modes are its source's.
+  const forkOf = flow.draftKey === null ? null : newTaskDraftForkOf(flow.draftKey);
+  const identityLocked = isComposerInteractionLocked || forkOf !== null;
   const { environments, selectedEnvironmentId, switchEnvironment, switchingToEnvironmentId } = flow;
   const cycleEnvironment = () => {
-    if (isComposerInteractionLocked) return true;
+    if (identityLocked) return true;
     const next = nextEnvironmentId(environments, switchingToEnvironmentId ?? selectedEnvironmentId);
     if (next !== null) void switchEnvironment(next);
     return true;
@@ -734,7 +737,7 @@ export function NewTaskDraftScreen(props: {
             : null
       : gt("Wait for shared content to finish importing.");
   const chooseProject = () => {
-    if (isComposerInteractionLocked) {
+    if (identityLocked) {
       return;
     }
     promptInputRef.current?.blur();
@@ -742,7 +745,7 @@ export function NewTaskDraftScreen(props: {
     navigation.navigate("NewTaskProject", { incomingShareId: props.incomingShareId });
   };
   const openContextPicker = (routeName: "NewTaskBranch" | "NewTaskEnvironment") => {
-    if (isComposerInteractionLocked) {
+    if (identityLocked) {
       return;
     }
     promptInputRef.current?.blur();
@@ -755,7 +758,7 @@ export function NewTaskDraftScreen(props: {
       connectionState={connectionState}
       label={selectedEnvironmentLabel}
       machineKind={resolveEnvironmentMachineKind(selectedEnvironmentServerConfig)}
-      disabled={isComposerInteractionLocked}
+      disabled={identityLocked}
       onChooseEnvironment={() => openContextPicker("NewTaskEnvironment")}
     />
   );
@@ -782,7 +785,7 @@ export function NewTaskDraftScreen(props: {
           accessibilityHint={gt("Opens the project picker")}
           accessibilityLabel={gt("No project")}
           chevronDirection="right"
-          disabled={isComposerInteractionLocked}
+          disabled={identityLocked}
           icon="folder"
           label={gt("No project")}
           onPress={chooseProject}
@@ -805,7 +808,7 @@ export function NewTaskDraftScreen(props: {
             accessibilityHint={gt("Opens the project picker")}
             accessibilityLabel={selectedProjectLabel ?? selectedProject.title}
             accessibilityRole="button"
-            disabled={isComposerInteractionLocked}
+            disabled={identityLocked}
             onPress={chooseProject}
             className="min-w-0 max-w-[250px] border-b border-foreground-muted active:opacity-65"
           >
@@ -873,7 +876,7 @@ export function NewTaskDraftScreen(props: {
           accessibilityHint={gt("Opens the project picker")}
           accessibilityLabel={gt("Project: {project}", { project: contextProjectLabel })}
           chevronDirection="right"
-          disabled={isComposerInteractionLocked}
+          disabled={identityLocked}
           icon="folder"
           label={contextProjectLabel}
           maxWidth="100%"
@@ -888,7 +891,7 @@ export function NewTaskDraftScreen(props: {
               : gt("Choose environment, {label}, Offline", { label: selectedEnvironmentLabel })
           }
           chevronDirection="right"
-          disabled={isComposerInteractionLocked}
+          disabled={identityLocked}
           renderIcon={(size) => (
             <EnvironmentMachineSymbol
               kind={resolveEnvironmentMachineKind(selectedEnvironmentServerConfig)}
@@ -918,7 +921,7 @@ export function NewTaskDraftScreen(props: {
             : gt("Switches to the current checkout")
         }
         accessibilityLabel={workspaceLabel}
-        disabled={isComposerInteractionLocked || !flow.isGitRepo}
+        disabled={identityLocked || !flow.isGitRepo}
         renderIcon={(size) => (
           <NewTaskWorkspaceIcon
             workspaceMode={flow.workspaceMode}
@@ -940,7 +943,7 @@ export function NewTaskDraftScreen(props: {
               : gt("Branch: {branch}", { branch: selectedBranchLabel })
           }
           chevronDirection="right"
-          disabled={isComposerInteractionLocked || !flow.isGitRepo}
+          disabled={identityLocked || !flow.isGitRepo}
           icon="arrow.triangle.branch"
           label={showBranchLoading ? gt("Loading branches…") : selectedBranchLabel}
           maxWidth="100%"
@@ -1027,7 +1030,7 @@ export function NewTaskDraftScreen(props: {
             thread={thread}
             project={selectedProject}
             cwd={flow.workspaceCwd}
-            forkOf={flow.draftKey === null ? null : newTaskDraftForkOf(flow.draftKey)}
+            forkOf={forkOf}
           />
         }
         draftMode={{
@@ -1036,6 +1039,7 @@ export function NewTaskDraftScreen(props: {
           editorRef: promptInputRef,
           sendBlockedReason: setupBlockReason,
           interactionLocked: isComposerInteractionLocked,
+          settingsLocked: forkOf !== null,
         }}
         canOperateThread={canOperate}
         selectedThread={thread}
@@ -1094,7 +1098,7 @@ export function NewTaskDraftScreen(props: {
         offersSideChat={false}
         onSendCommand={async () => null}
         onReconnectEnvironment={() => onReconnectEnvironment(selectedProject.environmentId)}
-        canSwitchThreadProvider
+        canSwitchThreadProvider={forkOf === null}
         onRespondToApproval={async () => {}}
         onSelectUserInputOption={() => {}}
         onChangeUserInputCustomAnswer={() => {}}

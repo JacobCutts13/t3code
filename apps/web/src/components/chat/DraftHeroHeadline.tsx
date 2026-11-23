@@ -1,12 +1,8 @@
 import type { DraftId } from "~/composerDraftStore";
 import { composerDraftHasUserContent, useComposerDraftStore } from "~/composerDraftStore";
-import { resolveEnvironmentMachineKind, type ScopedProjectRef, ThreadId } from "@t3tools/contracts";
-import {
-  scopedProjectKey,
-  scopeProjectRef,
-  scopeThreadRef,
-} from "@t3tools/client-runtime/environment";
-import { forkDraftSourceThreadId } from "@t3tools/client-runtime/state/threads";
+import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
+import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { forkDraftSource } from "@t3tools/client-runtime/state/threads";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { T, useGT, Var } from "gt-react";
 import { FolderPlusIcon } from "lucide-react";
@@ -85,16 +81,11 @@ export function DraftHeroHeadline({
   const isTriageDraftPrompt = useComposerDraftStore((store) =>
     draftId ? isTriagePrompt(store.getComposerDraft(draftId)?.prompt ?? "") : false,
   );
-  const forkSourceThreadId = useComposerDraftStore((store) =>
-    forkDraftSourceThreadId(
-      draftId ? store.getDraftSession(draftId)?.logicalProjectKey : undefined,
-    ),
+  const draftKey = useComposerDraftStore((store) =>
+    draftId ? store.getDraftSession(draftId)?.logicalProjectKey : undefined,
   );
-  const forkSource = useQuietThreadShell(
-    forkSourceThreadId === null || activeProjectRef === null
-      ? null
-      : scopeThreadRef(activeProjectRef.environmentId, ThreadId.make(forkSourceThreadId)),
-  );
+  const forkSourceRef = forkDraftSource(draftKey);
+  const forkSource = useQuietThreadShell(forkSourceRef);
   const openAddProject = () => openCommandPalette({ open: "add-project" });
   const { scratchEnvironmentId, scratchWorkspaceRootFor, openScratchProject } = useScratchProject();
   const openProjectDraft = useNewThreadHandler();
@@ -361,7 +352,7 @@ export function DraftHeroHeadline({
     ) : null;
 
   // A fork keeps its source's project; its first message creates it there.
-  if (forkSourceThreadId !== null) {
+  if (forkSourceRef !== null) {
     return (
       <h1 className="mx-auto w-full max-w-5xl text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
         <T>

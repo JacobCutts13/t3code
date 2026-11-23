@@ -362,6 +362,8 @@ export interface ChatComposerProps {
   composerDraftTarget: ScopedThreadRef | DraftId;
   environmentId: EnvironmentId;
   canOperateThread: boolean;
+  /** Shows the model and modes without letting them change, as a fork draft takes its source's. */
+  controlsLocked?: boolean;
   attachmentUploadsCapabilityKnown: boolean;
   supportsAttachmentUploads: boolean;
   supportsQuestionAttachments: boolean;
@@ -2502,7 +2504,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     : composerControlsCollapsed
       ? 0
       : expandedControlsIconOnlyBlockCount;
-  const composerControls = (
+  const composerControlsBar = (
     <ComposerControlsBar
       environmentId={environmentId}
       workspaceCwd={gitCwd}
@@ -2532,7 +2534,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       onOpenProviderSetup={onOpenProviderSetup}
       providerCatalogPending={providerCatalogPending}
       isSendBusy={isSendBusy}
-      multipleModelsEnabled={routeKind === "draft" && supportsMultipleModels}
+      multipleModelsEnabled={
+        routeKind === "draft" && supportsMultipleModels && props.controlsLocked !== true
+      }
       multipleModelSelections={multipleModelSelections}
       onMultipleModelSelectionsChange={setMultipleModelSelections}
       selectedModelSelection={selectedModelSelection}
@@ -2551,6 +2555,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       getModelDisabledReason={getModelDisabledReason}
     />
   );
+  const composerControls =
+    props.controlsLocked === true ? (
+      <div inert className="contents">
+        {composerControlsBar}
+      </div>
+    ) : (
+      composerControlsBar
+    );
   // An open question owns the space above the composer. Only a machine problem,
   // which is why an answer could not go through, stays beside it.
   const replyTo = composerDraft?.replyTo ?? null;
