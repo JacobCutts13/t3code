@@ -4,7 +4,6 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity";
 import {
-  ORCHESTRATION_V2_WS_METHODS,
   WS_METHODS,
   type EnvironmentId,
   type OrchestrationV2ShellSnapshot,
@@ -365,16 +364,6 @@ export function createThreadEnvironmentAtoms<R, E>(
     forkFromRun: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:fork-from-run",
       execute: forkThreadFromRun,
-      scheduler,
-      concurrency: {
-        mode: "serial",
-        key: ({ environmentId, input }) => JSON.stringify([environmentId, input.sourceThreadId]),
-      },
-    }),
-    /** Forks at the latest stable run; a worktree thread's fork gets its own worktree. */
-    forkThread: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:commands:thread:fork-thread",
-      tag: ORCHESTRATION_V2_WS_METHODS.forkThread,
       scheduler,
       concurrency: {
         mode: "serial",

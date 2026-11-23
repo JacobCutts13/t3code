@@ -3914,7 +3914,6 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   forceStopThread: "orchestration.forceStopThread",
   getTurnItem: "orchestration.getTurnItem",
   launchThread: "orchestration.launchThread",
-  forkThread: "orchestration.forkThread",
   subscribeShell: "orchestration.subscribeShell",
   subscribeThread: "orchestration.subscribeThread",
   subscribeCommandOutput: "orchestration.subscribeCommandOutput",
@@ -3999,23 +3998,6 @@ export const OrchestrationV2ThreadLaunchResult = Schema.Struct({
   sequence: Schema.optionalKey(NonNegativeInt),
 });
 export type OrchestrationV2ThreadLaunchResult = typeof OrchestrationV2ThreadLaunchResult.Type;
-
-/** Forks a thread at its latest stable run; a worktree thread's fork gets its own worktree. */
-export const OrchestrationV2ThreadForkInput = Schema.Struct({
-  sourceThreadId: ThreadId,
-  /** Also the request's idempotency key: a retry with the same id returns the same fork. */
-  targetThreadId: ThreadId,
-  title: Schema.optional(TrimmedNonEmptyString),
-  creationSource: Schema.optional(OrchestrationV2CreationSource),
-});
-export type OrchestrationV2ThreadForkInput = typeof OrchestrationV2ThreadForkInput.Type;
-
-export const OrchestrationV2ThreadForkResult = Schema.Struct({
-  threadId: ThreadId,
-  worktreePath: Schema.NullOr(TrimmedNonEmptyString),
-  branch: Schema.NullOr(TrimmedNonEmptyString),
-});
-export type OrchestrationV2ThreadForkResult = typeof OrchestrationV2ThreadForkResult.Type;
 
 export const OrchestrationV2DispatchCommandResult = Schema.Struct({
   sequence: NonNegativeInt,
@@ -4321,16 +4303,6 @@ export class OrchestrationV2ThreadLaunchError extends Schema.TaggedError<Orchest
   {
     commandId: CommandId,
     projectId: ProjectId,
-    message: Schema.String,
-    cause: Schema.optional(Schema.Defect()),
-  },
-) {}
-
-export class OrchestrationV2ThreadForkError extends Schema.TaggedError<OrchestrationV2ThreadForkError>()(
-  "OrchestrationV2ThreadForkError",
-  {
-    sourceThreadId: ThreadId,
-    targetThreadId: ThreadId,
     message: Schema.String,
     cause: Schema.optional(Schema.Defect()),
   },
@@ -4661,10 +4633,6 @@ export const OrchestrationV2RpcSchemas = {
   launchThread: {
     input: OrchestrationV2ThreadLaunchInput,
     output: OrchestrationV2ThreadLaunchResult,
-  },
-  forkThread: {
-    input: OrchestrationV2ThreadForkInput,
-    output: OrchestrationV2ThreadForkResult,
   },
   subscribeShell: {
     input: OrchestrationV2SubscribeShellInput,
