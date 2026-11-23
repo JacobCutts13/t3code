@@ -48,7 +48,8 @@ export function useForkThread() {
         {
           threadId: newThreadId(),
           createdAt: new Date().toISOString(),
-          branch: thread.branch,
+          // Without a worktree the fork shares the checkout as it is; no branch to switch to.
+          branch: thread.worktreePath === null ? null : thread.branch,
           worktreePath: null,
           envMode: thread.worktreePath === null ? "local" : "worktree",
           startFromOrigin: false,
