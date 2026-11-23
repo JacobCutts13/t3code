@@ -47,6 +47,7 @@ const QueuedThreadCreationSchema = Schema.Struct({
   worktreePath: Schema.NullOr(Schema.String),
   startFromOrigin: Schema.optional(Schema.Boolean),
   pullRequestReference: Schema.optional(Schema.String),
+  forkOf: Schema.optional(ThreadId),
 });
 
 export const QueuedThreadMessageSchema = Schema.Struct({
@@ -81,6 +82,8 @@ export interface QueuedThreadCreation {
   readonly worktreePath: string | null;
   readonly startFromOrigin?: boolean;
   readonly pullRequestReference?: string;
+  /** The thread this one forks; its conversation comes along. */
+  readonly forkOf?: ThreadId;
 }
 
 export interface QueuedThreadMessage {

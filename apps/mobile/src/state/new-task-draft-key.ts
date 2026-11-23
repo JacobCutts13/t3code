@@ -1,4 +1,18 @@
+import { forkDraftKey, forkDraftSourceThreadId } from "@t3tools/client-runtime/state/threads";
+
 const NEW_TASK_DRAFT_PREFIX = "new-task:";
+
+/** A fork's draft, keyed by its source so Fork reopens it. */
+export function forkNewTaskDraftKey(sourceThreadId: string): string {
+  return newTaskDraftKey(forkDraftKey(sourceThreadId));
+}
+
+/** The thread a new-task draft forks, or null. */
+export function newTaskDraftForkOf(draftKey: string): string | null {
+  return isNewTaskDraftKey(draftKey)
+    ? forkDraftSourceThreadId(draftKey.slice(NEW_TASK_DRAFT_PREFIX.length))
+    : null;
+}
 
 export function newTaskDraftKey(draftId: string): string {
   return `${NEW_TASK_DRAFT_PREFIX}${draftId}`;

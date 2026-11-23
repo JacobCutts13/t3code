@@ -5,11 +5,13 @@ import { vcsActionLabelText } from "@t3tools/client-runtime/state/vcs";
 import { useGT, useMessages } from "gt-react-native";
 import { AsyncResult } from "effect/reactivity";
 import * as Cause from "effect/Cause";
-import { AuthFilesystemReadScope, AuthSourceControlWriteScope } from "@t3tools/contracts";
+import { AuthFilesystemReadScope, AuthSourceControlWriteScope, ThreadId } from "@t3tools/contracts";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
+import { useQuietThreadShell } from "../../state/entities";
 import { useEnvironmentQuery } from "../../state/query";
 import { useEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -21,8 +23,15 @@ export function DraftThreadHeader(props: {
   readonly thread: EnvironmentThreadShell;
   readonly project: EnvironmentProject;
   readonly cwd: string | null;
+  /** The thread this draft forks, if it is a fork's draft. */
+  readonly forkOf: string | null;
 }) {
   const gt = useGT();
+  const forkSource = useQuietThreadShell(
+    props.forkOf === null
+      ? null
+      : scopeThreadRef(props.thread.environmentId, ThreadId.make(props.forkOf)),
+  );
   const messages = useMessages();
   const navigation = useNavigation();
   const environmentId = props.thread.environmentId;
@@ -50,7 +59,11 @@ export function DraftThreadHeader(props: {
   return (
     <ThreadHeader
       draft
-      title={gt("New thread")}
+      title={
+        props.forkOf === null
+          ? gt("New thread")
+          : gt("Fork of {title}", { title: forkSource?.title ?? "" })
+      }
       subtitle=""
       hasThreadCwd={props.cwd !== null}
       inspectorMode={null}

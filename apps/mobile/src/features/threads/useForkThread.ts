@@ -1,61 +1,47 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import {
-  isAtomCommandInterrupted,
-  squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { ThreadId } from "@t3tools/contracts";
-import * as Haptics from "expo-haptics";
-import { msg } from "gt-react-native";
 
-import * as Dialog from "../../components/ui/Dialog";
-import { uuidv4 } from "../../lib/uuid";
-import { threadEnvironment } from "../../state/threads";
-import { m } from "../../i18n/messages";
-import { useAtomCommand } from "../../state/use-atom-command";
+import { forkNewTaskDraftKey } from "../../state/new-task-draft-key";
+import {
+  createNewTaskDraft,
+  getComposerDraftSnapshot,
+  updateComposerDraftSettings,
+  waitForComposerDraftsLoaded,
+} from "../../state/use-composer-drafts";
 import { useSelectWorkspaceDetail } from "../layout/workspace/useSelectWorkspaceDetail";
-import { waitForThreadShell } from "./threadForkNavigation";
 
-/** Forks a whole thread at its latest completed run, then opens the fork. */
+/**
+ * Opens the thread's fork as a draft of its own. Its first message creates the fork, in a new
+ * worktree from the thread's branch, or in the same checkout when the thread has no worktree.
+ */
 export function useForkThread() {
-  const forkThread = useAtomCommand(threadEnvironment.forkThread, { reportFailure: false });
   const selectDetail = useSelectWorkspaceDetail();
-  return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id">) => {
-    const targetThreadId = ThreadId.make(uuidv4());
-    void Haptics.selectionAsync();
-    const result = await forkThread({
-      environmentId: thread.environmentId,
-      input: {
-        sourceThreadId: thread.id,
-        targetThreadId,
-        creationSource: "mobile",
-      },
-    });
-    if (isAtomCommandInterrupted(result)) return;
-    if (result._tag !== "Success") {
-      const error = squashAtomCommandFailure(result);
-      Dialog.alert(
-        m(msg("Could not fork thread")),
-        error instanceof Error && error.message.trim().length > 0
-          ? error.message
-          : m(msg("The thread could not be forked.")),
+  return async (thread: EnvironmentThreadShell) => {
+    await waitForComposerDraftsLoaded();
+    const draftKey = forkNewTaskDraftKey(thread.id);
+    if (getComposerDraftSnapshot(draftKey).project === undefined) {
+      createNewTaskDraft(
+        { environmentId: thread.environmentId, projectId: thread.projectId },
+        draftKey,
       );
-      return;
-    }
-    if (!(await waitForThreadShell(scopeThreadRef(thread.environmentId, targetThreadId)))) {
-      Dialog.alert(
-        m(msg("Fork created")),
-        m(
-          msg(
-            "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
-          ),
-        ),
-      );
-      return;
+      updateComposerDraftSettings(draftKey, {
+        modelSelection: thread.modelSelection,
+        runtimeMode: thread.runtimeMode,
+        interactionMode: thread.interactionMode,
+        workspaceSelection:
+          thread.worktreePath === null
+            ? { mode: "local", branch: null, worktreePath: null }
+            : { mode: "worktree", branch: thread.branch, worktreePath: null },
+      });
     }
     selectDetail({
       name: "Thread",
-      params: { environmentId: thread.environmentId, threadId: targetThreadId },
+      params: {
+        draft: {
+          environmentId: thread.environmentId,
+          projectId: thread.projectId,
+          draftId: draftKey,
+        },
+      },
     });
   };
 }

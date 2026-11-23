@@ -62,6 +62,7 @@ import {
   useComposerDraft,
   useStickyComposerModelSelection,
 } from "../../state/use-composer-drafts";
+import { newTaskDraftForkOf } from "../../state/new-task-draft-key";
 import {
   rememberModelOptions,
   withRememberedModelOptions,
@@ -763,6 +764,7 @@ export function NewTaskFlowProvider(
     }
     const workspaceSelection = resolveWorkspaceSelection(draft.workspaceSelection);
     const mode = workspaceSelection.mode;
+    const forkOf = newTaskDraftForkOf(selectedProjectDraftKey);
     return {
       environmentId: selectedProject.environmentId,
       threadId: ThreadId.make(metadata.threadId),
@@ -796,6 +798,7 @@ export function NewTaskFlowProvider(
         ...((workspaceSelection?.startFromOrigin ?? startFromOrigin)
           ? { startFromOrigin: true }
           : {}),
+        ...(forkOf === null ? {} : { forkOf: ThreadId.make(forkOf) }),
       },
       createdAt: metadata.createdAt,
     };

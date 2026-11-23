@@ -2014,11 +2014,13 @@ export function removeComposerDraftsForEnvironment(
   );
 }
 
-export function createNewTaskDraft(project: {
-  readonly environmentId: EnvironmentId;
-  readonly projectId: ProjectId;
-}): string {
-  const draftKey = newTaskDraftKey(newDraftId());
+export function createNewTaskDraft(
+  project: {
+    readonly environmentId: EnvironmentId;
+    readonly projectId: ProjectId;
+  },
+  draftKey = newTaskDraftKey(newDraftId()),
+): string {
   const stamp: ComposerDraftProject = {
     environmentId: project.environmentId,
     projectId: project.projectId,
