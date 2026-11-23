@@ -987,7 +987,6 @@ it.effect("a fork with a first message commits a preparing run that waits for it
     for (const [commandId, strategy] of [
       ["fork-first-message:root", { type: "root" }],
       ["fork-first-message:origin", { ...worktreeStrategy, startFromOrigin: true }],
-      ["fork-first-message:other-branch", { ...worktreeStrategy, baseRef: "main" }],
     ] as const) {
       const refused = yield* forkWith(commandId, strategy).pipe(Effect.flip);
       assert.include(String(refused.cause), "must use its source's workspace");

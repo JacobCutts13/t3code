@@ -6243,15 +6243,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       });
     }
     // A fork's first message builds the workspace its source implies, read under the source's
-    // lock: a new worktree from its branch as it is here, or the same checkout without one.
+    // lock: a new worktree (from its branch's commit, pinned at launch), or the same checkout.
     const forkWorkspace = command.initialMessage?.workspaceStrategy;
     if (
       command.initialMessage !== undefined &&
       !(sourceProjection.thread.worktreePath === null
         ? forkWorkspace?.type === "root"
-        : forkWorkspace?.type === "worktree" &&
-          forkWorkspace.baseRef === sourceProjection.thread.branch &&
-          forkWorkspace.startFromOrigin !== true)
+        : forkWorkspace?.type === "worktree" && forkWorkspace.startFromOrigin !== true)
     ) {
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,

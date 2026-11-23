@@ -717,7 +717,8 @@ const make = Effect.gen(function* () {
               refName: startRef === "-" ? "@{-1}" : startRef,
             })
             .pipe(Effect.mapError(mapError(input, "provision-worktree", threadId))));
-        if (!recordedBaseResolves) {
+        // A full commit is a pinned base, such as a fork's; another base would be the wrong one.
+        if (!recordedBaseResolves && !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(requestedBaseRef)) {
           const remoteName =
             remote?.remoteName ??
             (yield* git
@@ -1369,20 +1370,26 @@ const make = Effect.gen(function* () {
           yield* validateReusableThread(input, candidateThreadId);
         }
         // A thread never changes project, so this needs no lock; nothing commits before it.
-        if (input.forkOf !== undefined) {
-          const source = yield* threads
-            .getThreadShell(input.forkOf)
-            .pipe(Effect.mapError(mapError(input, "resolve-project", candidateThreadId)));
-          if (source?.projectId !== input.projectId || input.initialMessage === undefined) {
-            return yield* mapError(
-              input,
-              "resolve-project",
-              candidateThreadId,
-            )("A fork starts with its first message, in its source's project.");
-          }
+        const forkSource =
+          input.forkOf === undefined
+            ? null
+            : yield* threads
+                .getThreadShell(input.forkOf)
+                .pipe(Effect.mapError(mapError(input, "resolve-project", candidateThreadId)));
+        if (
+          input.forkOf !== undefined &&
+          (forkSource?.projectId !== input.projectId ||
+            input.initialMessage === undefined ||
+            input.reuseExistingThread === true)
+        ) {
+          return yield* mapError(
+            input,
+            "resolve-project",
+            candidateThreadId,
+          )("A fork is a new thread in its source's project, created with its first message.");
         }
 
-        const workspaceStrategy: ThreadLaunchWorkspaceStrategy =
+        const requestedStrategy: ThreadLaunchWorkspaceStrategy =
           input.workspaceStrategy.type === "root" && Option.isNone(launchReceipt)
             ? Option.match(
                 yield* managedFolders
@@ -1398,6 +1405,30 @@ const make = Effect.gen(function* () {
                 },
               )
             : input.workspaceStrategy;
+        // A fork's worktree starts from its source's branch as it is now, pinned to that commit
+        // so a later rename, or a tag of the same name, cannot move it.
+        const forkBaseCommit =
+          forkSource !== null && requestedStrategy.type === "worktree"
+            ? requestedStrategy.baseRef === forkSource.branch
+              ? yield* git
+                  .resolveCommitSha({
+                    cwd: project.workspaceRoot,
+                    refName: `refs/heads/${forkSource.branch}`,
+                  })
+                  .pipe(Effect.mapError(mapError(input, "provision-worktree", candidateThreadId)))
+              : null
+            : undefined;
+        if (forkBaseCommit === null) {
+          return yield* mapError(
+            input,
+            "provision-worktree",
+            candidateThreadId,
+          )("A fork starts from its source's branch, which no longer resolves.");
+        }
+        const workspaceStrategy: ThreadLaunchWorkspaceStrategy =
+          forkBaseCommit === undefined || requestedStrategy.type !== "worktree"
+            ? requestedStrategy
+            : { ...requestedStrategy, baseRef: forkBaseCommit };
         const initialBranch = yield* Effect.interruptible(
           launchBranch(workspaceStrategy, project.workspaceRoot),
         );

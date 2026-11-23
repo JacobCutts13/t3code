@@ -234,6 +234,8 @@ function makeHarness(options: HarnessOptions = {}) {
         options.fetchWorktreeBaseCommit ??
         (() => Effect.succeed({ commitSha: "remote-main-sha", remoteRefName: "origin/main" })),
       hasCommit: options.hasCommit ?? (() => Effect.succeed(false)),
+      resolveCommitSha: ({ refName }) =>
+        Effect.succeed(refName === "refs/heads/feature" ? FORK_SOURCE_COMMIT : null),
       currentBranch: () => Effect.succeed(null),
       resolveWorktreeBaseRemote: () => Effect.succeed({ remoteName: "origin", branchName: "main" }),
       resolvePrimaryRemoteName: () => Effect.succeed("origin"),
@@ -2059,6 +2061,8 @@ it.effect.each(["failed", "interrupted"] as const)(
   },
 );
 
+const FORK_SOURCE_COMMIT = "f".repeat(40);
+
 /** A worktree thread with a completed, checkpointed run, which a fork starts from. */
 const writeForkSource = (threadId: ThreadId) =>
   Effect.gen(function* () {
@@ -2135,7 +2139,7 @@ const writeForkSource = (threadId: ThreadId) =>
     });
   });
 
-it.effect("refuses a fork outside its source's project before committing anything", () => {
+it.effect("refuses a fork outside its source's project, or into an existing thread", () => {
   const harness = makeHarness();
   return Effect.gen(function* () {
     const launches = yield* ThreadLaunch.ThreadLaunchService;
@@ -2158,6 +2162,27 @@ it.effect("refuses a fork outside its source's project before committing anythin
       assert.fail(`expected ThreadLaunchError, got ${failed._tag}`);
     }
     assert.isNull(yield* threads.getThreadShell(ThreadId.make("thread:launch:fork-other-project")));
+
+    // Nor may it claim an existing thread, which would skip the fork.
+    const existing = yield* launches.launch(
+      launchInput({ command: "command:launch:fork-reuse-claim", thread: "thread:fork-reuse" }),
+    );
+    const reused = yield* launches
+      .launch({
+        ...launchInput({
+          command: "command:launch:fork-reuse",
+          thread: "thread:fork-reuse",
+          message: "Continue",
+          workspace: { type: "root" },
+        }),
+        reuseExistingThread: true,
+        forkOf: sourceThreadId,
+      })
+      .pipe(Effect.flip);
+    if (reused._tag !== "ThreadLaunchError") {
+      assert.fail(`expected ThreadLaunchError, got ${reused._tag}`);
+    }
+    assert.equal((yield* threads.getThreadProjection(existing.threadId)).messages.length, 0);
   }).pipe(Effect.provide(harness.layer));
 });
 
@@ -2187,6 +2212,11 @@ it.effect.each(["create", "fork"] as const)("replays a server-allocated %s launc
       const first = yield* launches.launch(rest);
       if (kind === "fork") {
         assert.equal(first.projection.thread.lineage.parentThreadId, sourceThreadId);
+        // Pinned to the branch's commit at launch, not resolved by name later.
+        assert.deepEqual(first.projection.runs[0]?.workspacePreparation, {
+          type: "worktree",
+          baseRef: FORK_SOURCE_COMMIT,
+        });
       }
       // One commit holds the thread and its first run, so no client sees the thread idle between.
       const launchCommits = yield* threads
@@ -2204,6 +2234,9 @@ it.effect.each(["create", "fork"] as const)("replays a server-allocated %s launc
         [rest.commandId, rest.commandId],
       );
       yield* Deferred.await(setupEntered);
+      if (kind === "fork") {
+        assert.equal(harness.createWorktree.mock.calls[0]?.[0]?.refName, FORK_SOURCE_COMMIT);
+      }
       const retry = yield* launches.launch(rest);
       assert.equal(first.threadId, retry.threadId);
       assert.isFalse(first.resumed);

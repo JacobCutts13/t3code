@@ -46,6 +46,11 @@ export class GitWorkflowService extends Context.Service<
       readonly cwd: string;
       readonly refName: string;
     }) => Effect.Effect<boolean, GitCommandError>;
+    /** The commit a ref names now, or null. */
+    readonly resolveCommitSha: (input: {
+      readonly cwd: string;
+      readonly refName: string;
+    }) => Effect.Effect<string | null, GitCommandError>;
     readonly status: (
       input: VcsStatusInput,
     ) => Effect.Effect<VcsStatusResult, GitManagerServiceError>;
@@ -313,6 +318,19 @@ export const make = Effect.gen(function* () {
           }),
         ),
         Effect.map((result) => result.exitCode === 0),
+      );
+    }),
+    resolveCommitSha: Effect.fn("GitWorkflowService.resolveCommitSha")(function (input) {
+      return ensureGitCommand("GitWorkflowService.resolveCommitSha", input.cwd).pipe(
+        Effect.andThen(
+          git.execute({
+            operation: "GitWorkflowService.resolveCommitSha",
+            cwd: input.cwd,
+            args: ["rev-parse", "--verify", `${input.refName}^{commit}`],
+            allowNonZeroExit: true,
+          }),
+        ),
+        Effect.map((result) => (result.exitCode === 0 ? result.stdout.trim() : null)),
       );
     }),
     hasRefNamed: Effect.fn("GitWorkflowService.hasRefNamed")(function (input) {
