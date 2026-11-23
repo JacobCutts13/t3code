@@ -2239,6 +2239,7 @@ export const layerWsRpc = (
                           runtimeMode: input.runtimeMode,
                           interactionMode: input.interactionMode,
                           workspaceStrategy: input.workspaceStrategy,
+                          ...(input.forkOf === undefined ? {} : { forkOf: input.forkOf }),
                           ...(input.initialMessage === undefined
                             ? {}
                             : {

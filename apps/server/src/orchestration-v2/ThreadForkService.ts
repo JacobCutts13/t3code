@@ -61,7 +61,7 @@ export interface ThreadForkServiceV2Shape {
     readonly title?: string;
     readonly sideChat?: boolean;
     /** The fork's own worktree, when the server prepared one. */
-    readonly workspace?: { readonly worktreePath: string; readonly branch: string };
+    readonly workspace?: { readonly worktreePath: string | null; readonly branch: string | null };
     readonly createdBy: OrchestrationV2Actor;
     readonly creationSource: OrchestrationV2CreationSource;
     readonly createdAt: DateTime.Utc;

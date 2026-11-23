@@ -3125,6 +3125,21 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
 ]);
 export type OrchestrationV2DomainEventJson = typeof OrchestrationV2DomainEventJson.Type;
 
+/**
+ * Only the server sets this. The thread and its first run commit together, so no client sees
+ * the thread idle before its run exists. The run waits for `workspaceStrategy` when given one.
+ */
+const OrchestrationV2ThreadInitialMessage = Schema.Struct({
+  messageId: MessageId,
+  text: Schema.String,
+  attachments: Schema.Array(ChatAttachment),
+  context: Schema.optional(OrchestrationMessageContext),
+  titleSeed: Schema.optional(TrimmedNonEmptyString),
+  scheduledTaskId: Schema.optional(ScheduledTaskId),
+  senderThreadId: Schema.optional(ThreadId),
+  workspaceStrategy: Schema.optional(OrchestrationV2ThreadLaunchWorkspaceStrategy),
+});
+
 export const OrchestrationV2Command = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("thread.stop"),
@@ -3163,22 +3178,7 @@ export const OrchestrationV2Command = Schema.Union([
         metadata: Schema.optional(OrchestrationV2ProviderThreadNativeMetadata),
       }),
     ),
-    /**
-     * Only the server sets this. The thread and its first run commit together, so no client sees
-     * the thread idle before its run exists. The run waits for `workspaceStrategy` when given one.
-     */
-    initialMessage: Schema.optional(
-      Schema.Struct({
-        messageId: MessageId,
-        text: Schema.String,
-        attachments: Schema.Array(ChatAttachment),
-        context: Schema.optional(OrchestrationMessageContext),
-        titleSeed: Schema.optional(TrimmedNonEmptyString),
-        scheduledTaskId: Schema.optional(ScheduledTaskId),
-        senderThreadId: Schema.optional(ThreadId),
-        workspaceStrategy: Schema.optional(OrchestrationV2ThreadLaunchWorkspaceStrategy),
-      }),
-    ),
+    initialMessage: Schema.optional(OrchestrationV2ThreadInitialMessage),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.archive"),
@@ -3586,9 +3586,10 @@ export const OrchestrationV2Command = Schema.Union([
     sourcePoint: OrchestrationV2ThreadForkSourcePoint,
     title: Schema.optional(TrimmedNonEmptyString),
     sideChat: Schema.optional(Schema.Boolean),
-    /** Only the server sets these, after it prepares the fork's own worktree. */
-    worktreePath: Schema.optional(TrimmedNonEmptyString),
-    branch: Schema.optional(TrimmedNonEmptyString),
+    /** Only the server sets these, with `initialMessage`, for the workspace that message prepares. */
+    worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+    branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+    initialMessage: Schema.optional(OrchestrationV2ThreadInitialMessage),
     createdAt: Schema.optional(Schema.DateTimeUtc),
   }),
   Schema.Struct({
@@ -3977,6 +3978,8 @@ export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
   workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy,
+  /** The thread this one forks, carrying its conversation; created with the first message. */
+  forkOf: Schema.optional(ThreadId),
   initialMessage: Schema.optional(
     Schema.Struct({
       messageId: Schema.optional(MessageId),

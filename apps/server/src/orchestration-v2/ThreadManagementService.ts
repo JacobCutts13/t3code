@@ -96,8 +96,13 @@ export function withCreationProvenance(
       return { ...rest, ...provenance };
     }
     case "thread.fork": {
-      // Only the server points a fork at the worktree it prepared, so a client cannot.
-      const { worktreePath: _worktreePath, branch: _branch, ...rest } = command;
+      // Only the server sets a fork's workspace and first message, so a client cannot.
+      const {
+        worktreePath: _worktreePath,
+        branch: _branch,
+        initialMessage: _initialMessage,
+        ...rest
+      } = command;
       return { ...rest, ...provenance };
     }
     case "message.dispatch":

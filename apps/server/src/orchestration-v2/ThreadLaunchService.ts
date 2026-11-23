@@ -103,6 +103,8 @@ export interface ThreadLaunchInput {
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
   readonly workspaceStrategy: ThreadLaunchWorkspaceStrategy;
+  /** The thread this one forks; its conversation comes along and its first message is required. */
+  readonly forkOf?: ThreadId;
   readonly initialMessage?: ThreadLaunchInitialMessage;
   readonly importedNativeThread?: {
     readonly ref: {
@@ -1415,30 +1417,43 @@ const make = Effect.gen(function* () {
                 threadId: candidateThreadId,
                 expectedEmpty: true,
               })
-            : threads.dispatch({
-                type: "thread.create",
-                commandId: input.commandId,
-                threadId: candidateThreadId,
-                projectId: input.projectId,
-                title: input.title,
-                modelSelection: input.modelSelection,
-                runtimeMode: input.runtimeMode,
-                interactionMode: input.interactionMode,
-                branch: initialBranch,
-                worktreePath: initialWorktreePath,
-                ...(input.importedNativeThread === undefined
-                  ? {}
-                  : { importedNativeThread: input.importedNativeThread }),
-                ...(input.linkOrigin === undefined ? {} : { linkOrigin: input.linkOrigin }),
-                ...(input.delegatedFrom === undefined
-                  ? {}
-                  : { delegatedFrom: input.delegatedFrom }),
-                createdBy: input.createdBy,
-                creationSource: input.creationSource,
-                ...(initialMessage === undefined
-                  ? {}
-                  : { initialMessage: { ...initialMessage, workspaceStrategy } }),
-              });
+            : input.forkOf !== undefined && initialMessage !== undefined
+              ? threads.dispatch({
+                  type: "thread.fork",
+                  commandId: input.commandId,
+                  sourceThreadId: input.forkOf,
+                  targetThreadId: candidateThreadId,
+                  sourcePoint: { type: "latest_stable" },
+                  worktreePath: initialWorktreePath,
+                  branch: initialBranch,
+                  createdBy: input.createdBy,
+                  creationSource: input.creationSource,
+                  initialMessage: { ...initialMessage, workspaceStrategy },
+                })
+              : threads.dispatch({
+                  type: "thread.create",
+                  commandId: input.commandId,
+                  threadId: candidateThreadId,
+                  projectId: input.projectId,
+                  title: input.title,
+                  modelSelection: input.modelSelection,
+                  runtimeMode: input.runtimeMode,
+                  interactionMode: input.interactionMode,
+                  branch: initialBranch,
+                  worktreePath: initialWorktreePath,
+                  ...(input.importedNativeThread === undefined
+                    ? {}
+                    : { importedNativeThread: input.importedNativeThread }),
+                  ...(input.linkOrigin === undefined ? {} : { linkOrigin: input.linkOrigin }),
+                  ...(input.delegatedFrom === undefined
+                    ? {}
+                    : { delegatedFrom: input.delegatedFrom }),
+                  createdBy: input.createdBy,
+                  creationSource: input.creationSource,
+                  ...(initialMessage === undefined
+                    ? {}
+                    : { initialMessage: { ...initialMessage, workspaceStrategy } }),
+                });
         const claimed = yield* claimDispatch.pipe(
           Effect.mapError(
             mapError(

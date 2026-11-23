@@ -937,6 +937,87 @@ it.effect("resolves an explicit checkpoint fork to its source run", () =>
   }).pipe(Effect.provide(forkCases[0]!.layer)),
 );
 
+it.effect("a fork with a first message commits a preparing run that waits for its worktree", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const parentId = ThreadId.make("fork-first-message-parent");
+    const forkId = ThreadId.make("fork-first-message-child");
+    yield* createParent(parentId);
+    yield* orchestrator.dispatch({
+      type: "thread.metadata.update",
+      commandId: CommandId.make("fork-first-message-parent:workspace"),
+      threadId: parentId,
+      worktreePath: "/repo/.t3/worktrees/parent",
+      branch: "feature",
+    });
+    yield* writeParentRun({
+      threadId: parentId,
+      runId: RunId.make("fork-first-message-parent-run"),
+      ordinal: 1,
+      status: "completed",
+      text: "Work",
+      stable: true,
+    });
+    const workspaceStrategy = { type: "worktree", baseRef: "feature" } as const;
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("fork-first-message"),
+      sourceThreadId: parentId,
+      targetThreadId: forkId,
+      sourcePoint: { type: "latest_stable" },
+      worktreePath: null,
+      branch: null,
+      initialMessage: {
+        messageId: MessageId.make("fork-first-message:message"),
+        text: "Continue here",
+        attachments: [],
+        workspaceStrategy,
+      },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const fork = yield* orchestrator.getThreadProjection(forkId);
+    assert.deepEqual(
+      [fork.thread.lineage.parentThreadId, fork.thread.lineage.relationshipToParent],
+      [parentId, "fork"],
+    );
+    assert.isNull(fork.thread.worktreePath);
+    assert.deepEqual(
+      fork.runs.map((run) => [run.status, run.workspacePreparation]),
+      [["preparing", workspaceStrategy]],
+    );
+    assert.deepEqual(fork.checkpointScopes, []);
+    // The fork moves to its own worktree, so the conversation carries over as copied context.
+    assert.deepEqual(
+      fork.contextTransfers.map((transfer) => [transfer.status, transfer.resolution?.strategy]),
+      [["consumed", "portable_context"]],
+    );
+
+    yield* orchestrator.dispatch({
+      type: "thread.metadata.update",
+      commandId: CommandId.make("fork-first-message:workspace"),
+      threadId: forkId,
+      worktreePath: "/repo/.t3/worktrees/fork",
+      branch: "feature-fork",
+    });
+    yield* orchestrator.dispatch({
+      type: "prepared-run.release",
+      commandId: CommandId.make("fork-first-message:release"),
+      threadId: forkId,
+      runId: fork.runs[0]!.id,
+    });
+    const started = yield* orchestrator.getThreadProjection(forkId);
+    assert.deepEqual(
+      started.runs.map((run) => run.status),
+      ["starting"],
+    );
+    assert.deepEqual(
+      started.checkpointScopes.map((scope) => scope.cwd),
+      ["/repo/.t3/worktrees/fork"],
+    );
+  }).pipe(Effect.provide(forkCases[0]!.layer)),
+);
+
 it.effect("a fresh send in a fork that has not run yet starts without the fork's context", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;

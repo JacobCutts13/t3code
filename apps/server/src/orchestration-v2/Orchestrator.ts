@@ -838,7 +838,7 @@ function metadataUpdateContinuation(
 // A later command for the first message would leave the new thread committed with no run,
 // and every client would show it idle until that command landed.
 function threadCreateInitialMessage(
-  command: Extract<OrchestrationV2Command, { readonly type: "thread.create" }>,
+  command: Extract<OrchestrationV2Command, { readonly type: "thread.create" | "thread.fork" }>,
 ): Extract<OrchestrationV2Command, { readonly type: "message.dispatch" }> | undefined {
   if (command.initialMessage === undefined) return undefined;
   const { workspaceStrategy, ...message } = command.initialMessage;
@@ -846,8 +846,9 @@ function threadCreateInitialMessage(
     ...message,
     type: "message.dispatch",
     commandId: command.commandId,
-    threadId: command.threadId,
-    modelSelection: command.modelSelection,
+    ...(command.type === "thread.fork"
+      ? { threadId: command.targetThreadId }
+      : { threadId: command.threadId, modelSelection: command.modelSelection }),
     dispatchMode:
       workspaceStrategy === undefined
         ? { type: "start_immediately" }
@@ -6268,9 +6269,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         targetThreadId: command.targetThreadId,
         ...(command.title === undefined ? {} : { title: command.title }),
         ...(command.sideChat ? { sideChat: true } : {}),
-        ...(command.worktreePath === undefined || command.branch === undefined
+        ...(command.worktreePath === undefined
           ? {}
-          : { workspace: { worktreePath: command.worktreePath, branch: command.branch } }),
+          : { workspace: { worktreePath: command.worktreePath, branch: command.branch ?? null } }),
         createdBy: command.createdBy,
         creationSource: command.creationSource,
         createdAt: now,
@@ -9512,29 +9513,33 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                   }),
               ),
             );
-    const checkpointScope = yield* checkpointService
-      .prepareRootRunScope({
-        threadId: command.threadId,
-        runId,
-        rootNodeId,
-        providerThreadId: providerThread.id,
-        cwd:
-          resolvedRuntimePolicy.cwd ??
-          existingProviderSession?.cwd ??
-          projection.thread.worktreePath ??
-          process.cwd(),
-        createdAt: now,
-      })
-      .pipe(
-        Effect.mapError(
-          (cause) =>
-            new OrchestratorDispatchError({
-              commandId: command.commandId,
-              commandType: command.type,
-              cause,
-            }),
-        ),
-      );
+    // A deferred run takes its checkpoint scope once its workspace is prepared.
+    const checkpointScope =
+      dispatchMode.type === "defer_start"
+        ? null
+        : yield* checkpointService
+            .prepareRootRunScope({
+              threadId: command.threadId,
+              runId,
+              rootNodeId,
+              providerThreadId: providerThread.id,
+              cwd:
+                resolvedRuntimePolicy.cwd ??
+                existingProviderSession?.cwd ??
+                projection.thread.worktreePath ??
+                process.cwd(),
+              createdAt: now,
+            })
+            .pipe(
+              Effect.mapError(
+                (cause) =>
+                  new OrchestratorDispatchError({
+                    commandId: command.commandId,
+                    commandType: command.type,
+                    cause,
+                  }),
+              ),
+            );
     const run: OrchestrationV2Run = {
       id: runId,
       threadId: command.threadId,
@@ -9545,7 +9550,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       userMessageId: command.messageId,
       rootNodeId,
       activeAttemptId: attemptId,
-      status: "starting",
+      status: dispatchMode.type === "defer_start" ? "preparing" : "starting",
+      ...(dispatchMode.type === "defer_start" && dispatchMode.workspaceStrategy !== undefined
+        ? { workspacePreparation: dispatchMode.workspaceStrategy }
+        : {}),
       queuePosition: null,
       requestedAt: now,
       startedAt: null,
@@ -9596,7 +9604,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       providerTurnId: null,
       nativeItemRef: null,
       runtimeRequestId: null,
-      checkpointScopeId: checkpointScope.id,
+      checkpointScopeId: checkpointScope?.id ?? null,
       startedAt: null,
       completedAt: null,
     };
@@ -9942,15 +9950,17 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       occurredAt: now,
       payload: rootNode,
     });
-    yield* emitEvent({
-      type: "checkpoint-scope.created",
-      threadId: command.threadId,
-      runId,
-      nodeId: rootNodeId,
-      providerInstanceId: modelSelection.instanceId,
-      occurredAt: now,
-      payload: checkpointScope,
-    });
+    if (checkpointScope !== null) {
+      yield* emitEvent({
+        type: "checkpoint-scope.created",
+        threadId: command.threadId,
+        runId,
+        nodeId: rootNodeId,
+        providerInstanceId: modelSelection.instanceId,
+        occurredAt: now,
+        payload: checkpointScope,
+      });
+    }
     if (handoffTurnItem !== null) {
       yield* emitEvent({
         type: "turn-item.updated",
@@ -9984,6 +9994,37 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         yield* notificationTasks(command.threadId, message, projection.subagents),
       ),
     });
+    if (dispatchMode.type === "defer_start") {
+      yield* emitEvent({
+        type: "turn-item.updated",
+        threadId: command.threadId,
+        runId,
+        nodeId: rootNodeId,
+        providerInstanceId: modelSelection.instanceId,
+        occurredAt: now,
+        payload: {
+          id: idAllocator.derive.turnItemFromProviderItem({
+            driver: adapter.driver,
+            nativeItemId: `workspace-preparation:${runId}`,
+          }),
+          threadId: command.threadId,
+          runId,
+          nodeId: rootNodeId,
+          providerThreadId: providerThread.id,
+          providerTurnId: null,
+          nativeItemRef: null,
+          parentItemId: null,
+          ordinal: turnItem.ordinal + 1,
+          status: "running",
+          title: WORKSPACE_PREPARATION_INPUT,
+          startedAt: now,
+          completedAt: null,
+          updatedAt: now,
+          type: "command_execution",
+          input: WORKSPACE_PREPARATION_INPUT,
+        },
+      });
+    }
     const forkResolution = nativeForkResolution ?? portableForkResolution;
     if (pendingForkTransfer !== undefined && forkResolution !== null) {
       yield* emitEvent({
@@ -10041,7 +10082,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       threadId: command.threadId,
       request: { type: "provider-turn.start", runId },
     } satisfies PendingOrchestrationEffectV2;
-    yield* Ref.update(effects, (existing) => [...existing, pendingEffect]);
+    if (dispatchMode.type !== "defer_start") {
+      yield* Ref.update(effects, (existing) => [...existing, pendingEffect]);
+    }
   });
 
   // A native background subagent keeps working, and delegating, after the latest run settles.
@@ -16102,9 +16145,18 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.interrupt.unresponsive":
         yield* dispatchInterruptUnresponsive(command, events);
         break;
-      case "thread.fork":
+      case "thread.fork": {
         yield* dispatchThreadFork(command, events);
+        const initialMessage = threadCreateInitialMessage(command);
+        if (initialMessage !== undefined) {
+          cancelUnsettledEffects = yield* dispatchMessage(
+            withoutGuestAttribution(initialMessage),
+            events,
+            effects,
+          );
+        }
         break;
+      }
       case "thread.merge_back":
         yield* dispatchThreadMergeBack(command, events);
         break;
