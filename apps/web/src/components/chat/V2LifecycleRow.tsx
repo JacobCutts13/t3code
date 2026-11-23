@@ -16,6 +16,7 @@ import { MiddleTruncate } from "../ui/middle-truncate";
 import * as DateTime from "effect/DateTime";
 import { WorkLogRow } from "./WorkLog";
 import {
+  handoffKeepsModel,
   resolveHandoffEndpoints,
   type HandoffEndpoints,
   type HandoffTimelineRun,
@@ -92,10 +93,12 @@ export function V2LifecycleRow(props: {
     );
   }
   if (item.type === "handoff") {
+    const endpoints = resolveHandoffEndpoints(item, props.runs);
+    if (item.status !== "failed" && handoffKeepsModel(endpoints)) return null;
     return (
       <EnvironmentHandoffRow
         environmentId={props.environmentId}
-        endpoints={resolveHandoffEndpoints(item, props.runs)}
+        endpoints={endpoints}
         failed={item.status === "failed"}
       />
     );

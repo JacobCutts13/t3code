@@ -7,6 +7,7 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
+  handoffKeepsModel,
   resolveHandoffEndpoints,
   resolveModelSwitchChange,
   resolvePendingHandoff,
@@ -72,6 +73,15 @@ describe("handoff endpoints shared by web and mobile", () => {
     expect(
       resolveHandoffEndpoints(item, [run("target", 2, from, "wrong-model")]).to.model,
     ).toBeUndefined();
+  });
+
+  it("treats a handoff as worth showing only when the provider or model changes", () => {
+    const same = { instanceId: to, model: "opus" };
+    expect(handoffKeepsModel({ from: [same], to: same })).toBe(true);
+    expect(handoffKeepsModel({ from: [{ ...same, model: "sonnet" }], to: same })).toBe(false);
+    expect(handoffKeepsModel({ from: [{ instanceId: from, model: "opus" }], to: same })).toBe(
+      false,
+    );
   });
 });
 

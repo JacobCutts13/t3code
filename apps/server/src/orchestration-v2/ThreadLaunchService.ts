@@ -184,6 +184,13 @@ export class ThreadLaunchBaseRefError extends Schema.TaggedError<ThreadLaunchBas
   }
 }
 
+/** `<branch>-fork-<n>` with the lowest n not already taken. */
+function nextForkBranch(branch: string, existing: ReadonlyArray<string>): string {
+  let n = 1;
+  while (existing.includes(`${branch}-fork-${n}`)) n++;
+  return `${branch}-fork-${n}`;
+}
+
 export class ThreadLaunchBranchExistsError extends Schema.TaggedError<ThreadLaunchBranchExistsError>()(
   "ThreadLaunchBranchExistsError",
   {
@@ -1428,7 +1435,19 @@ const make = Effect.gen(function* () {
         const workspaceStrategy: ThreadLaunchWorkspaceStrategy =
           forkBaseCommit === undefined || requestedStrategy.type !== "worktree"
             ? requestedStrategy
-            : { ...requestedStrategy, baseRef: forkBaseCommit };
+            : {
+                ...requestedStrategy,
+                baseRef: forkBaseCommit,
+                // baseRef was the source's branch, checked above.
+                branch: nextForkBranch(
+                  requestedStrategy.baseRef,
+                  yield* git
+                    .listLocalBranchNames(project.workspaceRoot)
+                    .pipe(
+                      Effect.mapError(mapError(input, "provision-worktree", candidateThreadId)),
+                    ),
+                ),
+              };
         const initialBranch = yield* Effect.interruptible(
           launchBranch(workspaceStrategy, project.workspaceRoot),
         );

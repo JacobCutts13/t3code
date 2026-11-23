@@ -2212,10 +2212,11 @@ it.effect.each(["create", "fork"] as const)("replays a server-allocated %s launc
       const first = yield* launches.launch(rest);
       if (kind === "fork") {
         assert.equal(first.projection.thread.lineage.parentThreadId, sourceThreadId);
-        // Pinned to the branch's commit at launch, not resolved by name later.
+        // Pinned to the branch's commit at launch, and named after the source's branch.
         assert.deepEqual(first.projection.runs[0]?.workspacePreparation, {
           type: "worktree",
           baseRef: FORK_SOURCE_COMMIT,
+          branch: "feature-fork-1",
         });
       }
       // One commit holds the thread and its first run, so no client sees the thread idle between.

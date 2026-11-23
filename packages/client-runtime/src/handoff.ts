@@ -75,6 +75,13 @@ export function resolveHandoffEndpoints(
   return { from: fromEndpoints, to: { instanceId: item.toProviderInstanceId, model: toModel } };
 }
 
+/** A handoff that keeps the same provider and model tells the user nothing worth a row. */
+export function handoffKeepsModel(endpoints: HandoffEndpoints): boolean {
+  return endpoints.from.every(
+    (from) => from.instanceId === endpoints.to.instanceId && from.model === endpoints.to.model,
+  );
+}
+
 function latestRunModelBefore(
   runs: ReadonlyArray<HandoffTimelineRun>,
   instanceId: ProviderInstanceId,

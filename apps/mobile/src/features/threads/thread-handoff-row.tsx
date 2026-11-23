@@ -2,6 +2,7 @@ import * as Dialog from "../../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
+  handoffKeepsModel,
   resolveHandoffEndpoints,
   resolveModelSwitchChange,
   type HandoffEndpoints,
@@ -93,6 +94,7 @@ export function ThreadHandoffRow(props: {
   );
   const endpoints = useAtomValue(endpointsAtom);
   if (item.type !== "handoff" || endpoints === null) return null;
+  if (item.status !== "failed" && handoffKeepsModel(endpoints)) return null;
   const color = item.status === "failed" ? "#e11d48" : props.iconColor;
   return (
     <ThreadHandoffDivider
