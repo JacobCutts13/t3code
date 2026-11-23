@@ -1428,7 +1428,8 @@ const make = Effect.gen(function* () {
                   branch: initialBranch,
                   createdBy: input.createdBy,
                   creationSource: input.creationSource,
-                  initialMessage: { ...initialMessage, workspaceStrategy },
+                  // The server titles a fork after its source, not its first message.
+                  initialMessage: { ...withoutTitleSeed(initialMessage), workspaceStrategy },
                 })
               : threads.dispatch({
                   type: "thread.create",
@@ -1679,3 +1680,8 @@ const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(ThreadLaunchService, make);
+
+const withoutTitleSeed = <A extends { readonly titleSeed?: string }>({
+  titleSeed: _titleSeed,
+  ...message
+}: A) => message;

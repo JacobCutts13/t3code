@@ -2854,7 +2854,6 @@
   "65290c3d43702628": "The review started, but the pull request is not linked to it",
   "310f2ad52b5cfb74": "Could not start the review",
   "831fba9edc1a8f8c": "Forken skapades, men dess tråddata nådde inte den här klienten. Återanslut och försök öppna den från sidofältet.",
-  "d4db9414ad456062": "Failed to fork thread",
   "433bd7a75c28a858": "Kunde inte skapa {label}-repot",
   "181a251357eeca66": "{error} Använd Publicera repo i Git-menyn för att försöka igen.",
   "fc6379bdbd00c0a3": "Publicerat till {label}",
@@ -3556,6 +3555,14 @@
   "a0e0e2640219f1b0": "Välj ett projekt",
   "074db680e148e829": "Lägg till ett projekt",
   "1bbfd30a652f7e0f": "eller starta utan projekt",
+  "2194626656c25b9c": [
+    "Fork av ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "b8e0e89c83a639fa": [
     {
       "i": 1,

@@ -169,6 +169,8 @@ interface StartThreadBootstrap {
     readonly branch: string | null;
     readonly worktreePath: string | null;
     readonly createdAt: string;
+    /** The thread this draft forks; its conversation comes along. */
+    readonly forkOf?: ThreadId;
   };
   readonly prepareWorktree?: {
     readonly requireWorktree?: boolean;
@@ -806,6 +808,7 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
       runtimeMode: input.runtimeMode,
       interactionMode: input.interactionMode,
       workspaceStrategy,
+      ...(bootstrap?.forkOf === undefined ? {} : { forkOf: bootstrap.forkOf }),
       initialMessage: {
         messageId: input.message.messageId,
         text: input.message.text,

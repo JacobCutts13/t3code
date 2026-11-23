@@ -2854,7 +2854,6 @@
   "65290c3d43702628": "The review started, but the pull request is not linked to it",
   "310f2ad52b5cfb74": "Could not start the review",
   "831fba9edc1a8f8c": "O fork foi criado, mas os dados da thread não chegaram a este cliente. Reconecte e tente abri-la pela barra lateral.",
-  "d4db9414ad456062": "Failed to fork thread",
   "433bd7a75c28a858": "Não foi possível criar o repositório no {label}",
   "181a251357eeca66": "{error} Use Publicar repositório no menu do Git para tentar novamente.",
   "fc6379bdbd00c0a3": "Publicado no {label}",
@@ -3556,6 +3555,14 @@
   "a0e0e2640219f1b0": "Escolha um projeto",
   "074db680e148e829": "Adicione um projeto",
   "1bbfd30a652f7e0f": "ou comece sem projeto",
+  "2194626656c25b9c": [
+    "Fork de ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "b8e0e89c83a639fa": [
     {
       "i": 1,

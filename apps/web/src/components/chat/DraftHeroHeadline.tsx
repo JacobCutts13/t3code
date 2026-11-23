@@ -1,7 +1,12 @@
 import type { DraftId } from "~/composerDraftStore";
 import { composerDraftHasUserContent, useComposerDraftStore } from "~/composerDraftStore";
-import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
-import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { resolveEnvironmentMachineKind, type ScopedProjectRef, ThreadId } from "@t3tools/contracts";
+import {
+  scopedProjectKey,
+  scopeProjectRef,
+  scopeThreadRef,
+} from "@t3tools/client-runtime/environment";
+import { forkDraftSourceThreadId } from "@t3tools/client-runtime/state/threads";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { T, useGT, Var } from "gt-react";
 import { FolderPlusIcon } from "lucide-react";
@@ -27,7 +32,7 @@ import {
   buildSidebarProjectPickerEntries,
   projectGroupsSpanEnvironments,
 } from "~/sidebarProjectGrouping";
-import { useProjects } from "~/state/entities";
+import { useProjects, useQuietThreadShell } from "~/state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { ProjectEnvironmentBadge } from "../ProjectEnvironmentBadge";
 import { ProjectFavicon } from "../ProjectFavicon";
@@ -79,6 +84,16 @@ export function DraftHeroHeadline({
   // A boolean, so typing in a draft does not re-render the hero.
   const isTriageDraftPrompt = useComposerDraftStore((store) =>
     draftId ? isTriagePrompt(store.getComposerDraft(draftId)?.prompt ?? "") : false,
+  );
+  const forkSourceThreadId = useComposerDraftStore((store) =>
+    forkDraftSourceThreadId(
+      draftId ? store.getDraftSession(draftId)?.logicalProjectKey : undefined,
+    ),
+  );
+  const forkSource = useQuietThreadShell(
+    forkSourceThreadId === null || activeProjectRef === null
+      ? null
+      : scopeThreadRef(activeProjectRef.environmentId, ThreadId.make(forkSourceThreadId)),
   );
   const openAddProject = () => openCommandPalette({ open: "add-project" });
   const { scratchEnvironmentId, scratchWorkspaceRootFor, openScratchProject } = useScratchProject();
@@ -344,6 +359,17 @@ export function DraftHeroHeadline({
         {noProjectShortcut ? <TooltipPopup side="bottom">{noProjectShortcut}</TooltipPopup> : null}
       </Tooltip>
     ) : null;
+
+  // A fork keeps its source's project; its first message creates it there.
+  if (forkSourceThreadId !== null) {
+    return (
+      <h1 className="mx-auto w-full max-w-5xl text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
+        <T>
+          Fork of <Var>{forkSource?.title ?? ""}</Var>
+        </T>
+      </h1>
+    );
+  }
 
   if (isScratchDraft && isTriageDraftPrompt) {
     const environment = environments.find(

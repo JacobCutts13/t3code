@@ -205,16 +205,37 @@ export function resolveThreadTreeRowRef<
   return { environmentId: row.environmentId, threadId: row.id };
 }
 
-/** Why Fork is unavailable, or null. The server forks at the latest completed run and stays authoritative. */
+/**
+ * Why Fork is unavailable, or null; undefined hides it. The server forks at the latest completed
+ * run and stays authoritative.
+ */
 export function threadForkBlockedReason(
   thread: {
     readonly lineage: { readonly sideChat?: boolean | undefined };
     readonly latestRun: { readonly completedAt: string | null } | null;
+    readonly branch: string | null;
+    readonly worktreePath: string | null;
   },
   resolve: MFunctionType = mFallback,
-): string | null {
+): string | null | undefined {
+  // A fork's worktree starts from its parent's branch; a detached worktree has none.
+  if (thread.worktreePath !== null && thread.branch === null) return undefined;
   if (thread.lineage.sideChat === true) return resolve(msg("Side chats can't be forked"));
   if (thread.latestRun?.completedAt == null)
     return resolve(msg("Available after a completed turn"));
   return null;
+}
+
+const FORK_DRAFT_KEY_PREFIX = "fork:";
+
+/** A fork is a draft of its own, keyed by its source, until its first message creates it. */
+export function forkDraftKey(sourceThreadId: string): string {
+  return `${FORK_DRAFT_KEY_PREFIX}${sourceThreadId}`;
+}
+
+/** The thread a draft forks, or null for an ordinary draft. */
+export function forkDraftSourceThreadId(draftKey: string | undefined): string | null {
+  return draftKey?.startsWith(FORK_DRAFT_KEY_PREFIX) === true
+    ? draftKey.slice(FORK_DRAFT_KEY_PREFIX.length)
+    : null;
 }

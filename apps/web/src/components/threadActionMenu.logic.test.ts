@@ -96,13 +96,26 @@ describe("buildThreadActionMenuItems", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,
       branch: "main",
-      forkBlockedReason: threadForkBlockedReason(thread),
+      forkBlockedReason: threadForkBlockedReason({ branch: "main", worktreePath: null, ...thread }),
     });
     const ids = items.map((item) => item.id);
     expect(ids.indexOf("fork")).toBe(ids.indexOf("new-thread-on-branch") + 1);
     const fork = items.find((item) => item.id === "fork");
     expect(fork?.disabled ?? false).toBe(reason !== null);
     expect(fork?.detail).toBe(reason ?? undefined);
+  });
+
+  it("hides Fork thread for a worktree with no branch to start the fork from", () => {
+    const items = buildThreadActionMenuItems({
+      ...baseState,
+      forkBlockedReason: threadForkBlockedReason({
+        lineage: {},
+        latestRun: { completedAt: "2026-08-07T15:00:00Z" },
+        branch: null,
+        worktreePath: "/repo/.t3/worktrees/detached",
+      }),
+    });
+    expect(items.some((item) => item.id === "fork")).toBe(false);
   });
 
   it("disables only rename where no inline title editor exists", () => {

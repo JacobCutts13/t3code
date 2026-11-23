@@ -2853,7 +2853,6 @@
   "65290c3d43702628": "The review started, but the pull request is not linked to it",
   "310f2ad52b5cfb74": "Could not start the review",
   "831fba9edc1a8f8c": "포크가 생성되었지만 스레드 데이터가 이 클라이언트에 도달하지 않았습니다. 다시 연결한 후 사이드바에서 열어 보세요.",
-  "d4db9414ad456062": "Failed to fork thread",
   "433bd7a75c28a858": "{label} 저장소를 만들 수 없습니다",
   "181a251357eeca66": "{error} 다시 시도하려면 Git 메뉴에서 저장소 게시를 사용하세요.",
   "fc6379bdbd00c0a3": "{label}에 게시됨",
@@ -3552,6 +3551,14 @@
   "a0e0e2640219f1b0": "프로젝트 선택",
   "074db680e148e829": "프로젝트 추가",
   "1bbfd30a652f7e0f": "또는 프로젝트 없이 시작",
+  "2194626656c25b9c": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "의 포크"
+  ],
   "b8e0e89c83a639fa": [
     {
       "i": 1,

@@ -1592,17 +1592,18 @@ function OpenCommandPaletteDialog(props: {
   if (activeThread !== null && canOperateActiveThread) {
     const thread = activeThread;
     const forkBlockedReason = threadForkBlockedReason(thread, m);
-    actionItems.push({
-      kind: "action",
-      value: "action:fork-thread",
-      searchTerms: ["fork", "branch", "copy", "duplicate", "thread"],
-      title: gt("Fork thread"),
-      ...(forkBlockedReason === null ? {} : { description: forkBlockedReason, disabled: true }),
-      icon: <GitForkIcon className={ITEM_ICON_CLASS} />,
-      run: async () => {
-        await forkThread(thread);
-      },
-    });
+    if (forkBlockedReason !== undefined)
+      actionItems.push({
+        kind: "action",
+        value: "action:fork-thread",
+        searchTerms: ["fork", "branch", "copy", "duplicate", "thread"],
+        title: gt("Fork thread"),
+        ...(forkBlockedReason === null ? {} : { description: forkBlockedReason, disabled: true }),
+        icon: <GitForkIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await forkThread(thread);
+        },
+      });
   }
 
   if (activeThread !== null) {

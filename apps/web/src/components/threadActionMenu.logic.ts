@@ -125,7 +125,7 @@ export interface ThreadActionMenuState {
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
   /** Why the thread cannot be forked yet; null when it can. Omitted hides the action. */
-  readonly forkBlockedReason?: string | null;
+  readonly forkBlockedReason?: string | null | undefined;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */

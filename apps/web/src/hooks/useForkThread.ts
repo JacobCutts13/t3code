@@ -1,20 +1,14 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import {
-  isAtomCommandInterrupted,
-  squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import { forkDraftKey } from "@t3tools/client-runtime/state/threads";
 import type { ScopedThreadRef } from "@t3tools/contracts";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useNavigate } from "@tanstack/react-router";
 import { msg } from "gt-react";
 
-import { stackedThreadToast, toastManager } from "../components/ui/toast";
-import { newThreadId } from "../lib/utils";
+import { useComposerDraftStore } from "../composerDraftStore";
+import { newDraftId, newThreadId } from "../lib/utils";
 import { waitForThreadShell } from "../state/entities";
-import { threadEnvironment } from "../state/threads";
-import { buildThreadRouteParams } from "../threadRoutes";
-import { useAtomCommand } from "../state/use-atom-command";
+import { buildDraftThreadRouteParams, buildThreadRouteParams } from "../threadRoutes";
 import { m } from "../i18n/messages";
 
 /** Opens a thread a fork just created, once its shell reaches this client; returns an error otherwise. */
@@ -36,28 +30,36 @@ export function useOpenForkedThread() {
   };
 }
 
-/** Forks a whole thread at its latest completed run, then opens the fork. */
+/**
+ * Opens the thread's fork as a draft of its own. Its first message creates the fork, in a new
+ * worktree from the thread's branch, or in the same checkout when the thread has no worktree.
+ */
 export function useForkThread() {
-  const forkThread = useAtomCommand(threadEnvironment.forkThread, { reportFailure: false });
-  const openForkedThread = useOpenForkedThread();
-  const failureToast = (description: string) =>
-    toastManager.add(
-      stackedThreadToast({ type: "error", title: m(msg("Failed to fork thread")), description }),
-    );
-  return async (thread: Pick<EnvironmentThreadShell, "environmentId" | "id">) => {
-    const targetThreadId = newThreadId();
-    const result = await forkThread({
-      environmentId: thread.environmentId,
-      input: { sourceThreadId: thread.id, targetThreadId },
-    });
-    if (result._tag === "Failure") {
-      if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        failureToast(thrownErrorMessage(error, m) ?? m(msg("An error occurred.")));
-      }
-      return;
+  const navigate = useNavigate();
+  return async (thread: EnvironmentThreadShell) => {
+    const store = useComposerDraftStore.getState();
+    const key = forkDraftKey(thread.id);
+    const draftId = store.getDraftSessionByLogicalProjectKey(key)?.draftId ?? newDraftId();
+    if (store.getDraftSession(draftId) === null) {
+      store.setLogicalProjectDraftThreadId(
+        key,
+        scopeProjectRef(thread.environmentId, thread.projectId),
+        draftId,
+        {
+          threadId: newThreadId(),
+          createdAt: new Date().toISOString(),
+          branch: thread.branch,
+          worktreePath: null,
+          envMode: thread.worktreePath === null ? "local" : "worktree",
+          startFromOrigin: false,
+          // The source lives on this machine; the draft must not be routed to another.
+          environmentSelection: "manual",
+          runtimeMode: thread.runtimeMode,
+          interactionMode: thread.interactionMode,
+        },
+      );
+      store.setModelSelection(draftId, thread.modelSelection, { replaceOptions: true });
     }
-    const error = await openForkedThread(scopeThreadRef(thread.environmentId, targetThreadId));
-    if (error !== null) failureToast(error);
+    await navigate({ to: "/draft/$draftId", params: buildDraftThreadRouteParams(draftId) });
   };
 }
