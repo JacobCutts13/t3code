@@ -2,7 +2,7 @@ import type { QueuedThreadMessage } from "./thread-outbox-model";
 import type { DraftComposerAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { abortComposerDraftOperations } from "./composerDraftOperations";
-import { restoredNewTaskDraftKey } from "./new-task-draft-key";
+import { recoveredNewTaskDraftKey } from "./new-task-draft-key";
 import {
   appendComposerDraftAttachments,
   clearComposerDraftContent,
@@ -13,7 +13,7 @@ import {
 
 export async function recoverFailedThreadDraft(message: QueuedThreadMessage): Promise<void> {
   const sourceKey = scopedThreadKey(message.environmentId, message.threadId);
-  const targetKey = restoredNewTaskDraftKey(message.messageId);
+  const targetKey = recoveredNewTaskDraftKey(message);
   const source = getComposerDraftSnapshot(sourceKey);
   if (source.text.length === 0 && source.attachments.length === 0) {
     abortComposerDraftOperations(sourceKey);

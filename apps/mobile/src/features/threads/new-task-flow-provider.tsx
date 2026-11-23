@@ -803,10 +803,12 @@ export function NewTaskFlowProvider(
           currentCheckoutBranch: options?.currentCheckoutBranch ?? null,
         }),
         worktreePath: mode === "worktree" ? null : (workspaceSelection?.worktreePath ?? null),
-        ...((workspaceSelection?.startFromOrigin ?? startFromOrigin)
-          ? { startFromOrigin: true }
-          : {}),
-        ...(forkOf === null ? {} : { forkOf: ThreadId.make(forkOf.threadId) }),
+        // A fork records it either way, so a restored fork draft cannot take the project default.
+        ...(forkOf !== null
+          ? { startFromOrigin: false, forkOf: ThreadId.make(forkOf.threadId) }
+          : (workspaceSelection?.startFromOrigin ?? startFromOrigin)
+            ? { startFromOrigin: true }
+            : {}),
       },
       createdAt: metadata.createdAt,
     };

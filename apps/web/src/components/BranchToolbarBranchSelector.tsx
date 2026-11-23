@@ -31,6 +31,7 @@ import {
 } from "react";
 
 import { useComposerDraftStore, type DraftId } from "../composerDraftStore";
+import { forkDraftSource } from "@t3tools/client-runtime/state/threads";
 import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
 import { readLocalApi } from "../localApi";
 import { useOpenPrLink } from "../lib/openPullRequestLink";
@@ -176,7 +177,13 @@ export function BranchToolbarBranchSelector({
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const branchCwd = activeWorktreePath ?? activeProjectCwd;
   const hasServerThread = serverThread !== null;
-  const canUpdateThreadBranch = !hasServerThread || canOperateThread;
+  // A fork draft starts from its source's branch; picking, creating or checking out is off.
+  const forkDraft = useComposerDraftStore(
+    (store) =>
+      forkDraftSource(draftId ? store.getDraftSession(draftId)?.logicalProjectKey : undefined) !==
+      null,
+  );
+  const canUpdateThreadBranch = (!hasServerThread || canOperateThread) && !forkDraft;
   const canChangeThreadBranch = canWriteSourceControl && canUpdateThreadBranch;
   const effectiveEnvMode =
     effectiveEnvModeOverride ??
@@ -883,7 +890,7 @@ export function BranchToolbarBranchSelector({
               )
             }
             className="min-w-0 max-w-full active:scale-100"
-            disabled={isInitialBranchesLoadPending || isBranchActionPending}
+            disabled={isInitialBranchesLoadPending || isBranchActionPending || forkDraft}
             // NVDA browse mode re-reads a combobox when its attributes change, not when its text does.
             aria-label={gt("Branch: {branch}", { branch: triggerLabel })}
           >

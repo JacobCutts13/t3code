@@ -500,6 +500,7 @@
   "eabffa063b9244f8": "Din DNS eller brandvägg kanske blockerar T3 Connect. Prova ett annat nätverk, till exempel ett annat wifi eller mobildata.",
   "c039a54c8238eafe": "Den kan vara överbelastad, i viloläge eller utanför nätverket.",
   "3c4391a7f6421455": "{host} bekräftade inte meddelandet inom 60 sekunder.",
+  "e75efb53360b9a41": "Uppdatera {host} för att forka trådar.",
   "204ac030de627c0a": "Git-URL",
   "68b989c06486c4e0": "URL",
   "b0f180f236623386": "Ange hela namnet ägare/repo.",

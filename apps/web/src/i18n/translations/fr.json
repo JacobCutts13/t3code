@@ -500,6 +500,7 @@
   "eabffa063b9244f8": "Votre DNS ou votre pare-feu bloque peut-être T3 Connect. Essayez un autre réseau, comme un autre Wi-Fi ou les données mobiles.",
   "c039a54c8238eafe": "Il est peut-être surchargé, en veille ou hors réseau.",
   "3c4391a7f6421455": "{host} n’a pas confirmé le message dans les 60 secondes.",
+  "e75efb53360b9a41": "Mettez à jour {host} pour forker des fils.",
   "204ac030de627c0a": "URL Git",
   "68b989c06486c4e0": "URL",
   "b0f180f236623386": "Saisissez le nom complet propriétaire/dépôt.",

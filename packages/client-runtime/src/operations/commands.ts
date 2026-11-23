@@ -796,6 +796,19 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
                 ? {}
                 : { branch: bootstrap.branch }),
             };
+    // A server without it would drop `forkOf` and start a plain thread; the draft keeps the message.
+    if (
+      bootstrap?.forkOf !== undefined &&
+      (yield* getInitialServerConfig()).environment.capabilities.forkOnLaunch !== true
+    ) {
+      const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
+      return yield* new EnvironmentRpcUnavailableError({
+        environmentId: supervisor.target.environmentId,
+        ...translatableMessage(
+          msg("Update {host} to fork threads.", { host: supervisor.target.label }),
+        ),
+      });
+    }
     return yield* request(ORCHESTRATION_V2_WS_METHODS.launchThread, {
       commandId,
       creationSource: input.creationSource ?? "web",

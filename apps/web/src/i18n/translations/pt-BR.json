@@ -500,6 +500,7 @@
   "eabffa063b9244f8": "Seu DNS ou firewall pode estar bloqueando o T3 Connect. Tente outra rede, como outro Wi-Fi ou dados móveis.",
   "c039a54c8238eafe": "Ele pode estar sobrecarregado, em repouso ou fora da rede.",
   "3c4391a7f6421455": "{host} não confirmou a mensagem em 60 segundos.",
+  "e75efb53360b9a41": "Atualize {host} para fazer fork de conversas.",
   "204ac030de627c0a": "URL do Git",
   "68b989c06486c4e0": "URL",
   "b0f180f236623386": "Digite o nome completo no formato proprietário/repositório.",

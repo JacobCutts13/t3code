@@ -1,4 +1,5 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import { forkDraftSource } from "@t3tools/client-runtime/state/threads";
 import type { UnifiedSettings } from "@t3tools/contracts";
 import { useMessages } from "gt-react";
 import type { Dispatch } from "react";
@@ -93,9 +94,11 @@ export function useComposerSelection(input: ComposerSelectionInput) {
   const setComposerDraftRuntimeMode = useComposerDraftStore((store) => store.setRuntimeMode);
   const setDraftThreadContext = useComposerDraftStore((store) => store.setDraftThreadContext);
   const applyThreadModelPick = useApplyThreadModelPick();
+  // A fork draft's model, modes and workspace are its source's.
+  const forkDraft = forkDraftSource(draftThread?.logicalProjectKey) !== null;
 
   const handleRuntimeModeChange = (mode: RuntimeMode) => {
-    if (mode === runtimeMode) return;
+    if (forkDraft || mode === runtimeMode) return;
     setComposerDraftRuntimeMode(composerDraftTarget, mode);
     if (isLocalDraftThread) {
       setDraftThreadContext(composerDraftTarget, { runtimeMode: mode });
@@ -134,7 +137,7 @@ export function useComposerSelection(input: ComposerSelectionInput) {
     model: string,
     options?: { focusComposer?: boolean },
   ) => {
-    if (!activeThread) return;
+    if (!activeThread || forkDraft) return;
     const entry = providerStatuses.find((snapshot) => snapshot.instanceId === instanceId);
     const resolvedDriverKind = entry?.driver ?? null;
     if (
@@ -239,7 +242,7 @@ export function useComposerSelection(input: ComposerSelectionInput) {
   };
   const onProviderModelSelectStable = useStableCallback(onProviderModelSelect);
   const onEnvModeChange = (mode: DraftThreadEnvMode) => {
-    if (multipleModelSelections !== null) return;
+    if (multipleModelSelections !== null || forkDraft) return;
     if (canOverrideServerThreadEnvMode) {
       if (activeThread) setPendingServerThreadEnvModeEntry({ threadId: activeThread.id, mode });
       scheduleComposerFocus();
@@ -263,6 +266,7 @@ export function useComposerSelection(input: ComposerSelectionInput) {
   // re-renders the branch toolbar and thread details panel with it.
   const activeThreadId = activeThread?.id;
   const onStartFromOriginChange = (nextStartFromOrigin: boolean) => {
+    if (forkDraft) return;
     if (canOverrideServerThreadEnvMode && activeThreadId !== undefined) {
       setPendingServerThreadStartFromOriginByThreadId((current) =>
         current[activeThreadId] === nextStartFromOrigin

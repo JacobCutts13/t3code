@@ -75,6 +75,7 @@ const makeSupervisor = Effect.fn("TestEnvironmentCommands.makeSupervisor")(funct
   readonly projection?: OrchestrationV2ThreadProjection;
   readonly projectionRequests?: ThreadId[];
   readonly advertiseThreadStop?: boolean;
+  readonly advertiseForkOnLaunch?: boolean;
 }) {
   const client = {
     [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command: OrchestrationV2Command) =>
@@ -123,6 +124,7 @@ const makeSupervisor = Effect.fn("TestEnvironmentCommands.makeSupervisor")(funct
         capabilities: {
           repositoryIdentity: true,
           ...(input.advertiseThreadStop === true ? { threadStop: true } : {}),
+          ...(input.advertiseForkOnLaunch === true ? { forkOnLaunch: true } : {}),
         },
       },
     } as never),
@@ -223,6 +225,52 @@ describe("V2 environment commands", () => {
           checkpointId,
         },
       ]);
+    }).pipe(Effect.provide(layerTestRandom)),
+  );
+
+  it.effect("sends a fork only to a server that keeps it a fork", () =>
+    Effect.gen(function* () {
+      for (const advertiseForkOnLaunch of [false, true]) {
+        const launches: OrchestrationV2ThreadLaunchInput[] = [];
+        const supervisor = yield* makeSupervisor({
+          commands: [],
+          projects: [],
+          launches,
+          advertiseForkOnLaunch,
+        });
+        const exit = yield* startThreadTurn({
+          commandId: CommandId.make(`launch-fork-${advertiseForkOnLaunch}`),
+          threadId: v2ThreadId,
+          message: {
+            messageId: MessageId.make(`message-fork-${advertiseForkOnLaunch}`),
+            role: "user",
+            text: "Continue",
+            attachments: [],
+          },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          bootstrap: {
+            createThread: {
+              projectId: ProjectId.make("project-1"),
+              title: "Thread",
+              modelSelection: v2Projection.thread.modelSelection,
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              branch: null,
+              worktreePath: null,
+              createdAt: "2026-06-20T00:00:00.000Z",
+              forkOf: ThreadId.make("thread-source"),
+            },
+          },
+        }).pipe(
+          Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+          Effect.exit,
+        );
+        expect(Exit.isSuccess(exit)).toBe(advertiseForkOnLaunch);
+        expect(launches.map((launch) => launch.forkOf)).toEqual(
+          advertiseForkOnLaunch ? ["thread-source"] : [],
+        );
+      }
     }).pipe(Effect.provide(layerTestRandom)),
   );
 

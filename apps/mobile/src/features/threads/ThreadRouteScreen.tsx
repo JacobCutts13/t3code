@@ -44,7 +44,7 @@ import {
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useConnectionsReady } from "../../state/workspace";
 import { useEnvironmentShellReadiness } from "../../state/shell";
-import { restoredNewTaskDraftKey } from "../../state/new-task-draft-key";
+import { recoveredNewTaskDraftKey } from "../../state/new-task-draft-key";
 import { clearPendingThreadCreationOutcome } from "../../state/pending-thread-creation";
 import { recoverFailedThreadDraft } from "../../state/recover-failed-thread-draft";
 import { useEnvironmentQuery } from "../../state/query";
@@ -865,7 +865,7 @@ function ThreadRouteContent(
     navigation.dispatch(
       StackActions.replace("Thread", {
         draft: {
-          draftId: restoredNewTaskDraftKey(creation.messageId),
+          draftId: recoveredNewTaskDraftKey(creation),
           environmentId: String(creation.environmentId),
           projectId: String(creation.creation.projectId),
           ...(selectedThreadProject ? { title: selectedThreadProject.title } : {}),

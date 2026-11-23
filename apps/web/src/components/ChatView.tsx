@@ -3912,14 +3912,16 @@ export default function ChatView(props: ChatViewProps) {
                                     ? {}
                                     : {
                                         trailing: (
-                                          <ComposerContextPermissions
-                                            environmentId={environmentId}
-                                            runtimeMode={runtimeMode}
-                                            supportedRuntimeModes={
-                                              activeProviderStatus?.supportedRuntimeModes
-                                            }
-                                            onRuntimeModeChange={handleRuntimeModeChangeStable}
-                                          />
+                                          <div inert={isForkDraft} className="contents">
+                                            <ComposerContextPermissions
+                                              environmentId={environmentId}
+                                              runtimeMode={runtimeMode}
+                                              supportedRuntimeModes={
+                                                activeProviderStatus?.supportedRuntimeModes
+                                              }
+                                              onRuntimeModeChange={handleRuntimeModeChangeStable}
+                                            />
+                                          </div>
                                         ),
                                       })}
                                 />

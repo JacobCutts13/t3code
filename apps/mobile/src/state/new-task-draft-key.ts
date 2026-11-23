@@ -29,6 +29,17 @@ export function restoredNewTaskDraftKey(messageId: string): string {
   return newTaskDraftKey(`restored-${messageId}`);
 }
 
+/** Where a new thread's unsent first message returns: its fork's draft, which keeps it a fork. */
+export function recoveredNewTaskDraftKey(message: {
+  readonly environmentId: string;
+  readonly messageId: string;
+  readonly creation?: { readonly forkOf?: string | undefined } | undefined;
+}): string {
+  return message.creation?.forkOf === undefined
+    ? restoredNewTaskDraftKey(message.messageId)
+    : forkNewTaskDraftKey(message.environmentId, message.creation.forkOf);
+}
+
 export function parseLegacyNewTaskDraftKey(
   draftKey: string,
 ): { readonly environmentId: string; readonly projectId: string } | null {

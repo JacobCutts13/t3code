@@ -23,21 +23,17 @@ export function useForkThread() {
         { environmentId: thread.environmentId, projectId: thread.projectId },
         draftKey,
       );
-      updateComposerDraftSettings(draftKey, {
-        modelSelection: thread.modelSelection,
-        runtimeMode: thread.runtimeMode,
-        interactionMode: thread.interactionMode,
-        workspaceSelection:
-          thread.worktreePath === null
-            ? { mode: "local", branch: null, worktreePath: null }
-            : {
-                mode: "worktree",
-                branch: thread.branch,
-                worktreePath: null,
-                startFromOrigin: false,
-              },
-      });
     }
+    // Reopening refreshes what comes from the source, which may have moved; the prompt stays.
+    updateComposerDraftSettings(draftKey, {
+      modelSelection: thread.modelSelection,
+      runtimeMode: thread.runtimeMode,
+      interactionMode: thread.interactionMode,
+      workspaceSelection:
+        thread.worktreePath === null
+          ? { mode: "local", branch: null, worktreePath: null }
+          : { mode: "worktree", branch: thread.branch, worktreePath: null, startFromOrigin: false },
+    });
     selectDetail({
       name: "Thread",
       params: {

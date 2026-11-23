@@ -39,31 +39,31 @@ export function useForkThread() {
   return async (thread: EnvironmentThreadShell) => {
     const store = useComposerDraftStore.getState();
     const key = forkDraftKey(scopeThreadRef(thread.environmentId, thread.id));
-    const draftId = store.getDraftSessionByLogicalProjectKey(key)?.draftId ?? newDraftId();
-    if (store.getDraftSession(draftId) === null) {
-      store.setLogicalProjectDraftThreadId(
-        key,
-        scopeProjectRef(thread.environmentId, thread.projectId),
-        draftId,
-        {
-          threadId: newThreadId(),
-          createdAt: new Date().toISOString(),
-          // Without a worktree the fork shares the checkout as it is; no branch to switch to.
-          branch: thread.worktreePath === null ? null : thread.branch,
-          worktreePath: null,
-          envMode: thread.worktreePath === null ? "local" : "worktree",
-          startFromOrigin: false,
-          // The source lives on this machine; the draft must not be routed to another.
-          environmentSelection: "manual",
-          runtimeMode: thread.runtimeMode,
-          interactionMode: thread.interactionMode,
-        },
-      );
-      store.setModelSelection(draftId, thread.modelSelection, {
-        explicit: true,
-        replaceOptions: true,
-      });
-    }
+    const existing = store.getDraftSessionByLogicalProjectKey(key);
+    const draftId = existing?.draftId ?? newDraftId();
+    // Reopening refreshes what comes from the source, which may have moved; the prompt stays.
+    store.setLogicalProjectDraftThreadId(
+      key,
+      scopeProjectRef(thread.environmentId, thread.projectId),
+      draftId,
+      {
+        threadId: existing?.threadId ?? newThreadId(),
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        // Without a worktree the fork shares the checkout as it is; no branch to switch to.
+        branch: thread.worktreePath === null ? null : thread.branch,
+        worktreePath: null,
+        envMode: thread.worktreePath === null ? "local" : "worktree",
+        startFromOrigin: false,
+        // The source lives on this machine; the draft must not be routed to another.
+        environmentSelection: "manual",
+        runtimeMode: thread.runtimeMode,
+        interactionMode: thread.interactionMode,
+      },
+    );
+    store.setModelSelection(draftId, thread.modelSelection, {
+      explicit: true,
+      replaceOptions: true,
+    });
     await navigate({ to: "/draft/$draftId", params: buildDraftThreadRouteParams(draftId) });
   };
 }
