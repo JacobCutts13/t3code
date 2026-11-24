@@ -2,6 +2,7 @@ import { msg, T, Var } from "gt-react";
 import { ExternalLinkIcon } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 
+import { contextMenuSourceOf } from "../../contextMenuSource";
 import { m } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
@@ -55,6 +56,7 @@ export function ExternalRefLink({
         url,
         openLabel,
         position: { x: event.clientX, y: event.clientY },
+        source: contextMenuSourceOf(event),
       });
     },
   };

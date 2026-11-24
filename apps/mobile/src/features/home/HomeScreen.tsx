@@ -459,7 +459,7 @@ export function HomeScreen(props: HomeScreenProps) {
     }
     onSelectThread(thread);
   };
-  useThreadJumpShortcuts(threadListV2Items, selectThread);
+  useThreadJumpShortcuts(threadListV2Items, selectThread, props.onSelectPendingTask);
   const handleToggleThreadChildren = (thread: EnvironmentThreadShell) =>
     toggleThreadChildren(scopedThreadKey(thread.environmentId, thread.id));
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the list's visible range after commit to enable swipe gestures on those rows

@@ -100,6 +100,7 @@ export function PullRequestDetailCrumbs({
       <div
         aria-hidden={condensed}
         inert={condensed}
+        data-workspace-scroll-swap
         className={cn(
           ROW_CLASS_NAME,
           condensed
@@ -123,6 +124,7 @@ export function PullRequestDetailCrumbs({
       <div
         aria-hidden={!condensed}
         inert={!condensed}
+        data-workspace-scroll-swap
         className={cn(
           ROW_CLASS_NAME,
           condensed
