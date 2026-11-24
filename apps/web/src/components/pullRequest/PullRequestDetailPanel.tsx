@@ -1591,7 +1591,6 @@ export function PullRequestDetailPanel({
       >
         <PullRequestDetailCrumbs
           detail={detail}
-          threadRef={threadRef}
           toneClassName={statePresentation?.toneClassName ?? null}
           condensed={condensed}
           repositoryUrl={repositoryUrl}
