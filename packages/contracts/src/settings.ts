@@ -1225,8 +1225,17 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
 ] as const;
 export type ProjectScopedServerSettingKey = (typeof PROJECT_SCOPED_SERVER_SETTING_KEYS)[number];
 
+/** A provider-hosted environment a project's threads run in; its repos are what the agent clones. */
+export const ProviderCloudEnvironmentSelection = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: Schema.optionalKey(TrimmedNonEmptyString),
+  repos: Schema.Array(TrimmedNonEmptyString),
+});
+export type ProviderCloudEnvironmentSelection = typeof ProviderCloudEnvironmentSelection.Type;
+
 export const ProjectProviderInstanceOverride = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
+  cloudEnvironment: Schema.optionalKey(ProviderCloudEnvironmentSelection),
 });
 export type ProjectProviderInstanceOverride = typeof ProjectProviderInstanceOverride.Type;
 

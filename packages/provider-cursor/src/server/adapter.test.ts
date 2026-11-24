@@ -51,7 +51,7 @@ import * as CursorAgentSdk from "./CursorAgentSdk.ts";
 import * as CursorSdk from "./CursorSdk.ts";
 import { loadCursorSdk } from "./sdk.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
-import { cursorCloudRepositoryUrl } from "./cloudRepository.ts";
+import { cursorCloudRepositoryUrl, prepareCursorCloudRepositories } from "./cloudRepository.ts";
 
 // The SDK reads CURSOR_BACKEND_URL once when it loads, before any test body runs.
 const cursorBackendUrl = await vi.hoisted(async () => {
@@ -3511,27 +3511,42 @@ describe("CursorAdapterV2", () => {
       ),
   );
 
-  it.effect("dispatches cloud instances to the project's pushed branch without local MCP", () =>
+  it.effect("dispatches a project's cloud environment from its pushed branch", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
-      const cwd = yield* fileSystem.realPath(
+      const root = yield* fileSystem.realPath(
         yield* fileSystem.makeTempDirectoryScoped({ prefix: "cursor-v2-cloud-" }),
       );
-      for (const args of [
-        ["init", "-q", "-b", "feature/cloud", cwd],
-        ["-C", cwd, "remote", "add", "origin", "git@github.com:acme/widgets.git"],
-      ]) {
-        yield* spawnAndCollect("git", ChildProcess.make("git", args));
-      }
-      yield* fileSystem.makeDirectory(`${cwd}/.cursor`);
+      const cwd = `${root}/work`;
+      const bare = `${root}/remote.git`;
+      const git = (...args: ReadonlyArray<string>) =>
+        spawnAndCollect(
+          "git",
+          ChildProcess.make("git", [
+            "-c",
+            "user.name=T3",
+            "-c",
+            "user.email=t3@example.com",
+            ...args,
+          ]),
+        );
+      yield* git("init", "-q", "--bare", bare);
+      yield* git("init", "-q", "-b", "feature/cloud", cwd);
+      yield* fileSystem.writeFileString(`${cwd}/README.md`, "widgets\n");
+      yield* git("-C", cwd, "add", "README.md");
+      yield* git("-C", cwd, "commit", "-q", "-m", "init");
+      // Cursor matches the fetch URL; pushes land in the local bare repository.
+      yield* git("-C", cwd, "remote", "add", "origin", "git@github.com:acme/widgets.git");
+      yield* git("-C", cwd, "config", "remote.origin.pushurl", bare);
+      yield* fileSystem.writeFileString(`${cwd}/draft.md`, "not committed\n");
+      yield* fileSystem.makeDirectory(`${root}/cursor`);
       yield* fileSystem.writeFileString(
-        `${cwd}/.cursor/mcp.json`,
-        JSON.stringify({
-          mcpServers: { local: { command: "node", args: ["${workspaceFolder}/s.mjs"] } },
-        }),
+        `${root}/cursor/cli-config.json`,
+        JSON.stringify({ authInfo: { teamId: 3512493, teamName: "Acme" } }),
       );
+      const hostEnvironment = { CURSOR_DATA_DIR: `${root}/cursor` };
 
-      const instanceId = ProviderInstanceId.make("cursor-cloud");
+      const instanceId = ProviderInstanceId.make("cursor");
       // Delegated children get ids this long.
       const threadId = ThreadId.make(
         "thread:delegated-task:command%3Amcp%3Aef63eab0-9999-41c8-b2a8-0534f2a49c36%3Adelegate-task%3A3b6b8bf4",
@@ -3552,13 +3567,14 @@ describe("CursorAdapterV2", () => {
         interactionMode: "default",
         cwd,
       });
+      const cloudEnvironment = {
+        id: "env-widgets",
+        repos: ["https://github.com/acme/widgets", "https://github.com/acme/docs"],
+      };
       const opened: Array<CursorAgentSdk.CursorAgentSdkOpenInput> = [];
       const sentWith: Array<Record<string, unknown> | undefined> = [];
-      const adapter = yield* makeCursorAdapterV2({
-        instanceId,
-        environment: {},
-        cloud: true,
-      }).pipe(
+      let rejectSend = false;
+      const adapter = yield* makeCursorAdapterV2({ instanceId, environment: {} }).pipe(
         Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
           assertComplete: Effect.void,
           open: (input) =>
@@ -3570,7 +3586,33 @@ describe("CursorAdapterV2", () => {
                 close: Effect.void,
                 send: (sendInput) => {
                   sentWith.push(sendInput.options?.mcpServers);
-                  return Effect.die("sent");
+                  return rejectSend
+                    ? Effect.fail(
+                        new CursorAgentSdk.CursorAgentSdkRunnerError({
+                          method: "run.start",
+                          cause: new ConfigurationError(
+                            "[validation_error] The SCM integration does not have access to repository acme/widgets.",
+                          ),
+                        }),
+                      )
+                    : Effect.succeed({
+                        agentId: "bc-cloud-agent",
+                        runId: "bc-run",
+                        wait: Effect.succeed({
+                          id: "bc-run",
+                          status: "finished" as const,
+                          git: {
+                            branches: [
+                              {
+                                repoUrl: "https://github.com/acme/widgets",
+                                branch: "cursor/widgets",
+                                prUrl: "https://github.com/acme/widgets/pull/7",
+                              },
+                            ],
+                          },
+                        }),
+                        cancel: Effect.void,
+                      });
                 },
               };
             }),
@@ -3583,31 +3625,38 @@ describe("CursorAdapterV2", () => {
         modelSelection,
         runtimePolicy,
       });
-      const providerThread = yield* runtime.ensureThread({
-        threadId,
-        modelSelection,
-        runtimePolicy,
-      });
+      const providerThread = yield* runtime
+        .ensureThread({ threadId, modelSelection, runtimePolicy, cloudEnvironment })
+        .pipe(Effect.provideService(HostProcess.Environment, hostEnvironment));
       assert.deepEqual(opened[0]?.options.cloud, {
-        repos: [{ url: "https://github.com/acme/widgets", startingRef: "feature/cloud" }],
+        repos: [
+          { url: "https://github.com/acme/widgets", startingRef: "feature/cloud" },
+          { url: "https://github.com/acme/docs" },
+        ],
         autoCreatePR: true,
       });
+      assert.equal(opened[0]?.options.teamId, 3512493);
       assert.isUndefined(opened[0]?.options.local);
       assert.isUndefined(opened[0]?.options.mcpServers);
       assert.isAtMost(opened[0]?.options.name?.length ?? 0, 100);
+      // Like Cursor's CLI handoff, the branch reaches the remote before the agent clones it.
+      assert.equal(
+        (yield* git("-C", bare, "rev-parse", "refs/heads/feature/cloud")).stdout.trim(),
+        (yield* git("-C", cwd, "rev-parse", "HEAD")).stdout.trim(),
+      );
 
       const now = yield* DateTime.now;
-      yield* runtime
-        .startTurn({
+      const startTurn = (session: typeof runtime, ordinal: number) =>
+        session.startTurn({
           threadId,
           providerThread,
           modelSelection,
           runtimePolicy,
-          runId: RunId.make("cursor-cloud-run"),
-          runOrdinal: 1,
-          providerTurnOrdinal: 1,
-          attemptId: RunAttemptId.make("cursor-cloud-attempt"),
-          rootNodeId: NodeId.make("cursor-cloud-root"),
+          runId: RunId.make(`cursor-cloud-run-${ordinal}`),
+          runOrdinal: ordinal,
+          providerTurnOrdinal: ordinal,
+          attemptId: RunAttemptId.make(`cursor-cloud-attempt-${ordinal}`),
+          rootNodeId: NodeId.make(`cursor-cloud-root-${ordinal}`),
           appThread: {
             id: threadId,
             projectId: ProjectId.make("cursor-cloud-project"),
@@ -3632,32 +3681,102 @@ describe("CursorAdapterV2", () => {
             deletedAt: null,
           },
           message: {
-            messageId: MessageId.make("cursor-cloud-message"),
+            messageId: MessageId.make(`cursor-cloud-message-${ordinal}`),
             createdBy: "user",
             creationSource: "web",
             text: "Hello.",
             attachments: [],
           },
-        })
-        .pipe(Effect.exit);
+        });
+      yield* startTurn(runtime, 1);
+      const events = yield* runtime.events.pipe(
+        Stream.takeUntil((event) => event.type === "turn.terminal"),
+        Stream.runCollect,
+      );
       assert.deepEqual(sentWith, [undefined]);
+      assert.deepEqual(
+        events.flatMap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.type === "system_notice"
+            ? [event.turnItem.message]
+            : [],
+        ),
+        [
+          "Running in Cursor Cloud (acme/widgets, acme/docs) from `feature/cloud`. 1 uncommitted file in this checkout is not included.",
+          "Pull request: https://github.com/acme/widgets/pull/7",
+        ],
+      );
 
-      // The SDK rejects local options for a cloud agent, whatever runtime the instance has now.
+      // The SDK rejects local options for a cloud agent, and team scoping is not persisted.
       const resumed = yield* adapter.openSession({
         threadId,
         providerSessionId: ProviderSessionId.make("cursor-cloud-session-2"),
         modelSelection,
         runtimePolicy,
       });
-      yield* resumed.resumeThread({ providerThread });
+      yield* resumed
+        .resumeThread({ providerThread })
+        .pipe(Effect.provideService(HostProcess.Environment, hostEnvironment));
       assert.deepEqual(opened[1]?.options.cloud, {});
+      assert.equal(opened[1]?.options.teamId, 3512493);
       assert.isUndefined(opened[1]?.options.local);
+
+      rejectSend = true;
+      const rejected = yield* startTurn(resumed, 2).pipe(Effect.exit);
+      assert.isTrue(Exit.isFailure(rejected));
+      if (Exit.isFailure(rejected)) {
+        assert.equal(
+          makeProviderFailure({ cause: rejected.cause }).message,
+          "Cursor Cloud could not start this agent: [validation_error] The SCM integration does not have access to repository acme/widgets.",
+        );
+      }
     }).pipe(
       Effect.scoped,
       Effect.provide(
         Layer.mergeAll(NodeServices.layer, IdAllocator.layer, McpProviderSessions.layer),
       ),
     ),
+  );
+
+  it.effect("prepares an environment the project is outside of, and refuses a failed push", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const root = yield* fileSystem.realPath(
+        yield* fileSystem.makeTempDirectoryScoped({ prefix: "cursor-v2-cloud-prepare-" }),
+      );
+      const git = (...args: ReadonlyArray<string>) =>
+        spawnAndCollect(
+          "git",
+          ChildProcess.make("git", [
+            "-c",
+            "user.name=T3",
+            "-c",
+            "user.email=t3@example.com",
+            ...args,
+          ]),
+        );
+      yield* git("init", "-q", "-b", "main", root);
+      yield* fileSystem.writeFileString(`${root}/README.md`, "plain\n");
+      yield* git("-C", root, "add", "README.md");
+      yield* git("-C", root, "commit", "-q", "-m", "init");
+      const environment = {
+        id: "env-pair",
+        repos: ["https://github.com/acme/services", "https://github.com/acme/support-app"],
+      };
+
+      // A project folder that is none of the environment's repos starts each from its default.
+      assert.deepEqual(yield* prepareCursorCloudRepositories(root, environment), {
+        repos: environment.repos.map((url) => ({ url })),
+        uncommittedFiles: 0,
+      });
+
+      yield* git("-C", root, "remote", "add", "origin", "https://github.com/acme/services.git");
+      yield* git("-C", root, "config", "remote.origin.pushurl", `${root}/missing.git`);
+      const failed = yield* prepareCursorCloudRepositories(root, environment).pipe(Effect.flip);
+      assert.match(
+        failed.message,
+        /^Cursor Cloud could not start this agent: T3 Code could not push main to origin/,
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
   it("normalizes git remotes to the HTTPS URLs Cursor Cloud clones", () => {

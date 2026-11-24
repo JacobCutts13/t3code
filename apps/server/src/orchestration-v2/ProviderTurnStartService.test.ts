@@ -102,11 +102,14 @@ const normalize = (target: string) => {
   }
   return `/${parts.join("/")}`;
 };
-const layerWorktreeLocation = (worktreesDir = managedWorktreesDir) =>
+const layerWorktreeLocation = (
+  worktreesDir = managedWorktreesDir,
+  settings?: Parameters<typeof ServerSettings.layerTest>[0],
+) =>
   Layer.mergeAll(
     Path.layer,
     Layer.mock(ServerConfig.ServerConfig)({ worktreesDir } as ServerConfig.ServerConfig["Service"]),
-    ServerSettings.layerTest(),
+    ServerSettings.layerTest(settings),
   );
 
 function startWithMissingWorktree(
@@ -483,6 +486,7 @@ function makeLocalCommandHarness(input: {
   readonly goalDriver?: "opencode" | "antigravity";
   readonly worktreePath?: string;
   readonly worktreesDir?: string;
+  readonly serverSettings?: Parameters<typeof ServerSettings.layerTest>[0];
   readonly workspaceRoot?: string;
   readonly gitWorkflow?: GitWorkflow.GitWorkflowService["Service"];
   readonly fileSystem?: FileSystem.FileSystem;
@@ -1387,7 +1391,7 @@ function makeLocalCommandHarness(input: {
               };
             }),
         }),
-        layerWorktreeLocation(input.worktreesDir),
+        layerWorktreeLocation(input.worktreesDir, input.serverSettings),
         layerNoTaskFolders,
         input.fileSystem === undefined
           ? FileSystem.layerNoop({ exists: () => Effect.succeed(true) })
@@ -3131,6 +3135,39 @@ effectIt.effect("reads current startup state after waiting for the workspace lea
     yield* Fiber.join(startup);
     expect(harness.open).not.toHaveBeenCalled();
     expect(harness.startRootRun).not.toHaveBeenCalled();
+  }),
+);
+
+effectIt.effect("creates a new native thread in the project's cloud environment", () =>
+  Effect.gen(function* () {
+    const cloudEnvironment = {
+      id: "env-services",
+      repos: ["https://github.com/acme/services"],
+    };
+    const harness = makeLocalCommandHarness({
+      text: "Continue",
+      serverSettings: {
+        projectSettingsOverrides: {
+          [ProjectId.make("project-native-account-command")]: {
+            providerInstances: {
+              [ProviderInstanceId.make("codex-personal")]: { cloudEnvironment },
+            },
+          },
+        },
+      },
+    });
+    const providerThread = harness.projection().providerThreads[0]!;
+    const ensureThread = vi.fn((_input: ProviderAdapter.ProviderAdapterV2EnsureThreadInput) =>
+      Effect.succeed(providerThread),
+    );
+    harness.open.mockReturnValue(
+      Effect.succeed({ driver: providerThread.driver, ensureThread } as never),
+    );
+
+    yield* harness.start.pipe(Effect.exit);
+
+    expect(ensureThread).toHaveBeenCalledOnce();
+    expect(ensureThread.mock.calls[0]?.[0]).toMatchObject({ cloudEnvironment });
   }),
 );
 

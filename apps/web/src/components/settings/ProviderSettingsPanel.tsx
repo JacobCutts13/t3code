@@ -25,6 +25,7 @@ import {
   PROVIDER_DISPLAY_NAMES,
   ProviderDriverKind,
   type ProjectId,
+  type ProviderCloudEnvironmentSelection,
   type ProviderInstanceConfig,
   type ProviderInstanceId,
   type ServerProvider,
@@ -107,6 +108,7 @@ import { UsageProviderSettings } from "./UsageProviderSettings";
 import { ProviderSetupSection, readAntigravityAuthMethod } from "./ProviderSetupSection";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
 import { CodexSetupSection, CodexManagedRuntimeFields } from "./CodexSetupSection";
+import { CursorCloudEnvironmentRow } from "./CursorCloudEnvironmentRow";
 import { readCodexSetupMode } from "./CodexSetupSection.logic";
 import { providerClients } from "./providerDriverMeta";
 import { useSearchableSetting } from "./settingsSearch";
@@ -131,6 +133,7 @@ import {
   classifyProviderEnvironmentAccess,
   isProviderSettingsEnvironmentAvailable,
   type ProviderEnvironmentAccess,
+  type ProviderInstanceOverrideUpdate,
   type ProviderOperateAccess,
   resolveRemoteOperateAccess,
   resolveSelectedProviderEnvironmentId,
@@ -949,13 +952,13 @@ export function EnvironmentProviderSettings({
   });
 
   const writeProjectOverride = useStableCallback(
-    (instanceId: ProviderInstanceId, next: boolean | undefined) => {
+    (instanceId: ProviderInstanceId, update: ProviderInstanceOverrideUpdate) => {
       updateSettings({
         projectSettingsOverrides: buildProviderInstanceOverridePatch(
           settings,
           projectIds,
           instanceId,
-          next,
+          update,
         ),
       });
     },
@@ -1014,6 +1017,14 @@ export function EnvironmentProviderSettings({
                 row.instanceId,
               )
             : false
+        }
+        projectId={showProjectOverride ? representativeProjectId : undefined}
+        projectCloudEnvironment={
+          showProjectOverride
+            ? settings.projectSettingsOverrides[representativeProjectId]?.providerInstances?.[
+                row.instanceId
+              ]?.cloudEnvironment
+            : undefined
         }
         modelPreferences={settings.providerModelPreferences?.[row.instanceId]}
         favorites={favorites}
@@ -1277,7 +1288,7 @@ interface ProviderInstanceRowActions {
   readonly resetDefaultInstance: (driverKind: ProviderDriverKind) => Promise<void>;
   readonly writeProjectOverride: (
     instanceId: ProviderInstanceId,
-    next: boolean | undefined,
+    update: ProviderInstanceOverrideUpdate,
   ) => void;
   readonly updateModelPreferences: ReturnType<typeof useUpdateEnvironmentModelPreferences>;
   readonly toggleModelFavorite: ReturnType<typeof useToggleEnvironmentModelFavorite>;
@@ -1304,6 +1315,8 @@ function ProviderInstanceRow({
   showProjectOverride,
   projectOverrideValue,
   projectOverrideEffectiveEnabled,
+  projectId,
+  projectCloudEnvironment,
   modelPreferences,
   favorites,
   actions,
@@ -1324,6 +1337,8 @@ function ProviderInstanceRow({
   readonly showProjectOverride: boolean;
   readonly projectOverrideValue: boolean | undefined;
   readonly projectOverrideEffectiveEnabled: boolean;
+  readonly projectId: ProjectId | undefined;
+  readonly projectCloudEnvironment: ProviderCloudEnvironmentSelection | undefined;
   readonly modelPreferences:
     | { readonly hiddenModels: ReadonlyArray<string>; readonly modelOrder: ReadonlyArray<string> }
     | undefined;
@@ -1355,8 +1370,8 @@ function ProviderInstanceRow({
     ? {
         value: projectOverrideValue,
         effectiveEnabled: projectOverrideEffectiveEnabled,
-        onChange: (next: boolean) => actions.writeProjectOverride(instanceId, next),
-        onReset: () => actions.writeProjectOverride(instanceId, undefined),
+        onChange: (next: boolean) => actions.writeProjectOverride(instanceId, { enabled: next }),
+        onReset: () => actions.writeProjectOverride(instanceId, { enabled: undefined }),
       }
     : undefined;
   const codexSetupMode = driver === "codex" ? readCodexSetupMode(instance.config) : null;
@@ -1368,6 +1383,82 @@ function ProviderInstanceRow({
     Boolean(recommendedVersion) &&
     liveProvider.versionAdvisory?.canInstallVersion === true;
 
+  const project =
+    projectId === undefined
+      ? undefined
+      : allProjects.find(
+          (candidate) => candidate.id === projectId && candidate.environmentId === environmentId,
+        );
+  const cloudEnvironmentRow =
+    mode === "editor" && driver === "cursor" && liveProvider?.cloudEnvironments !== undefined ? (
+      <CursorCloudEnvironmentRow
+        environments={liveProvider.cloudEnvironments}
+        projectRepository={project?.repositoryIdentity?.canonicalKey}
+        value={projectCloudEnvironment}
+        hasProject={showProjectOverride}
+        readOnly={readOnly || !canWriteSettings}
+        onChange={(next) => actions.writeProjectOverride(instanceId, { cloudEnvironment: next })}
+      />
+    ) : null;
+  const setupSection =
+    mode === "editor" && driver === "antigravity" ? (
+      <ProviderSetupSection
+        environmentId={environmentId}
+        environmentLabel={environmentLabel}
+        instanceId={instanceId}
+        provider={liveProvider}
+        binaryPath={configuredBinaryPath(instance.config)}
+        authMethod={readAntigravityAuthMethod(instance.config)}
+        enabled={resolveProviderInstanceEnabled(instance)}
+        readOnly={readOnly}
+        onEnable={() => actions.enableInstance(instanceId, { ...instance, enabled: true })}
+      />
+    ) : mode === "editor" && codexSetupMode === "managed" ? (
+      <CodexSetupSection
+        environmentId={environmentId}
+        instanceId={instanceId}
+        provider={liveProvider}
+        mode={codexSetupMode}
+        enabled={resolveProviderInstanceEnabled(instance)}
+        readOnly={readOnly}
+        onModeChange={(setupMode) =>
+          actions.enableInstance(instanceId, {
+            ...instance,
+            enabled: true,
+            config: {
+              ...(instance.config !== null && typeof instance.config === "object"
+                ? instance.config
+                : {}),
+              enabled: true,
+              setupMode,
+            },
+          })
+        }
+      />
+    ) : mode === "editor" &&
+      !readOnly &&
+      liveProvider &&
+      (liveProvider.setup?.canAuthenticate ||
+        (liveProvider.driver === "acpRegistry" && liveProvider.installed)) ? (
+      <ProviderAuthenticationSection
+        key={`${environmentId}:${instanceId}`}
+        environmentId={environmentId}
+        environmentLabel={environmentLabel}
+        instanceId={instanceId}
+        provider={liveProvider}
+        readOnly={readOnly}
+      />
+    ) : mode === "editor" &&
+      !readOnly &&
+      driver === "cursor" &&
+      liveProvider?.setup?.canAuthenticate === false ? (
+      <SettingsRow
+        title={gt("Cursor account")}
+        description={gt(
+          "Using CURSOR_API_KEY. Remove it from this provider's environment to use browser sign-in.",
+        )}
+      />
+    ) : null;
   return (
     <ProviderInstanceCard
       environmentId={environmentId}
@@ -1396,64 +1487,14 @@ function ProviderInstanceRow({
       }
       canWriteSettings={canWriteSettings}
       setup={
-        mode === "editor" && driver === "antigravity" ? (
-          <ProviderSetupSection
-            environmentId={environmentId}
-            environmentLabel={environmentLabel}
-            instanceId={instanceId}
-            provider={liveProvider}
-            binaryPath={configuredBinaryPath(instance.config)}
-            authMethod={readAntigravityAuthMethod(instance.config)}
-            enabled={resolveProviderInstanceEnabled(instance)}
-            readOnly={readOnly}
-            onEnable={() => actions.enableInstance(instanceId, { ...instance, enabled: true })}
-          />
-        ) : mode === "editor" && codexSetupMode === "managed" ? (
-          <CodexSetupSection
-            environmentId={environmentId}
-            instanceId={instanceId}
-            provider={liveProvider}
-            mode={codexSetupMode}
-            enabled={resolveProviderInstanceEnabled(instance)}
-            readOnly={readOnly}
-            onModeChange={(setupMode) =>
-              actions.enableInstance(instanceId, {
-                ...instance,
-                enabled: true,
-                config: {
-                  ...(instance.config !== null && typeof instance.config === "object"
-                    ? instance.config
-                    : {}),
-                  enabled: true,
-                  setupMode,
-                },
-              })
-            }
-          />
-        ) : mode === "editor" &&
-          !readOnly &&
-          liveProvider &&
-          (liveProvider.setup?.canAuthenticate ||
-            (liveProvider.driver === "acpRegistry" && liveProvider.installed)) ? (
-          <ProviderAuthenticationSection
-            key={`${environmentId}:${instanceId}`}
-            environmentId={environmentId}
-            environmentLabel={environmentLabel}
-            instanceId={instanceId}
-            provider={liveProvider}
-            readOnly={readOnly}
-          />
-        ) : mode === "editor" &&
-          !readOnly &&
-          driver === "cursor" &&
-          liveProvider?.setup?.canAuthenticate === false ? (
-          <SettingsRow
-            title={gt("Cursor account")}
-            description={gt(
-              "Using CURSOR_API_KEY. Remove it from this provider's environment to use browser sign-in.",
-            )}
-          />
-        ) : null
+        cloudEnvironmentRow === null ? (
+          setupSection
+        ) : (
+          <>
+            {setupSection}
+            {cloudEnvironmentRow}
+          </>
+        )
       }
       onUpdate={(next) => actions.updateInstance(instanceId, instance, next)}
       onDelete={

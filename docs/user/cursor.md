@@ -15,22 +15,30 @@ By default, runs operate in the selected T3 Code workspace through the SDK's loc
 
 ## Cursor Cloud agents
 
-Turn on **Cursor Cloud** in **Settings > Providers > Cursor**. It uses the instance's existing
-sign-in. Each new Cursor thread then starts a cloud agent on a Cursor-hosted VM that clones the
-project's `origin` remote at its current branch and opens a pull request when it finishes.
-Follow-up messages continue the same cloud agent.
+Map a project to one of your Cursor Cloud environments, and its Cursor threads run there instead of
+on this machine. In **Settings > Providers**, choose the project in **Applying settings for**, open
+**Cursor**, and pick an environment under **Cloud environment**. Environments that include the
+project's repository are listed first; **Run locally** removes the mapping. The list comes from the
+instance's existing sign-in and the team your Cursor CLI is signed in to.
 
-- Push the branch first. The VM clones from the remote, so local commits and uncommitted changes
-  are not included.
-- The remote must be a repository your Cursor account can access, such as a GitHub repository
-  connected in Cursor's dashboard.
+Each new Cursor thread in a mapped project starts a cloud agent with the environment's repositories
+and opens a pull request when it finishes. The thread shows where it runs and links the pull
+request. Follow-up messages continue the same cloud agent, including subagent and scheduled-task
+threads in that project.
+
+- If the project's own repository is in the environment, the agent starts from your current branch.
+  T3 Code pushes that branch first when the remote lacks your commits, and stops with git's error
+  if the push fails. Uncommitted changes are not included, and the thread says how many were left
+  behind. Other repositories start from their default branch.
+- Cursor must be able to clone every repository in the environment. When it refuses one, the thread
+  shows Cursor's reason, such as a repository its GitHub integration cannot reach.
 - Work happens on the VM, so the thread's diff and checkpoints show no local changes. Review the
   pull request instead.
 - T3 Code's MCP tools and your machine's MCP servers are not available to cloud agents; the VM uses
-  the repository's own Cursor configuration.
+  the repositories' own Cursor configuration.
 - Compaction, rewinding with **Edit from here**, and conversation snapshots are local-agent
   features. Cloud agents summarize on their own.
-- The switch only affects new threads. Existing threads keep running where they started.
+- A mapping only affects new threads. Existing threads keep running where they started.
 
 Custom Cursor MCP servers and plugins are not configured in T3 Code. They load from the environment
 machine's Cursor config when the agent opens: project `.cursor/mcp.json`, user `~/.cursor/mcp.json`,

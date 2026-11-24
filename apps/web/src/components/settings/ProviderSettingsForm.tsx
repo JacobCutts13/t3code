@@ -207,12 +207,6 @@ const PACKAGE_FIELD_TEXT: ReadonlyMap<string, string> = new Map([
     "Path to the Muse Code binary on this environment. Sign in with muse login on that host.",
     msg("Path to the Muse Code binary on this environment. Sign in with muse login on that host."),
   ],
-  [
-    "Run new threads on a Cursor-hosted VM from the project's pushed branch and open a pull request.",
-    msg(
-      "Run new threads on a Cursor-hosted VM from the project's pushed branch and open a pull request.",
-    ),
-  ],
   ["Path to the OpenCode binary.", msg("Path to the OpenCode binary.")],
   [
     "Leave blank to let T3 Code spawn the server when needed.",

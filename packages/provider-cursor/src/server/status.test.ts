@@ -205,11 +205,24 @@ describe("checkCursorProviderStatus", () => {
                 createdAt: "2026-01-01T00:00:00.000Z",
               },
               models: [sdkParameterizedModel],
+              environments: [
+                {
+                  id: "env-services",
+                  name: "",
+                  owner: "team",
+                  repos: ["https://github.com/acme/api"],
+                },
+                { id: "env-named", name: "Platform", repos: [] },
+              ],
             });
           }),
         ),
       );
 
+      expect(provider.cloudEnvironments).toEqual([
+        { id: "env-services", owner: "team", repos: ["https://github.com/acme/api"] },
+        { id: "env-named", name: "Platform", repos: [] },
+      ]);
       expect(provider).toMatchObject({
         status: "ready",
         slashCommands: [COMPACT_SLASH_COMMAND],
@@ -243,6 +256,7 @@ describe("checkCursorProviderStatus", () => {
                   createdAt: "2026-01-01",
                 },
                 models: [sdkParameterizedModel],
+                environments: [],
               }),
             ),
           ),
@@ -431,6 +445,7 @@ describe("checkCursorProviderStatus", () => {
                     createdAt: "2026-01-01T00:00:00.000Z",
                   },
                   models: [sdkParameterizedModel],
+                  environments: [],
                 });
           }),
         ),

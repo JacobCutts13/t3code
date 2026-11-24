@@ -20,6 +20,7 @@ import { makeCursorAdapterV2, type CursorAdapterV2DriverEnv } from "./adapter.ts
 import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
 import { buildInitialCursorProviderSnapshot, checkCursorProviderStatus } from "./status.ts";
 import * as CursorSdkCatalog from "./CursorSdkCatalog.ts";
+import { readCursorCliTeamId } from "./cliTeam.ts";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
 import {
   defaultProviderContinuationIdentity,
@@ -171,7 +172,6 @@ export const CursorDriver: ProviderDriver<
       environment: processEnv,
       getModels: () => catalogModels,
       getSdkModels: () => catalogSdkModels,
-      cloud: config.cloud,
     }).pipe(
       Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
         ...sdkRunner,
@@ -262,7 +262,11 @@ export const CursorDriver: ProviderDriver<
           CursorSdkCatalog.CursorSdkCatalog.of({
             // Untraced: CursorSdkCatalog.read already spans this call.
             read: Effect.fnUntraced(function* (apiKey) {
-              const snapshot = yield* catalog.read(apiKey);
+              const teamId = yield* readCursorCliTeamId().pipe(
+                Effect.provideService(FileSystem.FileSystem, fileSystem),
+                Effect.provideService(Path.Path, path),
+              );
+              const snapshot = yield* catalog.read(apiKey, { teamId });
               if (snapshot.models.length > 0) catalogSdkModels = snapshot.models;
               return snapshot;
             }),

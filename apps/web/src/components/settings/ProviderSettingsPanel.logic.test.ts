@@ -8,7 +8,10 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   buildProviderInstanceOverridePatch,
+  cloudEnvironmentLabel,
+  repositoryKey,
   resolveRemoteOperateAccess,
+  sortCloudEnvironmentsForProject,
 } from "./ProviderSettingsPanel.logic";
 
 describe("buildProviderInstanceOverridePatch", () => {
@@ -24,7 +27,9 @@ describe("buildProviderInstanceOverridePatch", () => {
     };
 
     expect(
-      buildProviderInstanceOverridePatch(settings, [projectId, siblingId], instanceId, false),
+      buildProviderInstanceOverridePatch(settings, [projectId, siblingId], instanceId, {
+        enabled: false,
+      }),
     ).toEqual({
       [projectId]: { providerInstances: { [instanceId]: { enabled: false } } },
       [siblingId]: {
@@ -42,7 +47,7 @@ describe("buildProviderInstanceOverridePatch", () => {
     };
 
     expect(
-      buildProviderInstanceOverridePatch(settings, [projectId], instanceId, undefined),
+      buildProviderInstanceOverridePatch(settings, [projectId], instanceId, { enabled: undefined }),
     ).toEqual({ [projectId]: null });
   });
 
@@ -57,10 +62,69 @@ describe("buildProviderInstanceOverridePatch", () => {
     };
 
     expect(
-      buildProviderInstanceOverridePatch(settings, [projectId], instanceId, undefined),
+      buildProviderInstanceOverridePatch(settings, [projectId], instanceId, { enabled: undefined }),
     ).toEqual({
       [projectId]: { newWorktreesStartFromOrigin: true, providerInstances: {} },
     });
+  });
+});
+
+describe("project cloud environments", () => {
+  const projectId = ProjectId.make("project-services");
+  const instanceId = ProviderInstanceId.make("cursor");
+  const services = { id: "env-services", repos: ["https://github.com/acme/services"] };
+
+  it("sets and clears a project's environment without touching its enabled override", () => {
+    const settings: Pick<ServerSettings, "projectSettingsOverrides"> = {
+      projectSettingsOverrides: {
+        [projectId]: { providerInstances: { [instanceId]: { enabled: true } } },
+      },
+    };
+    const selected = buildProviderInstanceOverridePatch(settings, [projectId], instanceId, {
+      cloudEnvironment: services,
+    });
+    expect(selected).toEqual({
+      [projectId]: {
+        providerInstances: { [instanceId]: { enabled: true, cloudEnvironment: services } },
+      },
+    });
+    expect(
+      buildProviderInstanceOverridePatch(
+        { projectSettingsOverrides: { [projectId]: selected[projectId]! } },
+        [projectId],
+        instanceId,
+        { cloudEnvironment: undefined },
+      ),
+    ).toEqual({ [projectId]: { providerInstances: { [instanceId]: { enabled: true } } } });
+  });
+
+  it("lists the project's own environments first, the closest match on top", () => {
+    const environments = [
+      { id: "env-docs", repos: ["https://github.com/acme/docs"] },
+      {
+        id: "env-pair",
+        repos: ["https://github.com/acme/support-app", "https://github.com/acme/services"],
+      },
+      { id: "env-empty", repos: [] },
+      { ...services, name: "Services" },
+      // The same repositories in another order are the same unnamed choice.
+      {
+        id: "env-pair-again",
+        repos: ["https://github.com/acme/services", "https://github.com/acme/support-app"],
+      },
+    ];
+    const sorted = sortCloudEnvironmentsForProject(environments, "github.com/Acme/services");
+    expect(sorted.map((environment) => environment.id)).toEqual([
+      "env-services",
+      "env-pair",
+      "env-docs",
+    ]);
+    expect(sorted.map(cloudEnvironmentLabel)).toEqual([
+      "Services",
+      "acme/support-app, acme/services",
+      "acme/docs",
+    ]);
+    expect(repositoryKey("git@github.com:Acme/Services.git")).toBe("github.com/acme/services");
   });
 });
 

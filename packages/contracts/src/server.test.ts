@@ -51,6 +51,7 @@ describe("provider status deltas", () => {
       models: [{ slug: "gpt", name: "GPT", isCustom: false, capabilities: null }],
       slashCommands: [{ name: "compact" }],
       skills: [{ name: "review", path: "/skills/review", enabled: true }],
+      cloudEnvironments: [{ id: "env-1", repos: ["https://github.com/acme/api"] }],
     });
     const claude = decodeServerProvider({ ...baseProviderSnapshot, instanceId: "claudeAgent" });
     const previous = [codex];
@@ -64,6 +65,7 @@ describe("provider status deltas", () => {
     expect(deltas[0]).toEqual(claude);
     expect(deltas[1]).not.toHaveProperty("models");
     expect(deltas[1]).not.toHaveProperty("slashCommands");
+    expect(deltas[1]).not.toHaveProperty("cloudEnvironments");
     expect(deltas[1]).toMatchObject({ skills: [], message: "Checked" });
 
     const codec = Schema.toCodecJson(ServerConfigProviderStatusDeltasPayload);

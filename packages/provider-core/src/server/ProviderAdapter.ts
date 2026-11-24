@@ -1,4 +1,7 @@
-import type { OrchestrationV2HistoricalMessage } from "@t3tools/contracts";
+import type {
+  OrchestrationV2HistoricalMessage,
+  ProviderCloudEnvironmentSelection,
+} from "@t3tools/contracts";
 import {
   type AgentFeedbackMode,
   ChatAttachment,
@@ -584,6 +587,8 @@ export interface ProviderAdapterV2EnsureThreadInput {
   readonly providerSessionId?: ProviderSessionId;
   readonly existingProviderThread?: OrchestrationV2ProviderThread;
   readonly forceNewNativeThread?: boolean;
+  /** The project's hosted environment for this instance; adapters without one run locally. */
+  readonly cloudEnvironment?: ProviderCloudEnvironmentSelection;
 }
 
 export interface ProviderAdapterV2TurnInput {

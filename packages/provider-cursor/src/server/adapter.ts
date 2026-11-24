@@ -27,6 +27,7 @@ import {
   type OrchestrationV2ProviderTurn,
   type OrchestrationV2Subagent,
   type OrchestrationV2TurnItem,
+  type ProviderCloudEnvironmentSelection,
   type ProviderInstanceId,
   type ServerProviderModel,
   type ServerProviderSkill,
@@ -60,7 +61,13 @@ import {
   rewriteCursorSkillMentions,
 } from "./skills.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
-import { type CursorCloudRepository, resolveCursorCloudRepository } from "./cloudRepository.ts";
+import {
+  type CursorCloudRepositories,
+  type CursorCloudRepository,
+  CursorCloudStartError,
+  prepareCursorCloudRepositories,
+} from "./cloudRepository.ts";
+import { readCursorCliTeamId } from "./cliTeam.ts";
 import { t3OrchestrationPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -330,8 +337,11 @@ export function makeCursorAgentOptions(input: {
   readonly threadId: ThreadId;
   readonly mcpSession: McpProviderSession.McpProviderSessionConfig | undefined;
   readonly platform: NodeJS.Platform;
-  /** Present for cloud agents; only a create names the repository to clone. */
-  readonly cloud?: { readonly repository?: CursorCloudRepository };
+  /** Present for cloud agents; only a create names the repositories to clone. */
+  readonly cloud?: {
+    readonly repos?: ReadonlyArray<CursorCloudRepository>;
+    readonly teamId?: number | undefined;
+  };
 }): AgentOptions {
   const common = {
     model: cursorSdkModelSelection(input.modelSelection, input.models, input.sdkModels),
@@ -342,10 +352,15 @@ export function makeCursorAgentOptions(input: {
   } satisfies AgentOptions;
   // The VM cannot reach this environment's T3 Code MCP server, so cloud agents get none.
   if (input.cloud !== undefined) {
-    const repository = input.cloud.repository;
+    const { repos, teamId } = input.cloud;
     return {
       ...common,
-      cloud: repository === undefined ? {} : { repos: [{ ...repository }], autoCreatePR: true },
+      // Team scoping is not persisted, so a resume sends it again.
+      ...(teamId === undefined ? {} : { teamId }),
+      cloud:
+        repos === undefined
+          ? {}
+          : { repos: repos.map((repo) => ({ ...repo })), autoCreatePR: true },
     };
   }
   const policy = cursorRuntimeAgentPolicy(input.runtimePolicy, input.platform);
@@ -389,6 +404,33 @@ const classifyCursorModelRejection =
     error.cause.message.startsWith("Cannot use this model:")
       ? new CursorModelUnavailableError({ model: modelSelection.model, cause: error.cause })
       : error;
+
+// Cursor refuses a cloud run it cannot set up, such as a repository its GitHub app cannot reach.
+const classifyCursorCloudRejection =
+  (cloud: boolean) =>
+  <E>(error: E): E | CursorCloudStartError =>
+    cloud &&
+    CursorAgentSdk.isCursorAgentSdkRunnerError(error) &&
+    isCursorSdkError(error.cause, "ConfigurationError")
+      ? new CursorCloudStartError({ reason: error.cause.message, cause: error.cause })
+      : error;
+
+function cursorCloudNotice(
+  environment: ProviderCloudEnvironmentSelection,
+  prepared: CursorCloudRepositories,
+): string {
+  const label =
+    environment.name ??
+    environment.repos.map((repo) => repo.replace(/^https?:\/\/[^/]+\//, "")).join(", ");
+  const start =
+    prepared.branch === undefined ? "each repository's default branch" : `\`${prepared.branch}\``;
+  const files = prepared.uncommittedFiles;
+  return `Running in Cursor Cloud (${label}) from ${start}.${
+    files === 0
+      ? ""
+      : ` ${files} uncommitted ${files === 1 ? "file in this checkout is" : "files in this checkout are"} not included.`
+  }`;
+}
 
 function stableJson(value: unknown): string {
   try {
@@ -1073,7 +1115,6 @@ export interface CursorAdapterV2Options {
   readonly environment: NodeJS.ProcessEnv;
   readonly getModels?: () => ReadonlyArray<ServerProviderModel>;
   readonly getSdkModels?: () => ReadonlyArray<SDKModel>;
-  readonly cloud?: boolean;
 }
 
 export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
@@ -1132,6 +1173,11 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
         // A native resume's own run may stop before it checkpoints; the request is still in history.
         const resumedAgent = yield* Ref.make<string | null>(null);
         const warnedUnsupportedSandbox = yield* Ref.make(false);
+        // Where a newly created cloud agent runs, shown once in its first turn.
+        const pendingCloudNotice = yield* Ref.make<{
+          readonly agentId: string;
+          readonly message: string;
+        } | null>(null);
         const activeTurn = yield* Ref.make<ActiveCursorTurn | null>(null);
         // Background shells the agent left running, by the shell id Cursor gave it.
         const backgroundShells = new Map<
@@ -1430,6 +1476,73 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               messageId,
               text: segment.text,
               streaming: !completed,
+            },
+          });
+        });
+
+        const emitCloudNotice = Effect.fnUntraced(function* (
+          context: ActiveCursorTurn,
+          kind: string,
+          message: string,
+        ) {
+          const target = parentTarget(context);
+          const nativeItemId = `${kind}:${context.providerTurnId}`;
+          const nativeItemRef = {
+            driver: CursorAgentSdk.CURSOR_PROVIDER,
+            nativeId: nativeItemId,
+            strength: "weak" as const,
+          };
+          const nodeId = idAllocator.derive.nodeFromProviderItem({
+            driver: CursorAgentSdk.CURSOR_PROVIDER,
+            nativeItemId,
+          });
+          const ordinal = yield* resolveItemOrdinal(context, nativeItemId);
+          const now = yield* DateTime.now;
+          yield* emitProviderEvent({
+            type: "node.updated",
+            driver: CursorAgentSdk.CURSOR_PROVIDER,
+            node: {
+              id: nodeId,
+              threadId: target.threadId,
+              runId: target.runId,
+              parentNodeId: target.parentNodeId,
+              rootNodeId: target.rootNodeId,
+              kind: "system",
+              status: "completed",
+              countsForRun: false,
+              providerThreadId: target.providerThreadId,
+              providerTurnId: target.providerTurnId,
+              nativeItemRef,
+              runtimeRequestId: null,
+              checkpointScopeId: null,
+              startedAt: now,
+              completedAt: now,
+            },
+          });
+          yield* emitProviderEvent({
+            type: "turn_item.updated",
+            driver: CursorAgentSdk.CURSOR_PROVIDER,
+            turnItem: {
+              id: idAllocator.derive.turnItemFromProviderItem({
+                driver: CursorAgentSdk.CURSOR_PROVIDER,
+                nativeItemId,
+              }),
+              threadId: target.threadId,
+              runId: target.runId,
+              nodeId,
+              providerThreadId: target.providerThreadId,
+              providerTurnId: target.providerTurnId,
+              nativeItemRef,
+              parentItemId: null,
+              ordinal,
+              status: "completed",
+              title: message,
+              startedAt: now,
+              completedAt: now,
+              updatedAt: now,
+              type: "system_notice",
+              message,
+              level: "info",
             },
           });
         });
@@ -2782,19 +2895,10 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               );
         };
 
-        const resolveCloudRepository = (cwd: string) =>
-          resolveCursorCloudRepository(cwd).pipe(
-            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-            Effect.filterOrFail(
-              (repository): repository is CursorCloudRepository => repository !== undefined,
-              () =>
-                new ProviderAdapter.ProviderAdapterProtocolError({
-                  driver: CursorAgentSdk.CURSOR_PROVIDER,
-                  detail:
-                    "Cursor Cloud needs a project with an `origin` remote that Cursor can clone, such as a GitHub repository.",
-                }),
-            ),
-          );
+        const readTeamId = readCursorCliTeamId().pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+        );
 
         const openAgent = Effect.fnUntraced(function* (openInput: {
           readonly operation: "create" | "resume";
@@ -2803,6 +2907,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
           readonly agentId?: string;
           readonly storeCwd?: string | undefined;
+          readonly cloudEnvironment?: ProviderCloudEnvironmentSelection | undefined;
         }) {
           const existing = yield* Ref.get(liveAgent);
           const cwd = openInput.runtimePolicy.cwd ?? process.cwd();
@@ -2826,14 +2931,22 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             yield* existing.session.close.pipe(Effect.ignore);
             yield* Ref.set(liveAgent, null);
           }
+          // A created agent follows the project's environment; a resumed one keeps its runtime.
+          const prepared =
+            openInput.operation === "create" && openInput.cloudEnvironment !== undefined
+              ? yield* prepareCursorCloudRepositories(cwd, openInput.cloudEnvironment).pipe(
+                  Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+                )
+              : undefined;
           const cloud =
-            openInput.operation === "create"
-              ? adapterOptions.cloud === true
-                ? { repository: yield* resolveCloudRepository(cwd) }
-                : undefined
-              : CursorAgentSdk.isCursorCloudAgentId(openInput.agentId)
-                ? {}
-                : undefined;
+            prepared !== undefined ||
+            (openInput.operation === "resume" &&
+              CursorAgentSdk.isCursorCloudAgentId(openInput.agentId))
+              ? {
+                  ...(prepared === undefined ? {} : { repos: prepared.repos }),
+                  teamId: yield* readTeamId,
+                }
+              : undefined;
           const options = makeCursorAgentOptions({
             ...(cloud === undefined ? {} : { cloud }),
             ...(apiKey === undefined ? {} : { apiKey }),
@@ -2865,13 +2978,22 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               threadId: openInput.threadId,
               providerSessionId: input.providerSessionId,
             })
-            .pipe(Effect.mapError(classifyCursorModelRejection(openInput.modelSelection)));
+            .pipe(
+              Effect.mapError(classifyCursorModelRejection(openInput.modelSelection)),
+              Effect.mapError(classifyCursorCloudRejection(cloud !== undefined)),
+            );
           const next = {
             nativeThreadId: sdkSession.agentId,
             storeCwd,
             session: sdkSession,
           } satisfies CursorLiveAgent;
           yield* Ref.set(liveAgent, next);
+          if (prepared !== undefined && openInput.cloudEnvironment !== undefined) {
+            yield* Ref.set(pendingCloudNotice, {
+              agentId: sdkSession.agentId,
+              message: cursorCloudNotice(openInput.cloudEnvironment, prepared),
+            });
+          }
           return next;
         });
 
@@ -3128,6 +3250,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                   }),
                 ),
                 Effect.mapError(classifyCursorModelRejection(turnInput.modelSelection)),
+                Effect.mapError(classifyCursorCloudRejection(cloud)),
               );
             // A resume sends no new instructions, and a native one still continues the stopped request.
             if (resume === undefined) {
@@ -3197,6 +3320,11 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               status: "active",
               updatedAt: startedAt,
             });
+            const cloudNotice = yield* Ref.get(pendingCloudNotice);
+            if (cloudNotice?.agentId === agent.nativeThreadId) {
+              yield* Ref.set(pendingCloudNotice, null);
+              yield* emitCloudNotice(context, "cloud-dispatch", cloudNotice.message);
+            }
             for (const update of pendingUpdates) {
               yield* handleInteractionUpdate(context, update);
             }
@@ -3221,6 +3349,16 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                       kind: "assistant",
                       text: result.result,
                     });
+                  }
+                  const pullRequestUrls = (result.git?.branches ?? []).flatMap((branch) =>
+                    branch.prUrl ? [branch.prUrl] : [],
+                  );
+                  if (context !== null && cloud && pullRequestUrls.length > 0) {
+                    yield* emitCloudNotice(
+                      context,
+                      "cloud-pull-request",
+                      `${pullRequestUrls.length === 1 ? "Pull request" : "Pull requests"}: ${pullRequestUrls.join(", ")}`,
+                    );
                   }
                   if (context !== null && isResumeFailureAfterTurnEnded(context, result)) {
                     yield* Effect.logWarning(
@@ -3352,6 +3490,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                 threadId: threadInput.threadId,
                 modelSelection: threadInput.modelSelection,
                 runtimePolicy: threadInput.runtimePolicy,
+                cloudEnvironment: threadInput.cloudEnvironment,
               });
               const now = yield* DateTime.now;
               return makeProviderThread({
@@ -3690,6 +3829,16 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                   messages: [],
                   runtimeRequests: [],
                 };
+              }
+              if (
+                CursorAgentSdk.isCursorCloudAgentId(
+                  rollbackInput.providerThread.nativeThreadRef?.nativeId ?? undefined,
+                )
+              ) {
+                return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                  driver: CursorAgentSdk.CURSOR_PROVIDER,
+                  detail: "Cursor Cloud agents cannot be rewound. Start a new thread instead.",
+                });
               }
               // The first run starts without a checkpoint, so there is nothing to rewind onto.
               const opened = yield* openAgent({

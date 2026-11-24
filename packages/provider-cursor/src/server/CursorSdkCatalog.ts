@@ -12,9 +12,21 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+export interface CursorCloudEnvironment {
+  readonly id: string;
+  readonly name?: string;
+  readonly owner?: string;
+  readonly repos: ReadonlyArray<string>;
+}
+
 export interface CursorSdkCatalogSnapshot {
   readonly user: SDKUser | undefined;
   readonly models: ReadonlyArray<SDKModel>;
+  readonly environments: ReadonlyArray<CursorCloudEnvironment>;
+}
+
+export interface CursorSdkCatalogReadOptions {
+  readonly teamId?: number | undefined;
 }
 
 export class CursorSdkCatalogError extends Schema.TaggedError<CursorSdkCatalogError>()(
@@ -46,6 +58,7 @@ export class CursorSdkCatalog extends Context.Service<
   {
     readonly read: (
       apiKey: string,
+      options?: CursorSdkCatalogReadOptions,
     ) => Effect.Effect<CursorSdkCatalogSnapshot, CursorSdkCatalogError>;
   }
 >()("@t3tools/provider-cursor/server/CursorSdkCatalog") {}
@@ -55,6 +68,10 @@ export interface CursorSdkCatalogProbes {
   readonly readModels: (
     apiKey: string,
   ) => Effect.Effect<ReadonlyArray<SDKModel>, CursorSdkCatalogError>;
+  readonly readEnvironments?: (
+    apiKey: string,
+    teamId: number | undefined,
+  ) => Effect.Effect<ReadonlyArray<CursorCloudEnvironment>, CursorSdkCatalogError>;
 }
 
 const CatalogUser = Schema.Struct({
@@ -95,6 +112,21 @@ const CatalogModel = Schema.Struct({
   ),
 });
 const CatalogModels = Schema.Struct({ items: Schema.Array(CatalogModel).pipe(Schema.mutable) });
+const CatalogEnvironments = Schema.Struct({
+  items: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      name: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      owner: Schema.optionalKey(Schema.String),
+      repos: Schema.optionalKey(
+        Schema.Array(Schema.Union([Schema.String, Schema.Struct({ url: Schema.String })])),
+      ),
+    }),
+  ),
+  nextCursor: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+// A runaway cursor must not loop forever; Cursor caps a page at 100 environments.
+const MAX_ENVIRONMENT_PAGES = 20;
 const ApiError = Schema.Struct({
   code: Schema.optionalKey(Schema.String),
   message: Schema.optionalKey(Schema.String),
@@ -111,10 +143,19 @@ const makeLiveProbes = Effect.gen(function* () {
     Config.withDefault("https://api.cursor.com"),
     Effect.orDie,
   )).replace(/\/$/, "");
-  const request = Effect.fn("CursorSdkCatalog.request")(function* (apiKey: string, path: string) {
+  const request = Effect.fn("CursorSdkCatalog.request")(function* (
+    apiKey: string,
+    path: string,
+    teamId?: number,
+  ) {
     const response = yield* client
       .execute(
-        HttpClientRequest.get(`${baseUrl}${path}`).pipe(HttpClientRequest.bearerToken(apiKey)),
+        HttpClientRequest.get(`${baseUrl}${path}`).pipe(
+          HttpClientRequest.bearerToken(apiKey),
+          teamId === undefined
+            ? (request) => request
+            : HttpClientRequest.setHeader("x-cursor-team-id", String(teamId)),
+        ),
       )
       .pipe(
         Effect.mapError(
@@ -155,6 +196,34 @@ const makeLiveProbes = Effect.gen(function* () {
             : new CursorSdkCatalogError({ authenticationFailure: false, cause }),
         ),
       ),
+    readEnvironments: Effect.fn("CursorSdkCatalog.readEnvironments")(
+      function* (apiKey, teamId) {
+        const environments: Array<CursorCloudEnvironment> = [];
+        let cursor: string | undefined;
+        for (let page = 0; page < MAX_ENVIRONMENT_PAGES; page += 1) {
+          const query = new URLSearchParams({ limit: "100", ...(cursor ? { cursor } : {}) });
+          const body = yield* request(apiKey, `/v1/environments?${query}`, teamId).pipe(
+            Effect.flatMap(HttpClientResponse.schemaBodyJson(CatalogEnvironments)),
+          );
+          for (const item of body.items) {
+            environments.push({
+              id: item.id,
+              ...(item.name ? { name: item.name } : {}),
+              ...(item.owner === undefined ? {} : { owner: item.owner }),
+              repos: (item.repos ?? []).map((repo) => (typeof repo === "string" ? repo : repo.url)),
+            });
+          }
+          cursor = body.nextCursor ?? undefined;
+          if (cursor === undefined) break;
+        }
+        return environments;
+      },
+      Effect.mapError((cause) =>
+        isCatalogError(cause)
+          ? cause
+          : new CursorSdkCatalogError({ authenticationFailure: false, cause }),
+      ),
+    ),
   } satisfies CursorSdkCatalogProbes;
 });
 
@@ -166,8 +235,21 @@ export const makeCursorSdkCatalog = Effect.fn("CursorSdkCatalog.make")(function*
     timeToLive: (exit) =>
       Exit.isSuccess(exit) && exit.value.length > 0 ? Duration.minutes(30) : Duration.zero,
   });
+  const readEnvironments = probes.readEnvironments;
+  const environmentCache = yield* Cache.makeWith(
+    (key: string) => {
+      const { apiKey, teamId } = JSON.parse(key) as { apiKey: string; teamId?: number };
+      return readEnvironments === undefined
+        ? Effect.succeed<ReadonlyArray<CursorCloudEnvironment>>([])
+        : readEnvironments(apiKey, teamId);
+    },
+    {
+      capacity: 32,
+      timeToLive: (exit) => (Exit.isSuccess(exit) ? Duration.minutes(5) : Duration.zero),
+    },
+  );
   return CursorSdkCatalog.of({
-    read: Effect.fn("CursorSdkCatalog.read")(function (apiKey) {
+    read: Effect.fn("CursorSdkCatalog.read")(function (apiKey, options) {
       return Effect.all(
         {
           // Enterprise teams can block account labels while model discovery still works.
@@ -178,6 +260,17 @@ export const makeCursorSdkCatalog = Effect.fn("CursorSdkCatalog.make")(function*
             (error: CursorSdkCatalogError) => Effect.fail(error),
           ),
           models: Cache.get(modelCache, apiKey),
+          // Environments only feed the cloud picker; their failure must not fail model discovery.
+          environments: Cache.get(
+            environmentCache,
+            JSON.stringify({ apiKey, teamId: options?.teamId }),
+          ).pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Could not list Cursor cloud environments.", cause).pipe(
+                Effect.as<ReadonlyArray<CursorCloudEnvironment>>([]),
+              ),
+            ),
+          ),
         },
         { concurrency: "unbounded" },
       );

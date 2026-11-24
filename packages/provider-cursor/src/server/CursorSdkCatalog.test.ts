@@ -89,7 +89,9 @@ describe("CursorSdkCatalog", () => {
             ? body
             : request.url.endsWith("/me")
               ? user
-              : { items: models };
+              : request.url.includes("/v1/environments")
+                ? { items: [] }
+                : { items: models };
           const response =
             typeof responseBody === "string"
               ? new Response(responseBody, { status: matches ? status : 200 })
@@ -112,6 +114,7 @@ describe("CursorSdkCatalog", () => {
             expect(result.value).toEqual({
               user: expected === "no-user" ? undefined : user,
               models,
+              environments: [],
             });
         } else {
           expect(Exit.isFailure(result)).toBe(true);
@@ -124,6 +127,61 @@ describe("CursorSdkCatalog", () => {
         }
         expect(sdkLoad).not.toHaveBeenCalled();
       }),
+  );
+
+  it.effect("lists every page of cloud environments for the CLI's team", () =>
+    Effect.gen(function* () {
+      const environmentRequests: Array<{ url: string; team: string | undefined }> = [];
+      let failEnvironments = false;
+      const client = HttpClient.make((request) => {
+        const url = new URL(request.url);
+        let body: unknown = url.pathname === "/v1/me" ? user : { items: [model] };
+        if (url.pathname === "/v1/environments") {
+          environmentRequests.push({
+            url: request.url,
+            team: request.headers["x-cursor-team-id"],
+          });
+          if (failEnvironments) {
+            return Effect.succeed(
+              HttpClientResponse.fromWeb(request, new Response("Unavailable", { status: 503 })),
+            );
+          }
+          body =
+            url.searchParams.get("cursor") === null
+              ? {
+                  items: [
+                    {
+                      id: "env-1",
+                      name: null,
+                      owner: "team",
+                      repos: [{ url: "https://github.com/acme/api" }],
+                    },
+                  ],
+                  nextCursor: "page-2",
+                }
+              : { items: [{ id: "env-2", name: "Web", repos: ["https://github.com/acme/web"] }] };
+        }
+        return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(body)));
+      });
+      const catalog = yield* CursorSdkCatalog.CursorSdkCatalog.pipe(
+        Effect.provide(
+          CursorSdkCatalog.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client))),
+        ),
+      );
+
+      expect((yield* catalog.read("test-key", { teamId: 3512493 })).environments).toEqual([
+        { id: "env-1", owner: "team", repos: ["https://github.com/acme/api"] },
+        { id: "env-2", name: "Web", repos: ["https://github.com/acme/web"] },
+      ]);
+      expect(environmentRequests.map((request) => request.team)).toEqual(["3512493", "3512493"]);
+      expect(new URL(environmentRequests[1]!.url).searchParams.get("cursor")).toBe("page-2");
+
+      // Another team's list is its own cache entry, and its failure leaves model discovery intact.
+      failEnvironments = true;
+      const otherTeam = yield* catalog.read("test-key", { teamId: 7 });
+      expect(otherTeam.environments).toEqual([]);
+      expect(otherTeam.models).toEqual([model]);
+    }),
   );
 
   it.effect("shares concurrent first model discovery until the response arrives", () =>

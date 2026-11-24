@@ -92,6 +92,15 @@ export const ServerProviderModel = Schema.Struct({
 });
 export type ServerProviderModel = typeof ServerProviderModel.Type;
 
+/** A saved hosted environment a provider can run agents in, such as a Cursor Cloud environment. */
+export const ServerProviderCloudEnvironment = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: Schema.optional(TrimmedNonEmptyString),
+  owner: Schema.optional(TrimmedNonEmptyString),
+  repos: Schema.Array(TrimmedNonEmptyString),
+});
+export type ServerProviderCloudEnvironment = typeof ServerProviderCloudEnvironment.Type;
+
 /** A backend a provider's models run on, such as one of fx's. */
 export const ServerProviderSubProvider = Schema.Struct({
   name: TrimmedNonEmptyString,
@@ -287,6 +296,8 @@ export const ServerProvider = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   skills: Schema.Array(ServerProviderSkill).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  // Producers that list environments always send the field, so absence never means "removed".
+  cloudEnvironments: Schema.optionalKey(Schema.Array(ServerProviderCloudEnvironment)),
   workspaceSnapshots: Schema.optionalKey(Schema.Array(ServerProviderWorkspaceSnapshot)),
   /**
    * Set when the server rescanned a workspace after a session start and its skills or commands
@@ -329,12 +340,15 @@ export function serverProviderDeltas(
   return next.map((provider) => {
     const base = held.get(provider.instanceId);
     if (base === undefined) return provider;
-    const { models, slashCommands, skills, ...rest } = provider;
+    const { models, slashCommands, skills, cloudEnvironments, ...rest } = provider;
     return {
       ...rest,
       ...(sameJson(base.models, models) ? {} : { models }),
       ...(sameJson(base.slashCommands, slashCommands) ? {} : { slashCommands }),
       ...(sameJson(base.skills, skills) ? {} : { skills }),
+      ...(cloudEnvironments === undefined || sameJson(base.cloudEnvironments, cloudEnvironments)
+        ? {}
+        : { cloudEnvironments }),
     };
   });
 }
@@ -350,8 +364,19 @@ export function applyServerProviderDeltas(
     const models = delta.models ?? base?.models;
     const slashCommands = delta.slashCommands ?? base?.slashCommands;
     const skills = delta.skills ?? base?.skills;
+    const cloudEnvironments = delta.cloudEnvironments ?? base?.cloudEnvironments;
     // A list this reader never held cannot be rebuilt; drop the provider like an unreadable one.
-    return models && slashCommands && skills ? [{ ...delta, models, slashCommands, skills }] : [];
+    return models && slashCommands && skills
+      ? [
+          {
+            ...delta,
+            models,
+            slashCommands,
+            skills,
+            ...(cloudEnvironments === undefined ? {} : { cloudEnvironments }),
+          },
+        ]
+      : [];
   });
 }
 

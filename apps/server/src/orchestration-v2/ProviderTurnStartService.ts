@@ -321,6 +321,7 @@ export const layer: Layer.Layer<
     const providerSessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
     const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
     const runtimePolicy = yield* RuntimePolicy.RuntimePolicyV2;
+    const serverSettings = yield* ServerSettings.ServerSettingsService;
     const restoreMissingWorktree = yield* makeRestoreMissingWorktree;
     const worktreeRestore = yield* ThreadWorktreeRestore;
     const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
@@ -959,6 +960,17 @@ export const layer: Layer.Layer<
         return;
       }
       const resolvedRuntimePolicy = resolvedPolicy.success;
+      // Only a new native thread reads this; resumed threads keep the runtime they started on.
+      const cloudEnvironment = yield* serverSettings.getSettings.pipe(
+        Effect.map(
+          (settings) =>
+            settings.projectSettingsOverrides[projection.thread.projectId]?.providerInstances?.[
+              run.providerInstanceId
+            ]?.cloudEnvironment,
+        ),
+        Effect.orElseSucceed(() => undefined),
+      );
+      const cloudEnvironmentInput = cloudEnvironment === undefined ? {} : { cloudEnvironment };
       if (!(yield* isCurrentAttemptInStatus("starting"))) return;
       const existingSessionProjection = projection.providerSessions.find(
         (candidate) => candidate.id === providerSessionId,
@@ -1546,6 +1558,7 @@ export const layer: Layer.Layer<
           });
           const loaded = yield* loadFromProvider(
             session.ensureThread({
+              ...cloudEnvironmentInput,
               threadId: projection.thread.id,
               title: projection.thread.title,
               modelSelection: run.modelSelection,
@@ -1635,6 +1648,7 @@ export const layer: Layer.Layer<
           // Pass the stored provider row for adoption; adapter-minted duplicates make activeProviderThreadId flap.
           return yield* loadFromProvider(
             session.ensureThread({
+              ...cloudEnvironmentInput,
               threadId: projection.thread.id,
               title: projection.thread.title,
               modelSelection: run.modelSelection,
@@ -1818,6 +1832,7 @@ export const layer: Layer.Layer<
         });
         const replacement = yield* loadFromProvider(
           session.ensureThread({
+            ...cloudEnvironmentInput,
             threadId: projection.thread.id,
             title: projection.thread.title,
             modelSelection: run.modelSelection,
