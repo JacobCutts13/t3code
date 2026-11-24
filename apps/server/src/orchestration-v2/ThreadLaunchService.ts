@@ -1595,32 +1595,46 @@ const make = Effect.gen(function* () {
                 threadId: candidateThreadId,
                 expectedEmpty: true,
               })
-            : threads.dispatch({
-                type: "thread.create",
-                commandId: input.commandId,
-                threadId: candidateThreadId,
-                projectId: input.projectId,
-                title: input.title,
-                ...(input.titleRenamed === true ? { titleRenamed: true } : {}),
-                modelSelection: input.modelSelection,
-                runtimeMode: input.runtimeMode,
-                interactionMode: input.interactionMode,
-                branch: initialBranch,
-                worktreePath: initialWorktreePath,
-                ...(input.importedNativeThread === undefined
-                  ? {}
-                  : { importedNativeThread: input.importedNativeThread }),
-                ...(input.linkOrigin === undefined ? {} : { linkOrigin: input.linkOrigin }),
-                ...(input.delegatedFrom === undefined
-                  ? {}
-                  : { delegatedFrom: input.delegatedFrom }),
-                ...(input.workflowRun === undefined ? {} : { workflowRun: input.workflowRun }),
-                createdBy: input.createdBy,
-                creationSource: input.creationSource,
-                ...(initialMessage === undefined
-                  ? {}
-                  : { initialMessage: { ...initialMessage, workspaceStrategy } }),
-              });
+            : input.forkOf !== undefined && initialMessage !== undefined
+              ? threads.dispatch({
+                  type: "thread.fork",
+                  commandId: input.commandId,
+                  sourceThreadId: input.forkOf,
+                  targetThreadId: candidateThreadId,
+                  sourcePoint: { type: "latest_stable" },
+                  worktreePath: initialWorktreePath,
+                  branch: initialBranch,
+                  createdBy: input.createdBy,
+                  creationSource: input.creationSource,
+                  // The server titles a fork after its source, not its first message.
+                  initialMessage: { ...withoutTitleSeed(initialMessage), workspaceStrategy },
+                })
+              : threads.dispatch({
+                  type: "thread.create",
+                  commandId: input.commandId,
+                  threadId: candidateThreadId,
+                  projectId: input.projectId,
+                  title: input.title,
+                  ...(input.titleRenamed === true ? { titleRenamed: true } : {}),
+                  modelSelection: input.modelSelection,
+                  runtimeMode: input.runtimeMode,
+                  interactionMode: input.interactionMode,
+                  branch: initialBranch,
+                  worktreePath: initialWorktreePath,
+                  ...(input.importedNativeThread === undefined
+                    ? {}
+                    : { importedNativeThread: input.importedNativeThread }),
+                  ...(input.linkOrigin === undefined ? {} : { linkOrigin: input.linkOrigin }),
+                  ...(input.delegatedFrom === undefined
+                    ? {}
+                    : { delegatedFrom: input.delegatedFrom }),
+                  ...(input.workflowRun === undefined ? {} : { workflowRun: input.workflowRun }),
+                  createdBy: input.createdBy,
+                  creationSource: input.creationSource,
+                  ...(initialMessage === undefined
+                    ? {}
+                    : { initialMessage: { ...initialMessage, workspaceStrategy } }),
+                });
         const claimed = yield* claimDispatch.pipe(
           Effect.mapError(
             mapError(
@@ -1847,3 +1861,8 @@ const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(ThreadLaunchService, make);
+
+const withoutTitleSeed = <A extends { readonly titleSeed?: string }>({
+  titleSeed: _titleSeed,
+  ...message
+}: A) => message;
