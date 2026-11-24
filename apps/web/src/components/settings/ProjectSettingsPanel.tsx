@@ -53,8 +53,9 @@ import {
   ProjectFaviconPickerDialog,
 } from "./ProjectFaviconPickerDialog";
 import { ProjectActionsSettings } from "./ProjectActionsSettings";
-import { ProjectRepositoriesSettings } from "./ProjectRepositoriesSettings";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
+import { ProjectNestedReposSettings } from "./ProjectNestedReposSettings";
+import { ProjectRepositoriesSettings } from "./ProjectRepositoriesSettings";
 import {
   defaultProjectIcon,
   hasDefaultProjectIcon,
@@ -693,7 +694,8 @@ function ProjectDetail({
         </SettingsSection>
         <ProjectDefaultsSettings category="project" />
         <ProjectActionsSettings />
-        <ProjectRepositoriesSettings />
+        <ProjectRepositoriesSettings members={group.memberProjects} />
+        <ProjectNestedReposSettings />
         {checkoutChoices}
         <SettingsSection title={gt("Danger")}>
           <SettingsRow
