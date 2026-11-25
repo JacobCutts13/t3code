@@ -66,6 +66,7 @@ import {
 import {
   buildThreadTree,
   flattenThreadTree,
+  isSettledThreadListRow,
   resolveThreadTreeRowRef,
   sortThreadTreeRoots,
   threadForkBlockedReason,
@@ -190,7 +191,6 @@ import { useForkThread } from "../hooks/useForkThread";
 import {
   applySidebarThreadDrop,
   filterSidebarV2TreeRows,
-  filterSidebarV2VisibleThreads,
   groupSidebarThreadsByProject,
   sidebarFolderExpansionKeys,
   buildBulkTitleRegenerationContextMenuItem,
@@ -372,8 +372,6 @@ type SidebarOptimisticDrop = {
 interface SidebarThreadPartitionInput {
   readonly threads: readonly EnvironmentThreadShell[];
   readonly scopedProjectKeys: ReadonlySet<string> | null;
-  /** Tasks linked environments run for a listed thread; they show under it. */
-  readonly delegatedUnderParent: ReadonlySet<string>;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
@@ -450,7 +448,6 @@ function useSidebarThreads(input: {
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly threads: readonly EnvironmentThreadShell[];
-  readonly delegatedUnderParent: ReadonlySet<string>;
   readonly routeRowThreadKey: string | null;
   readonly departingThreadKey: string | null;
   // Set in boring mode: the project groups to fold active threads into, in order.
@@ -465,13 +462,11 @@ function useSidebarThreads(input: {
     connectedEnvironmentIds,
     optimisticDrop,
     threads,
-    delegatedUnderParent,
     routeRowThreadKey,
     departingThreadKey,
     folderGroups,
     keepEmptyFolders: keepEmpty,
   } = input;
-  const shelfRouteThreadKey = routeRowThreadKey === departingThreadKey ? null : routeRowThreadKey;
   // Folders already separate the work, so boring mode has no Working shelf.
   const workingShelfEnabled =
     useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;
@@ -515,7 +510,6 @@ function useSidebarThreads(input: {
   const partition = partitionSidebarThreads({
     threads,
     scopedProjectKeys,
-    delegatedUnderParent,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
@@ -543,6 +537,7 @@ function useSidebarThreads(input: {
       : threads.find((candidate) => threadShellKey(candidate) === routeRowThreadKey);
   const routeRootKey =
     routeThread === undefined ? routeRowThreadKey : threadShellKey(tree.root(routeThread));
+  const shelfRouteThreadKey = routeRowThreadKey === departingThreadKey ? null : routeRootKey;
   const nestRows = (list: readonly EnvironmentThreadShell[]) =>
     flattenThreadTree(tree, list, isChildrenCollapsed);
   const withDescendants = (list: readonly EnvironmentThreadShell[]) =>
@@ -684,16 +679,16 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const {
     threads,
     scopedProjectKeys,
-    delegatedUnderParent,
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
     sortActiveBySend,
   } = input;
   const preciseNow = new Date().toISOString();
-  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
-  // Children render under their parent in its section, so only roots are placed and sorted.
-  const tree = buildThreadTree(filterSidebarV2TreeRows(threads, scopedProjectKeys));
+  const visible = filterSidebarV2TreeRows(threads, scopedProjectKeys);
+  const isSettled = (thread: EnvironmentThreadShell) =>
+    isSettledThreadListRow(thread, serverConfigs);
+  const tree = buildThreadTree(visible, isSettled);
   const byGroup = (
     list: readonly EnvironmentThreadShell[],
     sort: (threads: readonly EnvironmentThreadShell[]) => readonly EnvironmentThreadShell[],
@@ -738,7 +733,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     } else {
       const section = resolveSidebarThreadSection({
         snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
-        settled: configLoaded && thread.settledOverride === "settled",
+        settled: isSettled(thread),
         pinned: thread.pinnedAt != null,
       });
       (section === "snoozed"
@@ -1206,6 +1201,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             routeThreadRef,
             threads,
             (thread) => threadChildrenCollapsedById[threadShellKey(thread)] === true,
+            (thread) => isSettledThreadListRow(thread, serverConfigs),
           ),
         );
   const isSearchingThreads = threadSearchQuery.trim().length > 0;
@@ -1445,7 +1441,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     connectedEnvironmentIds,
     optimisticDrop,
     threads: listedThreads,
-    delegatedUnderParent,
     routeRowThreadKey,
     departingThreadKey,
     folderGroups: boringSidebarEnabled

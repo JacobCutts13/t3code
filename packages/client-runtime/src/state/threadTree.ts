@@ -1,8 +1,13 @@
-import type { OrchestrationV2ThreadShell, ScopedThreadRef } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  OrchestrationV2ThreadShell,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 import { isProviderNativeSubagentThread } from "@t3tools/contracts";
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
+import { scopedThreadKey } from "../environment/scoped.ts";
 import { parseThreadKey, threadKey } from "./entities.ts";
 import type { EnvironmentThreadShell } from "./models.ts";
 
@@ -19,6 +24,20 @@ export function isThreadTreeRow(thread: ThreadTreeThread): boolean {
       lineage: thread.lineage,
       creationSource: thread.source.creationSource,
     })
+  );
+}
+
+export function isSettledThreadListRow(
+  thread: Pick<EnvironmentThreadShell, "environmentId" | "id" | "settledOverride">,
+  settlementEnvironments?: Pick<ReadonlySet<EnvironmentId>, "has">,
+  queuedThreadKeys?: ReadonlySet<string>,
+): boolean {
+  return (
+    thread.settledOverride === "settled" &&
+    (settlementEnvironments?.has(thread.environmentId) ?? true) &&
+    queuedThreadKeys?.has(
+      scopedThreadKey({ environmentId: thread.environmentId, threadId: thread.id }),
+    ) !== true
   );
 }
 
@@ -55,16 +74,25 @@ export interface ThreadTree<T> {
 
 const NO_CHILDREN: readonly never[] = [];
 
+function startsSettledGroup<T>(thread: T, parent: T, isSettled: (thread: T) => boolean): boolean {
+  return isSettled(thread) && !isSettled(parent);
+}
+
 /**
  * Nests each row under its parent when the parent is itself one of `rows`; otherwise the row is
  * a root, so a child whose parent is archived, missing or hidden keeps a row of its own. Rows on
- * a parent cycle become roots. Pass the list's own rows, already filtered to `isThreadTreeRow`.
+ * a parent cycle or settled under a live parent become roots. Pass the list's own rows,
+ * already filtered to `isThreadTreeRow`.
  */
-export function buildThreadTree<T extends ThreadTreeThread>(rows: readonly T[]): ThreadTree<T> {
+export function buildThreadTree<T extends ThreadTreeThread>(
+  rows: readonly T[],
+  isSettled: (thread: T) => boolean = () => false,
+): ThreadTree<T> {
   const byKey = new Map(rows.map((row) => [refOf(row), row] as const));
   const listedParent = (row: T) => {
     const ref = threadTreeParentRef(row);
-    return ref === null ? undefined : byKey.get(threadKey(ref));
+    const parent = ref === null ? undefined : byKey.get(threadKey(ref));
+    return parent !== undefined && startsSettledGroup(row, parent, isSettled) ? undefined : parent;
   };
   const parentByKey = new Map<string, T>();
   for (const row of rows) {
@@ -175,6 +203,7 @@ export function resolveThreadTreeRowRef<
   ref: ScopedThreadRef,
   threads: readonly T[],
   isCollapsed: (thread: T) => boolean,
+  isSettled: (thread: T) => boolean = () => false,
 ): ScopedThreadRef {
   const find = (target: ScopedThreadRef) =>
     threads.find(
@@ -199,7 +228,9 @@ export function resolveThreadTreeRowRef<
     visited.add(threadKey(ancestorRef));
     const ancestor = find(ancestorRef);
     if (ancestor === undefined || ancestor.archivedAt !== null || !isThreadTreeRow(ancestor)) break;
+    if (startsSettledGroup(current, ancestor, isSettled)) break;
     if (isCollapsed(ancestor)) row = ancestor;
+    current = ancestor;
     ancestorRef = threadTreeParentRef(ancestor);
   }
   return { environmentId: row.environmentId, threadId: row.id };

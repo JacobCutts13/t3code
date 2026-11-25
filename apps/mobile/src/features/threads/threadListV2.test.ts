@@ -1470,6 +1470,24 @@ describe("nested child threads", () => {
       ["fork", 1, 0, false],
     ]);
   });
+
+  it("moves a settled child from its live parent's group to the Settled shelf", () => {
+    const settledFork = { ...fork, settledOverride: "settled" as const, settledAt: NOW };
+    const input = { environmentId: null, searchQuery: "", now: NOW };
+    const collapsed = buildThreadListV2Items({
+      ...input,
+      threads: [root, settledFork],
+      settledShelfExpanded: false,
+    });
+    expect(rows(collapsed.items)).toEqual([["root", 0, 0, false]]);
+    expect(collapsed.settledCount).toBe(1);
+    const expanded = buildThreadListV2Items({ ...input, threads: [root, settledFork] });
+    expect(rows(expanded.items)).toEqual([
+      ["root", 0, 0, false],
+      ["fork", 0, 0, false],
+    ]);
+    expect(expanded.settledShelfHeaderIndex).toBe(1);
+  });
 });
 
 const BASE_MS = Date.parse(NOW);

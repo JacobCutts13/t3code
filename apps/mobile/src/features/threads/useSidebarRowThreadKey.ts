@@ -1,11 +1,16 @@
 import { useAtomValue } from "@effect/atom-react";
 import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
-import { resolveThreadTreeRowRef } from "@t3tools/client-runtime/state/threads";
+import {
+  isSettledThreadListRow,
+  resolveThreadTreeRowRef,
+} from "@t3tools/client-runtime/state/threads";
 import { AsyncResult, Atom } from "effect/reactivity";
 
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { mobilePreferencesAtom } from "../../state/preferences";
+import { threadListEnvironmentsAtom } from "../../state/presentation";
 import { environmentThreadShells } from "../../state/threads";
+import { queuedThreadKeysAtom } from "../../state/use-thread-outbox";
 
 const NULL_ROW_KEY_ATOM = Atom.make<string | null>(null);
 
@@ -17,6 +22,8 @@ const sidebarRowThreadKeyAtom = Atom.family((openThreadKey: string) =>
     const openThreadRef = parseScopedThreadKey(openThreadKey);
     if (openThreadRef === null) return openThreadKey;
     const threads = get(environmentThreadShells.quietThreadShellsAtom);
+    const { settlementEnvironmentIds } = get(threadListEnvironmentsAtom);
+    const queuedThreadKeys = get(queuedThreadKeysAtom);
     const preferences = get(mobilePreferencesAtom);
     const collapsed = AsyncResult.isSuccess(preferences)
       ? preferences.value.collapsedThreadChildren
@@ -25,6 +32,7 @@ const sidebarRowThreadKeyAtom = Atom.family((openThreadKey: string) =>
       openThreadRef,
       threads,
       (thread) => collapsed?.includes(scopedThreadKey(thread.environmentId, thread.id)) === true,
+      (thread) => isSettledThreadListRow(thread, settlementEnvironmentIds, queuedThreadKeys),
     );
     return scopedThreadKey(rowRef.environmentId, rowRef.threadId);
   }),
