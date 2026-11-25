@@ -240,11 +240,16 @@ async function mountPanel(search: Omit<SettingsScopeSearch, "project"> = {}) {
     getParentRoute: () => settingsRoute,
     path: "projects",
     component: () => (
-      <ProjectSettingsPanel
-        projectKey={key}
-        environmentId={search.machine ? EnvironmentId.make(search.machine) : null}
-        checkoutKey={search.checkout ?? null}
-      />
+      <SettingsScopeProvider
+        search={settingsRoute.useSearch()}
+        onChange={(next) => void router.navigate({ to: "/settings/projects", search: () => next })}
+      >
+        <ProjectSettingsPanel
+          projectKey={key}
+          environmentId={search.machine ? EnvironmentId.make(search.machine) : null}
+          checkoutKey={search.checkout ?? null}
+        />
+      </SettingsScopeProvider>
     ),
   });
   const query = new URLSearchParams({ project: key });
