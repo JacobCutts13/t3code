@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 import { ExternalRefLink, ExternalRefScope } from "./ExternalRefLink";
 
 import { changeRequestTermKind } from "./changeRequestTerm";
@@ -23,25 +23,25 @@ const ROW_CLASS_NAME =
 function BackButton({ onBack, focusable }: { onBack: () => void; focusable: boolean }) {
   const gt = useGT();
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            size="icon-micro"
-            variant="ghost-muted"
-            {...(focusable ? {} : { tabIndex: -1 })}
-            onClick={onBack}
-            className="-ml-1.5"
-            aria-label={gt("Back to this thread's pull requests")}
-          >
-            <ArrowLeftIcon aria-hidden className="size-3.5" />
-          </Button>
-        }
-      />
-      <TooltipPopup side="top">
-        <T>Back to pull requests</T>
-      </TooltipPopup>
-    </Tooltip>
+    <SharedTooltipTrigger
+      render={
+        <Button
+          size="icon-micro"
+          variant="ghost-muted"
+          {...(focusable ? {} : { tabIndex: -1 })}
+          onClick={onBack}
+          className="-ml-1.5"
+          aria-label={gt("Back to this thread's pull requests")}
+        >
+          <ArrowLeftIcon aria-hidden className="size-3.5" />
+        </Button>
+      }
+      label={
+        <>
+          <T>Back to pull requests</T>
+        </>
+      }
+    />
   );
 }
 
@@ -141,16 +141,12 @@ export function PullRequestDetailCrumbs({
               openOnHostText={openOnHostText}
               focusable={condensed}
             />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="min-w-0 truncate font-medium text-foreground">
-                    {detail.title}
-                  </span>
-                }
-              />
-              <TooltipPopup side="top">{detail.title}</TooltipPopup>
-            </Tooltip>
+            <SharedTooltipTrigger
+              render={
+                <span className="min-w-0 truncate font-medium text-foreground">{detail.title}</span>
+              }
+              label={detail.title}
+            />
           </>
         ) : null}
       </div>

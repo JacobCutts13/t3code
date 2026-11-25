@@ -6,7 +6,6 @@
   "422ced5cda40580e": "Obtener la rama base",
   "47e6147265a28164": "Hacer checkout de archivos",
   "4735345a111c1581": "Inicializar submódulos",
-  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "Ejecutar script de configuración",
   "cbbdd0430fbe5fea": "Iniciar agente",
   "2a918ed2e51ab64a": "Conectando",
@@ -72,7 +71,6 @@
   "cd03eb1b84271c02": "Agente",
   "bfe1a60f3f9c60fb": "Turno {turn} · {what}",
   "dfdaa6255a416140": "Resumen de {turns, plural, one {{turns} turno reciente} other {{turns} turnos recientes}}, {textTurns, plural, =0 {sin texto de mensajes} one {con el texto de los mensajes del último turno} other {con el texto de los mensajes de los últimos {textTurns} turnos}}{truncated, select, yes {, acortado para ajustarse} other {}}",
-  "260c6b45f52d2f27": "Añade el texto de tus mensajes y de las respuestas del agente en {textTurns, plural, one {el último turno} other {los últimos {textTurns} turnos}}.",
   "afac52a5cc2dc801": "No se pudo enviar tu respuesta. Inténtalo de nuevo.",
   "79d776428f4d0650": "No se pudo cargar el archivo. Vuelve a conectarte e inténtalo de nuevo.",
   "3ea34cbb1ca5ba9b": "Vista previa cancelada.",
@@ -568,7 +566,6 @@
   "eabffa063b9244f8": "Puede que tu DNS o tu firewall estén bloqueando T3 Connect. Prueba con otra red, como otra Wi-Fi o datos móviles.",
   "c039a54c8238eafe": "Puede que esté sobrecargado, en reposo o fuera de la red.",
   "3c4391a7f6421455": "{host} no confirmó el mensaje en 60 segundos.",
-  "e75efb53360b9a41": "Actualiza {host} para hacer fork de hilos.",
   "204ac030de627c0a": "URL de Git",
   "68b989c06486c4e0": "URL",
   "b0f180f236623386": "Introduce el nombre completo propietario/repositorio.",
@@ -753,8 +750,6 @@
   "f0ab079175905bbb": "Commit, push y crear {shortLabel}",
   "8360d689ebc7f829": "¿Hacer push y crear {shortLabel} desde la rama predeterminada?",
   "daa408bb99d21d18": "{kind, select, pr {Esta acción hará push de los commits locales y creará una PR en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.} mr {Esta acción hará push de los commits locales y creará una MR en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.} generic {Esta acción hará push de los commits locales y creará una solicitud de cambios en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.} other {Esta acción hará push de los commits locales y creará {changeRequest} en \"{branch}\". Puedes continuar en esta rama o crear una rama de funcionalidad y ejecutar allí la misma acción.}}",
-  "e27a17996ff52408": "All teams",
-  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "Todavía no se pueden explorar las issues de este host.",
   "2f4a47129f89fe22": "Sin conexión. Añade una clave de API personal para listar sus issues.",
   "024baab60525a419": "Se rechazó la credencial guardada.",
@@ -910,8 +905,6 @@
   "e931fd397ade526b": "{kind, select, sideChat {{need, select, input {{count} chats laterales necesitan una respuesta} approval {{count} chats laterales necesitan aprobación} other {{count} chats laterales te necesitan}}} subagent {{need, select, input {{count} subagentes necesitan una respuesta} approval {{count} subagentes necesitan aprobación} other {{count} subagentes te necesitan}}} other {{need, select, input {{count} hilos necesitan una respuesta} approval {{count} hilos necesitan aprobación} other {{count} hilos te necesitan}}}}",
   "4bed196a655ab14f": "{live} de {total} agentes trabajando",
   "ba1727ddc7a0a0b6": "{count, plural, one {{count} agente terminado} other {{count} agentes terminados}}",
-  "a7f72d00b27fbaa3": "Side chats can't be forked",
-  "dbd17501ee8c9c5b": "Available after a completed turn",
   "4dd09c829329a994": "Mensaje en cola",
   "3f0b962160edbe6d": "No se pudo sincronizar el hilo.",
   "752b4d69669b0019": "No se pudo cargar la actividad anterior.",
@@ -1923,6 +1916,7 @@
   "69c659d8b6e271cc": "La página pide un archivo.",
   "a6efeb99b479990a": "Elegir archivos",
   "59c87648d44b958c": "Elegir archivo",
+  "6f321f153b8711bb": "Elige una opción",
   "61a552a67e9e3eac": "Respuesta al cuadro de diálogo",
   "1d9bd868fafea18a": "Descartar",
   "1d0a7acef4a95536": "Aceptar",
@@ -2842,7 +2836,6 @@
   "dff9e061996e7b1d": "¿Activar la fusión automática?",
   "dafc4bac6e5e37b0": "¿Desactivar la fusión automática?",
   "88c7a80c40bbfe56": "Fusionar {layers} en {base} con {kind, select, squash {squash} merge {merge} rebase {rebase} fastForward {fast-forward} other {{method}}}. Las capas por encima de #{number} siguen abiertas.",
-  "892f08d21b8e48a9": "Fusionar {layers} en {base} con {kind, select, squash {squash} merge {merge} rebase {rebase} fastForward {fast-forward} other {{method}}} cuando se cumplan sus requisitos. Puede ocurrir de inmediato.",
   "700223fdcaa96bb7": "Fusionar #{number} con {kind, select, squash {squash} merge {merge} rebase {rebase} fastForward {fast-forward} other {{method}}} cuando se cumplan sus requisitos. Puede ocurrir de inmediato.",
   "de93a05a4db7ab76": "Impide que el proveedor fusione automáticamente esta {term, select, mr {merge request} cr {solicitud de cambios} other {pull request}}.",
   "385ba70d2783260b": "Fusionar #{number} en {branch} con {kind, select, squash {squash} merge {merge} rebase {rebase} fastForward {fast-forward} other {{method}}}.",
@@ -3797,8 +3790,6 @@
   "b239ba3ce2899a3e": "O usa tus propias credenciales",
   "f0e6397ab4de588e": "Token",
   "ed83b25c71c98a20": "Elige uno o más {scope}s de {tracker} para cada proyecto. Sus issues aparecen junto a las del repositorio, y los agentes crean issues nuevas en el primero, salvo que se les pida otro.",
-  "99d51127f573296b": "Otra cuenta",
-  "8ec2c57414669b79": "Conecta un segundo espacio de trabajo o usuario de {tracker}.",
   "ce2136b36f87b655": "Conecta este entorno para cambiar sus ajustes.",
   "a90a441fd0e08de7": "Este entorno",
   "32fb83554cfd85b4": "Modelos de transcripción",
@@ -4209,7 +4200,6 @@
   ],
   "445f39cb8938d2a8": "Disponible tras el primer mensaje",
   "8245b10a0b796312": "Esta acción necesita un hilo guardado.",
-  "375afd7756f486b9": "Fork de {title}",
   "6e77208b9fd783df": "No se pudo hacer pull",
   "124b37e4aa047e44": "Incluir la conversación",
   "bb081b4501ebd5a7": "Enviar",
@@ -4219,6 +4209,7 @@
   "4e0710d19dfc2e7e": "¿Enviar este informe al equipo de T3?",
   "bddfc683c21e1362": "Esto es todo lo que sale de tu máquina. No se envía nada hasta que toques Enviar.",
   "bf19826f81484328": "Incluir la conversación",
+  "260c6b45f52d2f27": "Añade el texto de tus mensajes y de las respuestas del agente en {textTurns, plural, one {el último turno} other {los últimos {textTurns} turnos}}.",
   "ddb7e6f8ce99e657": "Solo quien pueda ejecutar agentes en esta máquina puede enviarlo o rechazarlo.",
   "433e4a9af4b69ebb": "Tu próximo mensaje inicia una sesión nueva. El agente no verá los mensajes anteriores de este hilo.",
   "e1189d2e582b008d": "Mantener la sesión actual",
@@ -4342,6 +4333,21 @@
       "v": "v"
     },
     " salió de su página y se detuvo"
+  ],
+  "796b81c4875c4feb": [
+    "La app ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " necesita un servidor de ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " más reciente en este entorno. Actualiza el servidor para usarla."
   ],
   "5ef18e4d39b398bf": [
     "No se puede cargar la app ",
@@ -4791,10 +4797,10 @@
   "c11a66f71057f074": "Tu prompt contiene \"ultrathink\" en el texto. Quítalo para cambiar esta opción.",
   "b589c01784b9a88c": "Buscar un modelo",
   "9b0277205d8a9b04": "Todos los proveedores",
+  "72ae7e7c5ca1c5fc": "Solo favoritos",
   "279ab25bdca98778": "Ajustes del hilo",
   "0ef86daa831dde67": "Cancelar ajustes del hilo",
   "cb27bc9ea63671c0": "Filtros de modelos",
-  "72ae7e7c5ca1c5fc": "Solo favoritos",
   "441bfc4afe4b5760": "Proveedor",
   "33c68c5151a81e31": "Mostrar modelos antiguos",
   "ce9438608fd47e03": "Guardar",
@@ -4904,6 +4910,7 @@
   "306a6f95ad9d52f7": "Sin enviar",
   "11276ab6c58b7a25": "Abre el borrador en el cuadro de mensaje de la tarea nueva. Desliza a la izquierda para descartarlo.",
   "99950f3a28d425fa": "Se envía cuando el entorno se vuelve a conectar. Abre la tarea para editarla. Desliza a la izquierda para eliminarla.",
+  "d71048f4fb9cf44a": "Esperando sincronización",
   "0a260c7744afd0be": "Esperando",
   "ad78fae7d373cf21": "Trabajando",
   "be451f475c514b37": "Descartar notificación de reactivación",
@@ -4917,7 +4924,6 @@
   "7171d7551e7cd04e": "Renombrar",
   "dffd2e20f7ff5aa1": "Marcar como no leído",
   "1385e2d8bd696370": "Convertir en proyecto",
-  "720018528e89b854": "Fork thread",
   "a1fcc064a5cece14": "Copiar hilo",
   "7b24be8e29a2efc5": "Copiar ID del hilo",
   "4205928193aec525": "Posponer",
@@ -5334,7 +5340,9 @@
   "744127f8dfad7d22": "Conecta un entorno para ver sus ejecuciones de flujos de trabajo.",
   "b9aae2f7cdb1a379": "Aún no hay ejecuciones de flujos de trabajo",
   "ace8fc1c643cf9f6": "Un flujo de trabajo une agentes, código, programaciones y preguntas para ti en una sola ejecución que sobrevive a los reinicios. Escribe uno en tu ordenador, en Flujos de trabajo y luego Definiciones.",
-  "fceb81aa6685fb47": "Chats",
+  "fc9c3a00cfc18b55": "Todos los tipos",
+  "e4d1316c85ed7066": "No hay preguntas de este tipo esperándote.",
+  "45a94c724845ec1d": "Otras",
   "86798f07ba2d7f4d": "Buscar issues",
   "484cd83bb303bab8": "Buscar pull requests",
   "75ed31fcea4f741a": "Filtrar issues",
@@ -5368,6 +5376,7 @@
   "f03ba5bbef74ca6d": "Issues",
   "ee0df48be7144de4": "Flujos de trabajo",
   "724eacadecd3a4cf": "Uso",
+  "fceb81aa6685fb47": "Chats",
   "f1bb8f9323639c63": "PR",
   "a3bd0ffad2733714": "Guía de revisión",
   "399447461c149bb1": "Vuelve a conectarte o pide a alguien con acceso de escritura que lo reintente.",
@@ -5469,11 +5478,6 @@
   "2d024c239f6e248b": "Usar valores predeterminados",
   "910651696e9f5582": "Usar los valores predeterminados del entorno para este proyecto",
   "9c7df6d5e2fd6c5c": "Gestionar {provider}",
-  "0578157ca37b13b2": "Prompt to run on settle",
-  "acb4b385a1a26120": "Mixed. Enter a prompt for all selected targets.",
-  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
-  "1873afead9b75ea6": "Prompt to run on settle",
-  "d4ec7141cb275379": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
   "a8b3689b7848d529": "No se pudieron guardar los ajustes.",
   "dd6fa89752876767": "No disponible en este servidor: {hint}",
   "342c0a9b4ac363e1": "Autenticado como {account} · {detail}",
@@ -5623,5 +5627,78 @@
   "ad208e3e32c85029": "Ocultar todo",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Llamadas a herramientas en el chat",
-  "8d545d54c0a9e950": "Oculta los comandos, ediciones y búsquedas que ejecutan los agentes. Ocultar las correctas mantiene los fallos. Zen solo muestra las respuestas finales. Las aprobaciones, preguntas y errores siempre se muestran."
+  "8d545d54c0a9e950": "Oculta los comandos, ediciones y búsquedas que ejecutan los agentes. Ocultar las correctas mantiene los fallos. Zen solo muestra las respuestas finales. Las aprobaciones, preguntas y errores siempre se muestran.",
+  "99d51127f573296b": "Otra cuenta",
+  "8ec2c57414669b79": "Conecta un segundo espacio de trabajo o usuario de {tracker}.",
+  "892f08d21b8e48a9": "Fusionar {layers} en {base} con {kind, select, squash {squash} merge {merge} rebase {rebase} fastForward {fast-forward} other {{method}}} cuando se cumplan sus requisitos. Puede ocurrir de inmediato.",
+  "89bf40eb2503b6c5": "Nuevo dispositivo conectado a {environment}",
+  "c94b5fe9ef372bc0": "{device} se conectó a través de {product}. Si no fuiste tú, quítalo en Ajustes → Acceso en T3 Code en ese ordenador.",
+  "bec67d0ed485f885": "{count, plural, one {{count} dispositivo se conectó} other {{count} dispositivos se conectaron}} a través de {product}. Si no fuiste tú, quítalos en Ajustes → Acceso en T3 Code en ese ordenador.",
+  "18c30aa94d0a807f": "Diagnóstico de conexión",
+  "eb287395a09cd288": "Enviar trazas de conexión",
+  "6787f93bbf6ce0b6": "Ayuda al equipo de T3 Code a solucionar problemas de conexión. Las trazas incluyen tiempos, tipos de error, un ID de esta sesión de la app y la versión de la app, nunca tus hilos, prompts ni código. Puedes cambiarlo en Ajustes > Acerca de T3 Code > Diagnóstico.",
+  "0b1e4aecbd38e0cf": "Cuando la app se conecta a un ordenador mediante {product}, envía al equipo de T3 Code cuánto tardó cada paso, el tipo de error, un ID de esta sesión de la app y la versión de la app. Las trazas nunca incluyen tus hilos, prompts ni código.",
+  "e0856d6a402ad821": "La política de {organization} no permite comandos de diseño de worktrees de proyectos.",
+  "e114d37b32ab0dc7": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " necesita un motivo."
+  ],
+  "7e1fd2eb570a372b": "{who} respondió {choice}",
+  "a3c43735e1a81498": "Motivo de {title}",
+  "bfad234f016cfa3f": "El porqué, en una frase. Acompaña a la respuesta que elijas.",
+  "3759768c5d342c22": [
+    "respondida",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "8afa4fbe16f95bcf": [
+    "por ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ",",
+    " ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "0f93532dd76391fc": "Respondiste {choice}",
+  "235902a19e95833b": [
+    "por ti,",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1a1beecff68a6e61": "Verificar cuenta de Google",
+  "99451a5d2d40440f": "Retirada por {by}.",
+  "3ee30a50b70fffab": "Retirada por {by}: {reason}",
+  "201490988858b511": "retirada por {by}",
+  "3cf89b125a47cfc8": "Add repo worktrees",
+  "e75efb53360b9a41": "Actualiza {host} para hacer fork de hilos.",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
+  "a7f72d00b27fbaa3": "Side chats can't be forked",
+  "dbd17501ee8c9c5b": "Available after a completed turn",
+  "375afd7756f486b9": "Fork de {title}",
+  "720018528e89b854": "Fork thread",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "acb4b385a1a26120": "Mixed. Enter a prompt for all selected targets.",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
+  "1873afead9b75ea6": "Prompt to run on settle",
+  "d4ec7141cb275379": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup."
 }

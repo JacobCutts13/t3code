@@ -6,7 +6,6 @@
   "422ced5cda40580e": "Basis-Branch fetchen",
   "47e6147265a28164": "Dateien auschecken",
   "4735345a111c1581": "Submodule initialisieren",
-  "3cf89b125a47cfc8": "Add repo worktrees",
   "fd07736396b009c5": "Setup-Skript ausführen",
   "cbbdd0430fbe5fea": "Agent starten",
   "2a918ed2e51ab64a": "Verbindung wird hergestellt",
@@ -72,7 +71,6 @@
   "cd03eb1b84271c02": "Agent",
   "bfe1a60f3f9c60fb": "Runde {turn} · {what}",
   "dfdaa6255a416140": "Übersicht über {turns, plural, one {{turns} letzte Runde} other {{turns} letzte Runden}}, {textTurns, plural, =0 {ohne Nachrichtentext} one {mit dem Nachrichtentext der letzten Runde} other {mit den Nachrichtentexten der letzten {textTurns} Runden}}{truncated, select, yes {, passend gekürzt} other {}}",
-  "260c6b45f52d2f27": "Fügt den Text deiner Nachrichten und der Antworten des Agenten aus {textTurns, plural, one {der letzten Runde} other {den letzten {textTurns} Runden}} hinzu.",
   "afac52a5cc2dc801": "Deine Antwort konnte nicht gesendet werden. Versuche es erneut.",
   "79d776428f4d0650": "Die Datei konnte nicht geladen werden. Verbinde dich erneut und versuch es noch einmal.",
   "3ea34cbb1ca5ba9b": "Vorschau abgebrochen.",
@@ -568,7 +566,6 @@
   "eabffa063b9244f8": "Dein DNS oder deine Firewall blockiert möglicherweise T3 Connect. Versuche ein anderes Netzwerk, etwa ein anderes WLAN oder mobile Daten.",
   "c039a54c8238eafe": "Er ist möglicherweise überlastet, im Ruhezustand oder nicht im Netzwerk.",
   "3c4391a7f6421455": "{host} hat die Nachricht nicht innerhalb von 60 Sekunden bestätigt.",
-  "e75efb53360b9a41": "Aktualisiere {host}, um Threads zu forken.",
   "204ac030de627c0a": "Git-URL",
   "68b989c06486c4e0": "URL",
   "b0f180f236623386": "Gib den vollständigen Namen im Format Besitzer/Repository ein.",
@@ -753,8 +750,6 @@
   "f0ab079175905bbb": "Committen, pushen & {shortLabel} erstellen",
   "8360d689ebc7f829": "Pushen & {shortLabel} aus dem Standard-Branch erstellen?",
   "daa408bb99d21d18": "{kind, select, pr {Diese Aktion pusht lokale Commits und erstellt einen PR auf „{branch}“. Du kannst auf diesem Branch weitermachen oder einen Feature-Branch erstellen und dieselbe Aktion dort ausführen.} mr {Diese Aktion pusht lokale Commits und erstellt einen MR auf „{branch}“. Du kannst auf diesem Branch weitermachen oder einen Feature-Branch erstellen und dieselbe Aktion dort ausführen.} generic {Diese Aktion pusht lokale Commits und erstellt eine Änderungsanfrage auf „{branch}“. Du kannst auf diesem Branch weitermachen oder einen Feature-Branch erstellen und dieselbe Aktion dort ausführen.} other {Diese Aktion pusht lokale Commits und erstellt {changeRequest} auf „{branch}“. Du kannst auf diesem Branch weitermachen oder einen Feature-Branch erstellen und dieselbe Aktion dort ausführen.}}",
-  "e27a17996ff52408": "All teams",
-  "b49eb6961867225c": "All {scopes}",
   "8471c4c5a50ffde3": "Issues dieses Hosts können noch nicht angezeigt werden.",
   "2f4a47129f89fe22": "Nicht verbunden. Füge einen persönlichen API-Schlüssel hinzu, um die Issues aufzulisten.",
   "024baab60525a419": "Die gespeicherten Anmeldedaten wurden abgelehnt.",
@@ -910,8 +905,6 @@
   "e931fd397ade526b": "{kind, select, sideChat {{need, select, input {{count} Nebenchats warten auf Eingabe} approval {{count} Nebenchats warten auf Genehmigung} other {{count} Nebenchats brauchen dich}}} subagent {{need, select, input {{count} Subagenten warten auf Eingabe} approval {{count} Subagenten warten auf Genehmigung} other {{count} Subagenten brauchen dich}}} other {{need, select, input {{count} Threads warten auf Eingabe} approval {{count} Threads warten auf Genehmigung} other {{count} Threads brauchen dich}}}}",
   "4bed196a655ab14f": "{live} von {total} Agenten arbeiten",
   "ba1727ddc7a0a0b6": "{count, plural, one {{count} Agent fertig} other {{count} Agenten fertig}}",
-  "a7f72d00b27fbaa3": "Side chats can't be forked",
-  "dbd17501ee8c9c5b": "Available after a completed turn",
   "4dd09c829329a994": "Eingereihte Nachricht",
   "3f0b962160edbe6d": "Der Thread konnte nicht synchronisiert werden.",
   "752b4d69669b0019": "Frühere Aktivitäten konnten nicht geladen werden.",
@@ -1923,6 +1916,7 @@
   "69c659d8b6e271cc": "Die Seite fordert eine Datei an.",
   "a6efeb99b479990a": "Dateien auswählen",
   "59c87648d44b958c": "Datei auswählen",
+  "6f321f153b8711bb": "Option auswählen",
   "61a552a67e9e3eac": "Antwort auf Dialog",
   "1d9bd868fafea18a": "Ablehnen",
   "1d0a7acef4a95536": "Akzeptieren",
@@ -2846,7 +2840,6 @@
   "dff9e061996e7b1d": "Auto-Merge aktivieren?",
   "dafc4bac6e5e37b0": "Auto-Merge deaktivieren?",
   "88c7a80c40bbfe56": "{layers} per {kind, select, squash {Squash} merge {Merge} rebase {Rebase} fastForward {Fast-Forward} other {{method}}} in {base} mergen. Ebenen über #{number} bleiben offen.",
-  "892f08d21b8e48a9": "{layers} per {kind, select, squash {Squash} merge {Merge} rebase {Rebase} fastForward {Fast-Forward} other {{method}}} in {base} mergen, sobald die Anforderungen erfüllt sind. Das kann sofort passieren.",
   "700223fdcaa96bb7": "#{number} per {kind, select, squash {Squash} merge {Merge} rebase {Rebase} fastForward {Fast-Forward} other {{method}}} mergen, sobald die Anforderungen erfüllt sind. Das kann sofort passieren.",
   "de93a05a4db7ab76": "{term, select, mr {Verhindern, dass der Anbieter diesen Merge Request automatisch mergt.} cr {Verhindern, dass der Anbieter diese Änderungsanfrage automatisch mergt.} other {Verhindern, dass der Anbieter diesen Pull Request automatisch mergt.}}",
   "385ba70d2783260b": "#{number} per {kind, select, squash {Squash} merge {Merge} rebase {Rebase} fastForward {Fast-Forward} other {{method}}} in {branch} mergen.",
@@ -3802,8 +3795,6 @@
   "b239ba3ce2899a3e": "Oder verwende deine eigenen Anmeldedaten",
   "f0e6397ab4de588e": "Token",
   "ed83b25c71c98a20": "Wähle für jedes Projekt ein oder mehrere {scope}s in {tracker}. Ihre Issues erscheinen neben denen des Repositorys, und Agenten legen neue Issues im ersten an, sofern kein anderes verlangt wird.",
-  "99d51127f573296b": "Weiteres Konto",
-  "8ec2c57414669b79": "Verbinde einen zweiten {tracker}-Workspace oder -Nutzer.",
   "ce2136b36f87b655": "Verbinde diese Umgebung, um ihre Einstellungen zu ändern.",
   "a90a441fd0e08de7": "Diese Umgebung",
   "32fb83554cfd85b4": "Transkriptionsmodelle",
@@ -4214,7 +4205,6 @@
   ],
   "445f39cb8938d2a8": "Nach der ersten Nachricht verfügbar",
   "8245b10a0b796312": "Diese Aktion braucht einen gespeicherten Thread.",
-  "375afd7756f486b9": "Fork von {title}",
   "6e77208b9fd783df": "Pullen fehlgeschlagen",
   "124b37e4aa047e44": "Unterhaltung mitsenden",
   "bb081b4501ebd5a7": "Senden",
@@ -4224,6 +4214,7 @@
   "4e0710d19dfc2e7e": "Diesen Bericht an das T3-Team senden?",
   "bddfc683c21e1362": "Das ist alles, was deinen Rechner verlässt. Erst wenn du auf Senden tippst, wird etwas gesendet.",
   "bf19826f81484328": "Unterhaltung mitsenden",
+  "260c6b45f52d2f27": "Fügt den Text deiner Nachrichten und der Antworten des Agenten aus {textTurns, plural, one {der letzten Runde} other {den letzten {textTurns} Runden}} hinzu.",
   "ddb7e6f8ce99e657": "Nur wer auf diesem Rechner Agenten ausführen kann, kann den Bericht senden oder ablehnen.",
   "433e4a9af4b69ebb": "Deine nächste Nachricht startet eine neue Sitzung. Der Agent sieht frühere Nachrichten in diesem Thread nicht.",
   "e1189d2e582b008d": "Aktuelle Sitzung behalten",
@@ -4348,6 +4339,21 @@
       "v": "v"
     },
     " hat ihre Seite verlassen und wurde gestoppt"
+  ],
+  "796b81c4875c4feb": [
+    "Die App ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " benötigt einen neueren ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "-Server in dieser Umgebung. Aktualisiere den Server, um sie zu nutzen."
   ],
   "5ef18e4d39b398bf": [
     "Die App ",
@@ -4798,10 +4804,10 @@
   "c11a66f71057f074": "Dein Prompt enthält „ultrathink“ im Text. Entferne es, um diese Option zu ändern.",
   "b589c01784b9a88c": "Modell suchen",
   "9b0277205d8a9b04": "Alle Anbieter",
+  "72ae7e7c5ca1c5fc": "Nur Favoriten",
   "279ab25bdca98778": "Thread-Einstellungen",
   "0ef86daa831dde67": "Thread-Einstellungen abbrechen",
   "cb27bc9ea63671c0": "Modellfilter",
-  "72ae7e7c5ca1c5fc": "Nur Favoriten",
   "441bfc4afe4b5760": "Anbieter",
   "33c68c5151a81e31": "Veraltete Modelle anzeigen",
   "ce9438608fd47e03": "Speichern",
@@ -4911,6 +4917,7 @@
   "306a6f95ad9d52f7": "Nicht gesendet",
   "11276ab6c58b7a25": "Öffnet den Entwurf im Eingabefeld für neue Aufgaben. Nach links wischen zum Verwerfen.",
   "99950f3a28d425fa": "Wird gesendet, sobald die Umgebung wieder verbunden ist. Öffnet die Aufgabe zum Bearbeiten. Nach links wischen zum Löschen.",
+  "d71048f4fb9cf44a": "Wartet auf Synchronisierung",
   "0a260c7744afd0be": "Wartet",
   "ad78fae7d373cf21": "Arbeitet",
   "be451f475c514b37": "Aufgeweckt-Hinweis schließen",
@@ -4924,7 +4931,6 @@
   "7171d7551e7cd04e": "Umbenennen",
   "dffd2e20f7ff5aa1": "Als ungelesen markieren",
   "1385e2d8bd696370": "In Projekt umwandeln",
-  "720018528e89b854": "Fork thread",
   "a1fcc064a5cece14": "Thread kopieren",
   "7b24be8e29a2efc5": "Thread-ID kopieren",
   "4205928193aec525": "Zurückstellen",
@@ -5340,7 +5346,9 @@
   "744127f8dfad7d22": "Verbinde eine Umgebung, um ihre Workflow-Ausführungen zu sehen.",
   "b9aae2f7cdb1a379": "Noch keine Workflow-Ausführungen",
   "ace8fc1c643cf9f6": "Ein Workflow verbindet Agenten, Code, Zeitpläne und Fragen an dich zu einer Ausführung, die Neustarts übersteht. Schreib einen auf deinem Computer, unter Workflows, dann Definitionen.",
-  "fceb81aa6685fb47": "Chats",
+  "fc9c3a00cfc18b55": "Alle Arten",
+  "e4d1316c85ed7066": "Keine Fragen dieser Art warten auf dich.",
+  "45a94c724845ec1d": "Sonstige",
   "86798f07ba2d7f4d": "Issues durchsuchen",
   "484cd83bb303bab8": "Pull Requests durchsuchen",
   "75ed31fcea4f741a": "Issues filtern",
@@ -5374,6 +5382,7 @@
   "f03ba5bbef74ca6d": "Issues",
   "ee0df48be7144de4": "Workflows",
   "724eacadecd3a4cf": "Nutzung",
+  "fceb81aa6685fb47": "Chats",
   "f1bb8f9323639c63": "PRs",
   "a3bd0ffad2733714": "Review-Leitfaden",
   "399447461c149bb1": "Verbinde dich erneut oder bitte jemanden mit Schreibzugriff, es erneut zu versuchen.",
@@ -5475,11 +5484,6 @@
   "2d024c239f6e248b": "Standards verwenden",
   "910651696e9f5582": "Umgebungsstandards für dieses Projekt verwenden",
   "9c7df6d5e2fd6c5c": "{provider} verwalten",
-  "0578157ca37b13b2": "Prompt to run on settle",
-  "acb4b385a1a26120": "Mixed. Enter a prompt for all selected targets.",
-  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
-  "1873afead9b75ea6": "Prompt to run on settle",
-  "d4ec7141cb275379": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup.",
   "a8b3689b7848d529": "Die Einstellungen konnten nicht gespeichert werden.",
   "dd6fa89752876767": "Auf diesem Server nicht verfügbar: {hint}",
   "342c0a9b4ac363e1": "Authentifiziert als {account} · {detail}",
@@ -5629,5 +5633,78 @@
   "ad208e3e32c85029": "Alle ausblenden",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Tool-Aufrufe im Chat",
-  "8d545d54c0a9e950": "Die Befehle, Bearbeitungen und Suchen ausblenden, die Agenten ausführen. „Erfolgreiche ausblenden“ behält Fehler. „Zen“ zeigt nur endgültige Antworten. Genehmigungen, Fragen und Fehler werden immer angezeigt."
+  "8d545d54c0a9e950": "Die Befehle, Bearbeitungen und Suchen ausblenden, die Agenten ausführen. „Erfolgreiche ausblenden“ behält Fehler. „Zen“ zeigt nur endgültige Antworten. Genehmigungen, Fragen und Fehler werden immer angezeigt.",
+  "99d51127f573296b": "Weiteres Konto",
+  "8ec2c57414669b79": "Verbinde einen zweiten {tracker}-Workspace oder -Nutzer.",
+  "892f08d21b8e48a9": "{layers} per {kind, select, squash {Squash} merge {Merge} rebase {Rebase} fastForward {Fast-Forward} other {{method}}} in {base} mergen, sobald die Anforderungen erfüllt sind. Das kann sofort passieren.",
+  "89bf40eb2503b6c5": "Neues Gerät bei {environment} angemeldet",
+  "c94b5fe9ef372bc0": "{device} hat sich über {product} verbunden. Warst du das nicht, entferne es in T3 Code auf diesem Computer unter Einstellungen → Zugriff.",
+  "bec67d0ed485f885": "{count, plural, one {{count} Gerät hat} other {{count} Geräte haben}} sich über {product} verbunden. Warst du das nicht, entferne sie in T3 Code auf diesem Computer unter Einstellungen → Zugriff.",
+  "18c30aa94d0a807f": "Verbindungsdiagnose",
+  "eb287395a09cd288": "Verbindungs-Traces senden",
+  "6787f93bbf6ce0b6": "Hilft dem T3 Code-Team, Verbindungsprobleme zu beheben. Traces enthalten Zeiten, Fehlertypen, eine ID für diese App-Sitzung und die App-Version, nie deine Threads, Prompts oder deinen Code. Du kannst das unter Einstellungen > Über T3 Code > Diagnose ändern.",
+  "0b1e4aecbd38e0cf": "Wenn die App über {product} eine Verbindung zu einem Computer herstellt, sendet sie dem T3 Code-Team, wie lange jeder Schritt gedauert hat, den Fehlertyp, eine ID für diese App-Sitzung und die App-Version. Traces enthalten nie deine Threads, Prompts oder deinen Code.",
+  "e0856d6a402ad821": "Die Richtlinie von {organization} erlaubt keine Worktree-Layout-Befehle von Projekten.",
+  "e114d37b32ab0dc7": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " braucht eine Begründung."
+  ],
+  "7e1fd2eb570a372b": "{who} hat {choice} geantwortet",
+  "a3c43735e1a81498": "Begründung für {title}",
+  "bfad234f016cfa3f": "Warum, in einem Satz. Gilt für die Antwort, die du wählst.",
+  "3759768c5d342c22": [
+    "beantwortet",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "8afa4fbe16f95bcf": [
+    "von ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ",",
+    " ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "0f93532dd76391fc": "Du hast {choice} geantwortet",
+  "235902a19e95833b": [
+    "von dir,",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1a1beecff68a6e61": "Google-Konto bestätigen",
+  "99451a5d2d40440f": "Zurückgezogen von {by}.",
+  "3ee30a50b70fffab": "Zurückgezogen von {by}: {reason}",
+  "201490988858b511": "zurückgezogen von {by}",
+  "3cf89b125a47cfc8": "Add repo worktrees",
+  "e75efb53360b9a41": "Aktualisiere {host}, um Threads zu forken.",
+  "e27a17996ff52408": "All teams",
+  "b49eb6961867225c": "All {scopes}",
+  "a7f72d00b27fbaa3": "Side chats can't be forked",
+  "dbd17501ee8c9c5b": "Available after a completed turn",
+  "375afd7756f486b9": "Fork von {title}",
+  "720018528e89b854": "Fork thread",
+  "0578157ca37b13b2": "Prompt to run on settle",
+  "acb4b385a1a26120": "Mixed. Enter a prompt for all selected targets.",
+  "3c5863ba3b9746ee": "Summarise what changed and update the project notes.",
+  "1873afead9b75ea6": "Prompt to run on settle",
+  "d4ec7141cb275379": "Sent to the agent when a finished thread settles. Leave empty to disable. Runs an extra turn before cleanup."
 }
