@@ -240,11 +240,16 @@ async function mountPanel(search: Omit<SettingsScopeSearch, "project"> = {}) {
     getParentRoute: () => settingsRoute,
     path: "projects",
     component: () => (
-      <ProjectSettingsPanel
-        projectKey={key}
-        environmentId={search.machine ? EnvironmentId.make(search.machine) : null}
-        checkoutKey={search.checkout ?? null}
-      />
+      <SettingsScopeProvider
+        search={settingsRoute.useSearch()}
+        onChange={(next) => void router.navigate({ to: "/settings/projects", search: () => next })}
+      >
+        <ProjectSettingsPanel
+          projectKey={key}
+          environmentId={search.machine ? EnvironmentId.make(search.machine) : null}
+          checkoutKey={search.checkout ?? null}
+        />
+      </SettingsScopeProvider>
     ),
   });
   const query = new URLSearchParams({ project: key });
@@ -830,4 +835,24 @@ describe("project name composition", () => {
       "日本語の名前",
     ]);
   });
+});
+
+it("shows the saved project name again after an empty name is rejected", async () => {
+  setup();
+  await using screen = await mountPanel();
+  const input = nameInput(screen);
+
+  await userEvent.fill(input, "   ");
+  await userEvent.keyboard("{Enter}");
+
+  await expect.element(input).toHaveValue("Shared repo");
+  expect(state.toast).toHaveBeenCalledWith({
+    type: "warning",
+    title: "Project title cannot be empty",
+  });
+
+  await userEvent.click(input);
+  await userEvent.keyboard("{Tab}");
+  expect(state.toast).toHaveBeenCalledOnce();
+  expect(state.update).not.toHaveBeenCalled();
 });
