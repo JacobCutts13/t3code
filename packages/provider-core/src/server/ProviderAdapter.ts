@@ -1,6 +1,6 @@
 import type {
   OrchestrationV2HistoricalMessage,
-  ProviderCloudEnvironmentSelection,
+  ProviderCloudEnvironment,
 } from "@t3tools/contracts";
 import {
   type AgentFeedbackMode,
@@ -588,7 +588,7 @@ export interface ProviderAdapterV2EnsureThreadInput {
   readonly existingProviderThread?: OrchestrationV2ProviderThread;
   readonly forceNewNativeThread?: boolean;
   /** The project's hosted environment for this instance; adapters without one run locally. */
-  readonly cloudEnvironment?: ProviderCloudEnvironmentSelection;
+  readonly cloudEnvironment?: ProviderCloudEnvironment;
 }
 
 export interface ProviderAdapterV2TurnInput {

@@ -1,13 +1,13 @@
 import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
+import { normalizeGitRemoteUrl } from "@t3tools/shared/git";
 import {
   AuthProvidersManageScope,
   type EnvironmentId,
   type ProjectId,
   type ProjectProviderInstanceOverride,
   type ProjectSettingsOverrides,
-  type ProviderCloudEnvironmentSelection,
+  type ProviderCloudEnvironment,
   type ProviderInstanceId,
-  type ServerProviderCloudEnvironment,
   sessionGrantsScope,
   type ServerSettings,
   type SessionGrantInput,
@@ -90,7 +90,7 @@ export function resolveRemoteOperateAccess(input: {
 /** One override field to write; `undefined` removes it so the project inherits again. */
 export type ProviderInstanceOverrideUpdate =
   | { readonly enabled: boolean | undefined }
-  | { readonly cloudEnvironment: ProviderCloudEnvironmentSelection | undefined };
+  | { readonly cloudEnvironment: ProviderCloudEnvironment | undefined };
 
 export function buildProviderInstanceOverridePatch(
   settings: Pick<ServerSettings, "projectSettingsOverrides">,
@@ -123,23 +123,13 @@ export function buildProviderInstanceOverridePatch(
   return patch;
 }
 
-/** `github.com/acme/api`, the form both Cursor environment repos and project identities reduce to. */
-export function repositoryKey(url: string): string {
-  return url
-    .trim()
-    .toLowerCase()
-    .replace(/^[a-z+]+:\/\//, "")
-    .replace(/^[^@/]+@/, "")
-    .replace(":", "/")
-    .replace(/\.git$/, "")
-    .replace(/\/+$/, "");
-}
-
 export function cloudEnvironmentLabel(
-  environment: Pick<ServerProviderCloudEnvironment, "name" | "repos">,
+  environment: Pick<ProviderCloudEnvironment, "name" | "repos">,
 ): string | undefined {
   if (environment.name) return environment.name;
-  const repos = environment.repos.map((repo) => repositoryKey(repo).replace(/^[^/]+\//, ""));
+  const repos = environment.repos.map((repo) =>
+    normalizeGitRemoteUrl(repo).replace(/^[^/]+\//, ""),
+  );
   return repos.length > 0 ? repos.join(", ") : undefined;
 }
 
@@ -148,12 +138,13 @@ export function cloudEnvironmentLabel(
  * Unnamed environments with the same repositories are one choice: an agent targets them by repo set.
  */
 export function sortCloudEnvironmentsForProject(
-  environments: ReadonlyArray<ServerProviderCloudEnvironment>,
+  environments: ReadonlyArray<ProviderCloudEnvironment>,
   projectRepository: string | undefined,
-): ReadonlyArray<ServerProviderCloudEnvironment> {
-  const key = projectRepository === undefined ? undefined : repositoryKey(projectRepository);
-  const rank = (environment: ServerProviderCloudEnvironment) =>
-    key !== undefined && environment.repos.some((repo) => repositoryKey(repo) === key)
+): ReadonlyArray<ProviderCloudEnvironment> {
+  const key =
+    projectRepository === undefined ? undefined : normalizeGitRemoteUrl(projectRepository);
+  const rank = (environment: ProviderCloudEnvironment) =>
+    key !== undefined && environment.repos.some((repo) => normalizeGitRemoteUrl(repo) === key)
       ? environment.repos.length
       : Number.POSITIVE_INFINITY;
   const seen = new Set<string>();
@@ -161,7 +152,7 @@ export function sortCloudEnvironmentsForProject(
     .filter((environment) => {
       if (environment.repos.length === 0) return false;
       if (environment.name !== undefined) return true;
-      const repoSet = environment.repos.map(repositoryKey).toSorted().join("\n");
+      const repoSet = environment.repos.map(normalizeGitRemoteUrl).toSorted().join("\n");
       if (seen.has(repoSet)) return false;
       seen.add(repoSet);
       return true;
@@ -171,16 +162,6 @@ export function sortCloudEnvironmentsForProject(
         rank(left) - rank(right) ||
         (cloudEnvironmentLabel(left) ?? "").localeCompare(cloudEnvironmentLabel(right) ?? ""),
     );
-}
-
-export function cloudEnvironmentSelection(
-  environment: ServerProviderCloudEnvironment,
-): ProviderCloudEnvironmentSelection {
-  return {
-    id: environment.id,
-    ...(environment.name === undefined ? {} : { name: environment.name }),
-    repos: environment.repos,
-  };
 }
 
 export function classifyProviderEnvironmentAccess(input: {

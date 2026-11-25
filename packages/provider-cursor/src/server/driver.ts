@@ -102,6 +102,7 @@ export const CursorDriver: ProviderDriver<
     const httpClient = yield* HttpClient.HttpClient;
     const sdkRunner = yield* CursorAgentSdk.CursorAgentSdkRunner;
     const processEnv = yield* mergeProviderInstanceEnvironment(environment);
+    const teamId = yield* readCursorCliTeamId();
     const continuationIdentity = defaultProviderContinuationIdentity({
       driverKind: DRIVER_KIND,
       instanceId,
@@ -172,6 +173,7 @@ export const CursorDriver: ProviderDriver<
       environment: processEnv,
       getModels: () => catalogModels,
       getSdkModels: () => catalogSdkModels,
+      teamId,
     }).pipe(
       Effect.provideService(CursorAgentSdk.CursorAgentSdkRunner, {
         ...sdkRunner,
@@ -262,10 +264,6 @@ export const CursorDriver: ProviderDriver<
           CursorSdkCatalog.CursorSdkCatalog.of({
             // Untraced: CursorSdkCatalog.read already spans this call.
             read: Effect.fnUntraced(function* (apiKey) {
-              const teamId = yield* readCursorCliTeamId().pipe(
-                Effect.provideService(FileSystem.FileSystem, fileSystem),
-                Effect.provideService(Path.Path, path),
-              );
               const snapshot = yield* catalog.read(apiKey, { teamId });
               if (snapshot.models.length > 0) catalogSdkModels = snapshot.models;
               return snapshot;

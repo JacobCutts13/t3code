@@ -8400,7 +8400,6 @@
   "2a0148ea9068a814": "Port HTTPS",
   "7f4f2ba57d3d1c76": "Saisissez un port entre 1 et 65535.",
   "82af9c66caf2f40c": "Point de terminaison HTTPS",
-  "41686cb49d237c53": "{environment} (personnel)",
   "f83a9540f9263cae": "Exécuter en local",
   "53f836f4f9972d10": "Environnement cloud",
   "daa7ec02e6b378f5": "Les fils Cursor de ce projet lancent un agent Cursor Cloud à partir de la branche poussée et ouvrent une pull request.",

@@ -28,7 +28,7 @@ import { ModelCapabilities, ProviderOptionDescriptor } from "./model.ts";
 import { RuntimeMode } from "./providerPolicy.ts";
 import { ProviderDriverKind, ProviderInstanceId } from "./providerInstance.ts";
 import { ServerProviderUsageLimits, UsageLimitSourceSnapshots } from "./providerUsageLimits.ts";
-import { ServerSettings } from "./settings.ts";
+import { ProviderCloudEnvironment, ServerSettings } from "./settings.ts";
 import { DesktopUpdateChannelSchema } from "./ipc.ts";
 
 const KeybindingsMalformedConfigIssue = Schema.Struct({
@@ -91,15 +91,6 @@ export const ServerProviderModel = Schema.Struct({
   capabilities: Schema.NullOr(ModelCapabilities),
 });
 export type ServerProviderModel = typeof ServerProviderModel.Type;
-
-/** A saved hosted environment a provider can run agents in, such as a Cursor Cloud environment. */
-export const ServerProviderCloudEnvironment = Schema.Struct({
-  id: TrimmedNonEmptyString,
-  name: Schema.optional(TrimmedNonEmptyString),
-  owner: Schema.optional(TrimmedNonEmptyString),
-  repos: Schema.Array(TrimmedNonEmptyString),
-});
-export type ServerProviderCloudEnvironment = typeof ServerProviderCloudEnvironment.Type;
 
 /** A backend a provider's models run on, such as one of fx's. */
 export const ServerProviderSubProvider = Schema.Struct({
@@ -297,7 +288,7 @@ export const ServerProvider = Schema.Struct({
   ),
   skills: Schema.Array(ServerProviderSkill).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   // Producers that list environments always send the field, so absence never means "removed".
-  cloudEnvironments: Schema.optionalKey(Schema.Array(ServerProviderCloudEnvironment)),
+  cloudEnvironments: Schema.optionalKey(Schema.Array(ProviderCloudEnvironment)),
   workspaceSnapshots: Schema.optionalKey(Schema.Array(ServerProviderWorkspaceSnapshot)),
   /**
    * Set when the server rescanned a workspace after a session start and its skills or commands

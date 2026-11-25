@@ -1,13 +1,9 @@
-import type {
-  ProviderCloudEnvironmentSelection,
-  ServerProviderCloudEnvironment,
-} from "@t3tools/contracts";
+import type { ProviderCloudEnvironment } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import {
   cloudEnvironmentLabel,
-  cloudEnvironmentSelection,
   sortCloudEnvironmentsForProject,
 } from "./ProviderSettingsPanel.logic";
 import { SettingsRow } from "./settingsLayout";
@@ -22,23 +18,18 @@ export function CursorCloudEnvironmentRow({
   readOnly,
   onChange,
 }: {
-  readonly environments: ReadonlyArray<ServerProviderCloudEnvironment>;
+  readonly environments: ReadonlyArray<ProviderCloudEnvironment>;
   readonly projectRepository: string | undefined;
-  readonly value: ProviderCloudEnvironmentSelection | undefined;
+  readonly value: ProviderCloudEnvironment | undefined;
   readonly hasProject: boolean;
   readonly readOnly: boolean;
-  readonly onChange: (next: ProviderCloudEnvironmentSelection | undefined) => void;
+  readonly onChange: (next: ProviderCloudEnvironment | undefined) => void;
 }) {
   const gt = useGT();
   const sorted = sortCloudEnvironmentsForProject(environments, projectRepository);
   const options = sorted.map((environment) => ({
     value: environment.id,
-    label:
-      environment.owner === "personal"
-        ? gt("{environment} (personal)", {
-            environment: cloudEnvironmentLabel(environment) ?? environment.id,
-          })
-        : (cloudEnvironmentLabel(environment) ?? environment.id),
+    label: cloudEnvironmentLabel(environment) ?? environment.id,
   }));
   // A saved environment Cursor no longer lists still decides where threads run, so keep showing it.
   if (value !== undefined && !sorted.some((environment) => environment.id === value.id)) {
@@ -64,13 +55,10 @@ export function CursorCloudEnvironmentRow({
             disabled={readOnly || !hasProject}
             onValueChange={(next) => {
               if (typeof next !== "string") return;
-              const environment = sorted.find((candidate) => candidate.id === next);
               onChange(
                 next === RUN_LOCALLY
                   ? undefined
-                  : environment === undefined
-                    ? value
-                    : cloudEnvironmentSelection(environment),
+                  : (sorted.find((environment) => environment.id === next) ?? value),
               );
             }}
           >

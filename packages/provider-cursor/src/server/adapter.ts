@@ -27,7 +27,7 @@ import {
   type OrchestrationV2ProviderTurn,
   type OrchestrationV2Subagent,
   type OrchestrationV2TurnItem,
-  type ProviderCloudEnvironmentSelection,
+  type ProviderCloudEnvironment,
   type ProviderInstanceId,
   type ServerProviderModel,
   type ServerProviderSkill,
@@ -62,12 +62,10 @@ import {
 } from "./skills.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
 import {
-  type CursorCloudRepositories,
   type CursorCloudRepository,
   CursorCloudStartError,
   prepareCursorCloudRepositories,
 } from "./cloudRepository.ts";
-import { readCursorCliTeamId } from "./cliTeam.ts";
 import { t3OrchestrationPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -414,23 +412,6 @@ const classifyCursorCloudRejection =
     isCursorSdkError(error.cause, "ConfigurationError")
       ? new CursorCloudStartError({ reason: error.cause.message, cause: error.cause })
       : error;
-
-function cursorCloudNotice(
-  environment: ProviderCloudEnvironmentSelection,
-  prepared: CursorCloudRepositories,
-): string {
-  const label =
-    environment.name ??
-    environment.repos.map((repo) => repo.replace(/^https?:\/\/[^/]+\//, "")).join(", ");
-  const start =
-    prepared.branch === undefined ? "each repository's default branch" : `\`${prepared.branch}\``;
-  const files = prepared.uncommittedFiles;
-  return `Running in Cursor Cloud (${label}) from ${start}.${
-    files === 0
-      ? ""
-      : ` ${files} uncommitted ${files === 1 ? "file in this checkout is" : "files in this checkout are"} not included.`
-  }`;
-}
 
 function stableJson(value: unknown): string {
   try {
@@ -1115,6 +1096,8 @@ export interface CursorAdapterV2Options {
   readonly environment: NodeJS.ProcessEnv;
   readonly getModels?: () => ReadonlyArray<ServerProviderModel>;
   readonly getSdkModels?: () => ReadonlyArray<SDKModel>;
+  /** The Cursor team cloud agents run under; unset keeps the account's default team. */
+  readonly teamId?: number | undefined;
 }
 
 export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
@@ -1173,11 +1156,6 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
         // A native resume's own run may stop before it checkpoints; the request is still in history.
         const resumedAgent = yield* Ref.make<string | null>(null);
         const warnedUnsupportedSandbox = yield* Ref.make(false);
-        // Where a newly created cloud agent runs, shown once in its first turn.
-        const pendingCloudNotice = yield* Ref.make<{
-          readonly agentId: string;
-          readonly message: string;
-        } | null>(null);
         const activeTurn = yield* Ref.make<ActiveCursorTurn | null>(null);
         // Background shells the agent left running, by the shell id Cursor gave it.
         const backgroundShells = new Map<
@@ -2895,11 +2873,6 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               );
         };
 
-        const readTeamId = readCursorCliTeamId().pipe(
-          Effect.provideService(FileSystem.FileSystem, fileSystem),
-          Effect.provideService(Path.Path, path),
-        );
-
         const openAgent = Effect.fnUntraced(function* (openInput: {
           readonly operation: "create" | "resume";
           readonly threadId: ThreadId;
@@ -2907,7 +2880,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
           readonly agentId?: string;
           readonly storeCwd?: string | undefined;
-          readonly cloudEnvironment?: ProviderCloudEnvironmentSelection | undefined;
+          readonly cloudEnvironment?: ProviderCloudEnvironment | undefined;
         }) {
           const existing = yield* Ref.get(liveAgent);
           const cwd = openInput.runtimePolicy.cwd ?? process.cwd();
@@ -2943,8 +2916,8 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             (openInput.operation === "resume" &&
               CursorAgentSdk.isCursorCloudAgentId(openInput.agentId))
               ? {
-                  ...(prepared === undefined ? {} : { repos: prepared.repos }),
-                  teamId: yield* readTeamId,
+                  ...(prepared === undefined ? {} : { repos: prepared }),
+                  teamId: adapterOptions.teamId,
                 }
               : undefined;
           const options = makeCursorAgentOptions({
@@ -2988,12 +2961,6 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
             session: sdkSession,
           } satisfies CursorLiveAgent;
           yield* Ref.set(liveAgent, next);
-          if (prepared !== undefined && openInput.cloudEnvironment !== undefined) {
-            yield* Ref.set(pendingCloudNotice, {
-              agentId: sdkSession.agentId,
-              message: cursorCloudNotice(openInput.cloudEnvironment, prepared),
-            });
-          }
           return next;
         });
 
@@ -3320,11 +3287,6 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               status: "active",
               updatedAt: startedAt,
             });
-            const cloudNotice = yield* Ref.get(pendingCloudNotice);
-            if (cloudNotice?.agentId === agent.nativeThreadId) {
-              yield* Ref.set(pendingCloudNotice, null);
-              yield* emitCloudNotice(context, "cloud-dispatch", cloudNotice.message);
-            }
             for (const update of pendingUpdates) {
               yield* handleInteractionUpdate(context, update);
             }

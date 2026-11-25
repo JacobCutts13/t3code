@@ -9,7 +9,6 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildProviderInstanceOverridePatch,
   cloudEnvironmentLabel,
-  repositoryKey,
   resolveRemoteOperateAccess,
   sortCloudEnvironmentsForProject,
 } from "./ProviderSettingsPanel.logic";
@@ -124,7 +123,6 @@ describe("project cloud environments", () => {
       "acme/support-app, acme/services",
       "acme/docs",
     ]);
-    expect(repositoryKey("git@github.com:Acme/Services.git")).toBe("github.com/acme/services");
   });
 });
 

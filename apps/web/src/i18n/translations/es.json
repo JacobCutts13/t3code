@@ -8399,7 +8399,6 @@
   "2a0148ea9068a814": "Puerto HTTPS",
   "7f4f2ba57d3d1c76": "Introduce un puerto del 1 al 65535.",
   "82af9c66caf2f40c": "Endpoint HTTPS",
-  "41686cb49d237c53": "{environment} (personal)",
   "f83a9540f9263cae": "Ejecutar localmente",
   "53f836f4f9972d10": "Entorno en la nube",
   "daa7ec02e6b378f5": "Los hilos de Cursor de este proyecto inician un agente de Cursor Cloud desde la rama publicada y abren una pull request.",

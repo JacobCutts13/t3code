@@ -1,4 +1,5 @@
 import type { SDKModel, SDKUser } from "@cursor/sdk";
+import type { ProviderCloudEnvironment } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
 import * as Config from "effect/Config";
 import * as Option from "effect/Option";
@@ -12,17 +13,10 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export interface CursorCloudEnvironment {
-  readonly id: string;
-  readonly name?: string;
-  readonly owner?: string;
-  readonly repos: ReadonlyArray<string>;
-}
-
 export interface CursorSdkCatalogSnapshot {
   readonly user: SDKUser | undefined;
   readonly models: ReadonlyArray<SDKModel>;
-  readonly environments: ReadonlyArray<CursorCloudEnvironment>;
+  readonly environments: ReadonlyArray<ProviderCloudEnvironment>;
 }
 
 export interface CursorSdkCatalogReadOptions {
@@ -71,7 +65,7 @@ export interface CursorSdkCatalogProbes {
   readonly readEnvironments?: (
     apiKey: string,
     teamId: number | undefined,
-  ) => Effect.Effect<ReadonlyArray<CursorCloudEnvironment>, CursorSdkCatalogError>;
+  ) => Effect.Effect<ReadonlyArray<ProviderCloudEnvironment>, CursorSdkCatalogError>;
 }
 
 const CatalogUser = Schema.Struct({
@@ -117,7 +111,6 @@ const CatalogEnvironments = Schema.Struct({
     Schema.Struct({
       id: Schema.String,
       name: Schema.optionalKey(Schema.NullOr(Schema.String)),
-      owner: Schema.optionalKey(Schema.String),
       repos: Schema.optionalKey(
         Schema.Array(Schema.Union([Schema.String, Schema.Struct({ url: Schema.String })])),
       ),
@@ -198,7 +191,7 @@ const makeLiveProbes = Effect.gen(function* () {
       ),
     readEnvironments: Effect.fn("CursorSdkCatalog.readEnvironments")(
       function* (apiKey, teamId) {
-        const environments: Array<CursorCloudEnvironment> = [];
+        const environments: Array<ProviderCloudEnvironment> = [];
         let cursor: string | undefined;
         for (let page = 0; page < MAX_ENVIRONMENT_PAGES; page += 1) {
           const query = new URLSearchParams({ limit: "100", ...(cursor ? { cursor } : {}) });
@@ -206,12 +199,12 @@ const makeLiveProbes = Effect.gen(function* () {
             Effect.flatMap(HttpClientResponse.schemaBodyJson(CatalogEnvironments)),
           );
           for (const item of body.items) {
-            environments.push({
-              id: item.id,
-              ...(item.name ? { name: item.name } : {}),
-              ...(item.owner === undefined ? {} : { owner: item.owner }),
-              repos: (item.repos ?? []).map((repo) => (typeof repo === "string" ? repo : repo.url)),
-            });
+            const id = item.id.trim();
+            const name = item.name?.trim();
+            const repos = (item.repos ?? [])
+              .map((repo) => (typeof repo === "string" ? repo : repo.url).trim())
+              .filter((repo) => repo.length > 0);
+            if (id) environments.push({ id, ...(name ? { name } : {}), repos });
           }
           cursor = body.nextCursor ?? undefined;
           if (cursor === undefined) break;
@@ -235,19 +228,6 @@ export const makeCursorSdkCatalog = Effect.fn("CursorSdkCatalog.make")(function*
     timeToLive: (exit) =>
       Exit.isSuccess(exit) && exit.value.length > 0 ? Duration.minutes(30) : Duration.zero,
   });
-  const readEnvironments = probes.readEnvironments;
-  const environmentCache = yield* Cache.makeWith(
-    (key: string) => {
-      const { apiKey, teamId } = JSON.parse(key) as { apiKey: string; teamId?: number };
-      return readEnvironments === undefined
-        ? Effect.succeed<ReadonlyArray<CursorCloudEnvironment>>([])
-        : readEnvironments(apiKey, teamId);
-    },
-    {
-      capacity: 32,
-      timeToLive: (exit) => (Exit.isSuccess(exit) ? Duration.minutes(5) : Duration.zero),
-    },
-  );
   return CursorSdkCatalog.of({
     read: Effect.fn("CursorSdkCatalog.read")(function (apiKey, options) {
       return Effect.all(
@@ -261,13 +241,12 @@ export const makeCursorSdkCatalog = Effect.fn("CursorSdkCatalog.make")(function*
           ),
           models: Cache.get(modelCache, apiKey),
           // Environments only feed the cloud picker; their failure must not fail model discovery.
-          environments: Cache.get(
-            environmentCache,
-            JSON.stringify({ apiKey, teamId: options?.teamId }),
+          environments: (
+            probes.readEnvironments?.(apiKey, options?.teamId) ?? Effect.succeed([])
           ).pipe(
             Effect.catch((cause) =>
               Effect.logWarning("Could not list Cursor cloud environments.", cause).pipe(
-                Effect.as<ReadonlyArray<CursorCloudEnvironment>>([]),
+                Effect.as<ReadonlyArray<ProviderCloudEnvironment>>([]),
               ),
             ),
           ),

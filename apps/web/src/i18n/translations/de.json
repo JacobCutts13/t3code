@@ -8400,7 +8400,6 @@
   "2a0148ea9068a814": "HTTPS-Port",
   "7f4f2ba57d3d1c76": "Gib einen Port von 1 bis 65535 ein.",
   "82af9c66caf2f40c": "HTTPS-Endpunkt",
-  "41686cb49d237c53": "{environment} (persönlich)",
   "f83a9540f9263cae": "Lokal ausführen",
   "53f836f4f9972d10": "Cloud-Umgebung",
   "daa7ec02e6b378f5": "Cursor-Threads in diesem Projekt starten einen Cursor-Cloud-Agenten vom gepushten Branch und öffnen einen Pull Request.",

@@ -8407,7 +8407,6 @@
   "2a0148ea9068a814": "HTTPS port",
   "7f4f2ba57d3d1c76": "Enter a port from 1 to 65535.",
   "82af9c66caf2f40c": "HTTPS endpoint",
-  "41686cb49d237c53": "{environment} (personal)",
   "f83a9540f9263cae": "Run locally",
   "53f836f4f9972d10": "Cloud environment",
   "daa7ec02e6b378f5": "Cursor threads in this project start a Cursor Cloud agent from the pushed branch and open a pull request.",

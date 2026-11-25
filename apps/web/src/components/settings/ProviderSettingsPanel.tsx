@@ -25,7 +25,7 @@ import {
   PROVIDER_DISPLAY_NAMES,
   ProviderDriverKind,
   type ProjectId,
-  type ProviderCloudEnvironmentSelection,
+  type ProviderCloudEnvironment,
   type ProviderInstanceConfig,
   type ProviderInstanceId,
   type ServerProvider,
@@ -1338,7 +1338,7 @@ function ProviderInstanceRow({
   readonly projectOverrideValue: boolean | undefined;
   readonly projectOverrideEffectiveEnabled: boolean;
   readonly projectId: ProjectId | undefined;
-  readonly projectCloudEnvironment: ProviderCloudEnvironmentSelection | undefined;
+  readonly projectCloudEnvironment: ProviderCloudEnvironment | undefined;
   readonly modelPreferences:
     | { readonly hiddenModels: ReadonlyArray<string>; readonly modelOrder: ReadonlyArray<string> }
     | undefined;
@@ -1389,6 +1389,15 @@ function ProviderInstanceRow({
       : allProjects.find(
           (candidate) => candidate.id === projectId && candidate.environmentId === environmentId,
         );
+  const withCloudEnvironment = (setup: ReactNode) =>
+    cloudEnvironmentRow === null ? (
+      setup
+    ) : (
+      <>
+        {setup}
+        {cloudEnvironmentRow}
+      </>
+    );
   const cloudEnvironmentRow =
     mode === "editor" && driver === "cursor" && liveProvider?.cloudEnvironments !== undefined ? (
       <CursorCloudEnvironmentRow
@@ -1398,65 +1407,6 @@ function ProviderInstanceRow({
         hasProject={showProjectOverride}
         readOnly={readOnly || !canWriteSettings}
         onChange={(next) => actions.writeProjectOverride(instanceId, { cloudEnvironment: next })}
-      />
-    ) : null;
-  const setupSection =
-    mode === "editor" && driver === "antigravity" ? (
-      <ProviderSetupSection
-        environmentId={environmentId}
-        environmentLabel={environmentLabel}
-        instanceId={instanceId}
-        provider={liveProvider}
-        binaryPath={configuredBinaryPath(instance.config)}
-        authMethod={readAntigravityAuthMethod(instance.config)}
-        enabled={resolveProviderInstanceEnabled(instance)}
-        readOnly={readOnly}
-        onEnable={() => actions.enableInstance(instanceId, { ...instance, enabled: true })}
-      />
-    ) : mode === "editor" && codexSetupMode === "managed" ? (
-      <CodexSetupSection
-        environmentId={environmentId}
-        instanceId={instanceId}
-        provider={liveProvider}
-        mode={codexSetupMode}
-        enabled={resolveProviderInstanceEnabled(instance)}
-        readOnly={readOnly}
-        onModeChange={(setupMode) =>
-          actions.enableInstance(instanceId, {
-            ...instance,
-            enabled: true,
-            config: {
-              ...(instance.config !== null && typeof instance.config === "object"
-                ? instance.config
-                : {}),
-              enabled: true,
-              setupMode,
-            },
-          })
-        }
-      />
-    ) : mode === "editor" &&
-      !readOnly &&
-      liveProvider &&
-      (liveProvider.setup?.canAuthenticate ||
-        (liveProvider.driver === "acpRegistry" && liveProvider.installed)) ? (
-      <ProviderAuthenticationSection
-        key={`${environmentId}:${instanceId}`}
-        environmentId={environmentId}
-        environmentLabel={environmentLabel}
-        instanceId={instanceId}
-        provider={liveProvider}
-        readOnly={readOnly}
-      />
-    ) : mode === "editor" &&
-      !readOnly &&
-      driver === "cursor" &&
-      liveProvider?.setup?.canAuthenticate === false ? (
-      <SettingsRow
-        title={gt("Cursor account")}
-        description={gt(
-          "Using CURSOR_API_KEY. Remove it from this provider's environment to use browser sign-in.",
-        )}
       />
     ) : null;
   return (
@@ -1486,16 +1436,66 @@ function ProviderInstanceRow({
         ) : undefined
       }
       canWriteSettings={canWriteSettings}
-      setup={
-        cloudEnvironmentRow === null ? (
-          setupSection
-        ) : (
-          <>
-            {setupSection}
-            {cloudEnvironmentRow}
-          </>
-        )
-      }
+      setup={withCloudEnvironment(
+        mode === "editor" && driver === "antigravity" ? (
+          <ProviderSetupSection
+            environmentId={environmentId}
+            environmentLabel={environmentLabel}
+            instanceId={instanceId}
+            provider={liveProvider}
+            binaryPath={configuredBinaryPath(instance.config)}
+            authMethod={readAntigravityAuthMethod(instance.config)}
+            enabled={resolveProviderInstanceEnabled(instance)}
+            readOnly={readOnly}
+            onEnable={() => actions.enableInstance(instanceId, { ...instance, enabled: true })}
+          />
+        ) : mode === "editor" && codexSetupMode === "managed" ? (
+          <CodexSetupSection
+            environmentId={environmentId}
+            instanceId={instanceId}
+            provider={liveProvider}
+            mode={codexSetupMode}
+            enabled={resolveProviderInstanceEnabled(instance)}
+            readOnly={readOnly}
+            onModeChange={(setupMode) =>
+              actions.enableInstance(instanceId, {
+                ...instance,
+                enabled: true,
+                config: {
+                  ...(instance.config !== null && typeof instance.config === "object"
+                    ? instance.config
+                    : {}),
+                  enabled: true,
+                  setupMode,
+                },
+              })
+            }
+          />
+        ) : mode === "editor" &&
+          !readOnly &&
+          liveProvider &&
+          (liveProvider.setup?.canAuthenticate ||
+            (liveProvider.driver === "acpRegistry" && liveProvider.installed)) ? (
+          <ProviderAuthenticationSection
+            key={`${environmentId}:${instanceId}`}
+            environmentId={environmentId}
+            environmentLabel={environmentLabel}
+            instanceId={instanceId}
+            provider={liveProvider}
+            readOnly={readOnly}
+          />
+        ) : mode === "editor" &&
+          !readOnly &&
+          driver === "cursor" &&
+          liveProvider?.setup?.canAuthenticate === false ? (
+          <SettingsRow
+            title={gt("Cursor account")}
+            description={gt(
+              "Using CURSOR_API_KEY. Remove it from this provider's environment to use browser sign-in.",
+            )}
+          />
+        ) : null,
+      )}
       onUpdate={(next) => actions.updateInstance(instanceId, instance, next)}
       onDelete={
         mode === "editor" && !isDefault

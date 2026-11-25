@@ -170,17 +170,17 @@ describe("CursorSdkCatalog", () => {
       );
 
       expect((yield* catalog.read("test-key", { teamId: 3512493 })).environments).toEqual([
-        { id: "env-1", owner: "team", repos: ["https://github.com/acme/api"] },
+        { id: "env-1", repos: ["https://github.com/acme/api"] },
         { id: "env-2", name: "Web", repos: ["https://github.com/acme/web"] },
       ]);
       expect(environmentRequests.map((request) => request.team)).toEqual(["3512493", "3512493"]);
       expect(new URL(environmentRequests[1]!.url).searchParams.get("cursor")).toBe("page-2");
 
-      // Another team's list is its own cache entry, and its failure leaves model discovery intact.
+      // A failed environment listing leaves model discovery intact.
       failEnvironments = true;
-      const otherTeam = yield* catalog.read("test-key", { teamId: 7 });
-      expect(otherTeam.environments).toEqual([]);
-      expect(otherTeam.models).toEqual([model]);
+      const failed = yield* catalog.read("test-key", { teamId: 3512493 });
+      expect(failed.environments).toEqual([]);
+      expect(failed.models).toEqual([model]);
     }),
   );
 

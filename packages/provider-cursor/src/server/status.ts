@@ -4,7 +4,6 @@ import type {
   ModelCapabilities,
   ProviderOptionDescriptor,
   ServerProviderAuth,
-  ServerProviderCloudEnvironment,
   ServerProviderModel,
   ServerProviderState,
 } from "@t3tools/contracts";
@@ -370,24 +369,5 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       ? { discoveryWarning: "Cursor SDK model discovery returned no built-in models." }
       : {}),
   });
-  return { ...draft, cloudEnvironments: cursorCloudEnvironments(snapshot.environments) };
+  return { ...draft, cloudEnvironments: snapshot.environments };
 });
-
-function cursorCloudEnvironments(
-  environments: ReadonlyArray<CursorSdkCatalog.CursorCloudEnvironment>,
-): ReadonlyArray<ServerProviderCloudEnvironment> {
-  return environments.flatMap((environment) => {
-    const id = environment.id.trim();
-    if (!id) return [];
-    const name = environment.name?.trim();
-    const owner = environment.owner?.trim();
-    return [
-      {
-        id,
-        ...(name ? { name } : {}),
-        ...(owner ? { owner } : {}),
-        repos: environment.repos.map((repo) => repo.trim()).filter((repo) => repo.length > 0),
-      },
-    ];
-  });
-}

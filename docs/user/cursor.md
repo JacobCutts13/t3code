@@ -22,14 +22,14 @@ project's repository are listed first; **Run locally** removes the mapping. The 
 instance's existing sign-in and the team your Cursor CLI is signed in to.
 
 Each new Cursor thread in a mapped project starts a cloud agent with the environment's repositories
-and opens a pull request when it finishes. The thread shows where it runs and links the pull
-request. Follow-up messages continue the same cloud agent, including subagent and scheduled-task
-threads in that project.
+and opens a pull request when it finishes; the thread links it. Every Cursor thread in that project
+runs this way, including subagent and scheduled-task threads, and follow-up messages continue the
+same cloud agent.
 
 - If the project's own repository is in the environment, the agent starts from your current branch.
   T3 Code pushes that branch first when the remote lacks your commits, and stops with git's error
-  if the push fails. Uncommitted changes are not included, and the thread says how many were left
-  behind. Other repositories start from their default branch.
+  if the push fails. Uncommitted changes are not included. Other repositories start from their
+  default branch.
 - Cursor must be able to clone every repository in the environment. When it refuses one, the thread
   shows Cursor's reason, such as a repository its GitHub integration cannot reach.
 - Work happens on the VM, so the thread's diff and checkpoints show no local changes. Review the

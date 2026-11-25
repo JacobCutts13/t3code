@@ -8405,7 +8405,6 @@
   "2a0148ea9068a814": "HTTPS-port",
   "7f4f2ba57d3d1c76": "Ange en port mellan 1 och 65535.",
   "82af9c66caf2f40c": "HTTPS-slutpunkt",
-  "41686cb49d237c53": "{environment} (personlig)",
   "f83a9540f9263cae": "Kör lokalt",
   "53f836f4f9972d10": "Molnmiljö",
   "daa7ec02e6b378f5": "Cursor-trådar i det här projektet startar en Cursor Cloud-agent från den pushade grenen och öppnar en pull request.",
