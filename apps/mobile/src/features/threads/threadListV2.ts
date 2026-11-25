@@ -36,6 +36,7 @@ import {
 import {
   buildThreadTree,
   flattenThreadTree,
+  isSettledThreadListRow,
   isThreadTreeRow,
   sortThreadTreeRoots,
   type ThreadTree,
@@ -386,19 +387,15 @@ export function getThreadListV2OrderedSection(input: {
   readonly snoozeEnvironmentIds?: ReadonlySet<EnvironmentId>;
   readonly queuedThreadKeys?: ReadonlySet<string>;
 }): EnvironmentThreadShell[] {
-  const queuedThreadKeys = input.queuedThreadKeys?.size ? input.queuedThreadKeys : undefined;
+  const isSettled = (thread: EnvironmentThreadShell) =>
+    isSettledThreadListRow(thread, input.settlementEnvironmentIds, input.queuedThreadKeys);
   // Nested children follow their parent, so only roots take a place in manual order.
   const tree = buildThreadTree(
     input.threads.filter((thread) => thread.archivedAt === null && isThreadTreeRow(thread)),
+    isSettled,
   );
   const threads = tree.roots.filter((thread) => {
-    if (
-      (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
-      thread.settledOverride === "settled" &&
-      queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true
-    ) {
-      return false;
-    }
+    if (isSettled(thread)) return false;
     if (
       (input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true) &&
       effectiveSnoozed(thread, { now: input.now })
@@ -799,7 +796,6 @@ export function buildThreadListV2Items(input: {
   const settled: EnvironmentThreadShell[] = [];
   const snoozed: EnvironmentThreadShell[] = [];
   let nextSnoozeWakeAt: string | null = null;
-  const queuedThreadKeys = input.queuedThreadKeys?.size ? input.queuedThreadKeys : undefined;
   const listedThreads = input.threads.filter(
     (thread) =>
       thread.archivedAt === null &&
@@ -824,14 +820,12 @@ export function buildThreadListV2Items(input: {
   const contentOnlyThreadKeys = new Set<string>();
   // Search lists matches flat; otherwise children render under their parent, so only roots
   // are placed in sections and sorted.
-  const tree = buildThreadTree(listedThreads);
   const isSnoozedRow = (thread: EnvironmentThreadShell) =>
     (input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true) &&
     effectiveSnoozed(thread, { now });
   const isSettledRow = (thread: EnvironmentThreadShell) =>
-    (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
-    thread.settledOverride === "settled" &&
-    queuedThreadKeys?.has(`${thread.environmentId}:${thread.id}`) !== true;
+    isSettledThreadListRow(thread, input.settlementEnvironmentIds, input.queuedThreadKeys);
+  const tree = buildThreadTree(listedThreads, isSettledRow);
   for (const thread of rankedMatches === null ? tree.roots : listedThreads) {
     if (matchingThreads !== null && !matchingThreads.has(thread)) {
       const key = threadSearchMatchKey({

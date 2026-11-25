@@ -22,6 +22,29 @@ vi.mock("../../state/threads", async () => {
   };
 });
 
+vi.mock("../../state/preferences", async () => {
+  const { AsyncResult, Atom: ReactivityAtom } = await import("effect/reactivity");
+  return {
+    mobilePreferencesAtom: ReactivityAtom.make(
+      AsyncResult.success({ collapsedThreadChildren: ["env-1:thread-parent"] }),
+    ),
+  };
+});
+
+vi.mock("../../state/presentation", async () => {
+  const { Atom: ReactivityAtom } = await import("effect/reactivity");
+  return {
+    threadListEnvironmentsAtom: ReactivityAtom.make({
+      settlementEnvironmentIds: new Set([EnvironmentId.make("env-1")]),
+    }),
+  };
+});
+
+vi.mock("../../state/use-thread-outbox", async () => {
+  const { Atom: ReactivityAtom } = await import("effect/reactivity");
+  return { queuedThreadKeysAtom: ReactivityAtom.make(new Set<string>()) };
+});
+
 const quietThreadShellsAtom = environmentThreadShells.quietThreadShellsAtom as Atom.Writable<
   readonly EnvironmentThreadShell[]
 >;
@@ -85,8 +108,12 @@ describe("useSidebarRowThreadKey", () => {
     expect(seen).toEqual([null, parentKey]);
 
     await setShells([
-      { ...parentThread, archivedAt: "2026-01-02T00:00:00.000Z" },
-      childThread,
+      parentThread,
+      {
+        ...childThread,
+        settledOverride: "settled",
+        settledAt: "2026-01-02T00:00:00.000Z",
+      },
       otherThread("v3"),
     ]);
     expect(seen).toEqual([null, parentKey, childKey]);
